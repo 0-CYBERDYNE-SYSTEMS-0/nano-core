@@ -319,8 +319,25 @@ async function removeProfile(profileName: string): Promise<void> {
     throw new Error(`Profile not found: ${profileName}`);
   }
 
-  // Remove profile directory
-  fs.rmSync(profileDir, { recursive: true, force: true });
+  // Remove profile directory (workaround for rm blocking)
+  function removeRecursive(dir: string): void {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+    } catch (err) {
+      // Fallback: manual recursive delete
+      const stat = fs.statSync(dir);
+      if (stat.isDirectory()) {
+        const entries = fs.readdirSync(dir);
+        for (const entry of entries) {
+          removeRecursive(path.join(dir, entry));
+        }
+        fs.rmdirSync(dir);
+      } else {
+        fs.unlinkSync(dir);
+      }
+    }
+  }
+  removeRecursive(profileDir);
 
   // Remove from .env if it was active
   if (process.env.FFT_PROFILE === profileName) {
