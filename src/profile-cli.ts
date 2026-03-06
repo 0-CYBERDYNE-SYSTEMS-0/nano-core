@@ -417,23 +417,10 @@ async function main(): Promise<void> {
       return;
     }
 
-    // Legacy commands (set, apply)
-    if (!args.profile) {
-      throw new Error('Missing profile');
-    }
-
-    if (args.writeEnv) {
-      applyProfileToEnv(args.profile!, envPath);
-      console.log(`Updated ${envPath}`);
-    }
-
-    if (args.command === 'apply') {
-      if (args.profile === 'farm') {
-        console.log('Applied farm profile flags. Next: restart service to enable farm runtime paths.');
-      } else {
-        console.log('Applied core profile flags. Next: restart service to run core runtime paths.');
-      }
-      return;
+    // Legacy commands (set, apply) - DISABLED for now
+    // Use new activate/switch commands instead
+    if (args.command === 'set' || args.command === 'apply') {
+      throw new Error(`Legacy command "${args.command}" is deprecated. Use "activate" or "switch" instead.`);
     }
 
     console.log(`Set profile=${args.profile}${args.writeEnv ? ' (persisted in .env)' : ''}`);

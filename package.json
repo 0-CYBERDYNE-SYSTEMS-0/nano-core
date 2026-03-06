@@ -1,29 +1,36 @@
 {
-  "name": "fft_nano",
-  "version": "1.1.0",
-  "description": "FFT_nano — secure, containerized OpenClaw-style personal AI assistant host.",
+  "name": "ff-nano",
+  "version": "0.1.0",
+  "description": "Agnostic AI agent runtime with capability profiles",
   "private": true,
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano.git"
+    "url": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git"
   },
   "bugs": {
-    "url": "https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano/issues"
+    "url": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core/issues"
   },
-  "homepage": "https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano#readme",
+  "homepage": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core#readme",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "fft": "./bin/fft.js",
-    "fft-nano": "./bin/fft.js"
+    "ff-nano": "./bin/fft.js",
+    "fft": "./bin/fft.js"
   },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "test": "node --import tsx --test $(find tests container/agent-runner/src -type f -name '*.test.ts' | tr '\\n' ' ')",
+    "ff-nano": "node ./bin/fft.js",
     "fft": "node ./bin/fft.js",
+    "profile": "tsx src/profile-cli.ts",
+    "profile:install": "tsx src/profile-cli.ts install",
+    "profile:list": "tsx src/profile-cli.ts list",
+    "profile:activate": "tsx src/profile-cli.ts activate",
+    "profile:switch": "tsx src/profile-cli.ts switch",
+    "profile:remove": "tsx src/profile-cli.ts remove",
     "web:install": "npm --prefix web/control-center ci",
     "web:build": "npm --prefix web/control-center run build",
     "web:dev": "npm --prefix web/control-center run dev",
@@ -33,7 +40,6 @@
     "tui:client:dev": "tsx src/tui/client.ts",
     "onboard": "tsx src/onboard-cli.ts",
     "onboard:full": "bash scripts/onboard-all.sh",
-    "profile": "tsx src/profile-cli.ts",
     "backup:state": "bash scripts/backup-state.sh",
     "restore:state": "bash scripts/restore-state.sh",
     "auth": "tsx src/whatsapp-auth.ts",
