@@ -1,11 +1,37 @@
 import os from 'os';
 import path from 'path';
+import fs from 'fs';
 import { PARITY_CONFIG, PARITY_CONFIG_PATH } from './parity-config.js';
 import { FEATURE_FARM, FFT_PROFILE, PROFILE_DETECTION } from './profile.js';
+import {
+  getProfileDir,
+  getProfileManifest,
+  type ProfileManifest
+} from './profile-storage.js';
 
 const DEFAULT_ASSISTANT_NAME = FFT_PROFILE === 'farm' ? 'FarmFriend' : 'OpenClaw';
 
-export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || DEFAULT_ASSISTANT_NAME;
+/**
+ * Load profile-specific configuration
+ * Merges profile env vars from PROFILE.json with existing environment
+ */
+function loadProfileConfig(profileName: string): Record<string, string> {
+  const manifest = getProfileManifest(profileName);
+  if (!manifest?.config?.envVars) {
+    return {};
+  }
+
+  console.log(`[Config] Loading profile config: ${profileName}`);
+  return manifest.config.envVars;
+}
+
+/**
+ * Merge profile config with process.env
+ * Profile config takes precedence over process.env for profile-specific vars
+ */
+const PROFILE_CONFIG = FFT_PROFILE ? loadProfileConfig(FFT_PROFILE) : {};
+
+export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || PROFILE_CONFIG.ASSISTANT_NAME || DEFAULT_ASSISTANT_NAME;
 export const POLL_INTERVAL = 2000;
 export const SCHEDULER_POLL_INTERVAL = 60000;
 export const SCHEDULER_MODE =
@@ -40,7 +66,7 @@ export const MAIN_WORKSPACE_DIR = path.resolve(
   expandHomePath(process.env.FFT_NANO_MAIN_WORKSPACE_DIR || '~/nano'),
 );
 export const FARM_STATE_ENABLED =
-  FEATURE_FARM && envFlag(process.env.FARM_STATE_ENABLED, FFT_PROFILE === 'farm');
+  FEATURE_FARM && envFlag(process.env.FARM_STATE_ENABLED || PROFILE_CONFIG.FARM_STATE_ENABLED, FFT_PROFILE === 'farm');
 export const FARM_MODE = (process.env.FARM_MODE || 'demo').trim().toLowerCase();
 export const FARM_STATE_DIR = path.resolve(DATA_DIR, 'farm-state');
 export const FARM_PROFILE_PATH = path.resolve(
@@ -226,3 +252,16 @@ export const TIMEZONE =
 
 export { PARITY_CONFIG, PARITY_CONFIG_PATH };
 export { FEATURE_FARM, FFT_PROFILE, PROFILE_DETECTION };
+
+/**
+ * Get startup hooks for active profile
+ * Returns array of file paths relative to profile directory
+ */
+export function getStartupHooks(): string[] {
+  if (!FFT_PROFILE) {
+    return [];
+  }
+
+  const manifest = getProfileManifest(FFT_PROFILE);
+  return manifest?.config?.startupHooks || [];
+}
