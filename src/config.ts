@@ -2,11 +2,9 @@ import os from 'os';
 import path from 'path';
 import fs from 'fs';
 import { PARITY_CONFIG, PARITY_CONFIG_PATH } from './parity-config.js';
-import { FEATURE_FARM, FFT_PROFILE, PROFILE_DETECTION } from './profile.js';
+import { FFT_PROFILE, PROFILE_DETECTION } from './profile.js';
 import {
-  getProfileDir,
   getProfileManifest,
-  type ProfileManifest
 } from './profile-storage.js';
 
 const DEFAULT_ASSISTANT_NAME = FFT_PROFILE === 'farm' ? 'FarmFriend' : 'OpenClaw';
@@ -65,38 +63,6 @@ export const MAIN_GROUP_FOLDER = 'main';
 export const MAIN_WORKSPACE_DIR = path.resolve(
   expandHomePath(process.env.FFT_NANO_MAIN_WORKSPACE_DIR || '~/nano'),
 );
-export const FARM_STATE_ENABLED =
-  FEATURE_FARM && envFlag(process.env.FARM_STATE_ENABLED || PROFILE_CONFIG.FARM_STATE_ENABLED, FFT_PROFILE === 'farm');
-export const FARM_MODE = (process.env.FARM_MODE || 'demo').trim().toLowerCase();
-export const FARM_STATE_DIR = path.resolve(DATA_DIR, 'farm-state');
-export const FARM_PROFILE_PATH = path.resolve(
-  expandHomePath(process.env.FARM_PROFILE_PATH || path.join(DATA_DIR, 'farm-profile.json')),
-);
-export const FARM_STATE_FAST_MS = envInt(
-  process.env.FARM_STATE_FAST_MS,
-  15000,
-  5000,
-  60000,
-);
-export const FARM_STATE_MEDIUM_MS = envInt(
-  process.env.FARM_STATE_MEDIUM_MS,
-  120000,
-  30000,
-  600000,
-);
-export const FARM_STATE_SLOW_MS = envInt(
-  process.env.FARM_STATE_SLOW_MS,
-  900000,
-  300000,
-  3600000,
-);
-export const HA_URL = process.env.HA_URL || 'http://localhost:8123';
-export const HA_URL_CANDIDATES = parseHaUrlCandidates(
-  HA_URL,
-  process.env.HA_URL_CANDIDATES,
-);
-export const HA_TOKEN = process.env.HA_TOKEN || '';
-export const FFT_DASHBOARD_REPO_PATH = process.env.FFT_DASHBOARD_REPO_PATH || '';
 
 export const CONTAINER_IMAGE =
   process.env.CONTAINER_IMAGE || 'fft-nano-agent:latest';
@@ -251,7 +217,7 @@ export const TIMEZONE =
   process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 export { PARITY_CONFIG, PARITY_CONFIG_PATH };
-export { FEATURE_FARM, FFT_PROFILE, PROFILE_DETECTION };
+export { FFT_PROFILE, PROFILE_DETECTION };
 
 /**
  * Get startup hooks for active profile
