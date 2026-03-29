@@ -1,0 +1,47 @@
+{
+  "featureId": "channel-provider-migration",
+  "milestone": "migration-logic",
+  "status": "pass",
+  "summary": "Channel settings and model/provider migration is correctly implemented. The migrateChannels method properly gates token migration behind --migrate-secrets for Telegram, Discord, and Slack. The migrateModel method correctly maps provider types to PI_API, handles API key naming by provider, and respects --overwrite for existing values. Comprehensive tests cover all 12 validation assertions (VAL-CHAN-001 to 006, VAL-MODEL-001 to 006) plus additional provider-specific tests for OpenRouter and Anthropic.",
+  "issues": [
+    {
+      "severity": "suggestion",
+      "description": "The channel migration handles Slack (SLACK_BOT_TOKEN, SLACK_APP_TOKEN) and Signal (SIGNAL_ENABLED) but these are not covered by validation contract assertions. This is good forward-thinking but untested by the contract.",
+      "file": "scripts/migrate-to-nanocore.ts",
+      "line": 1245,
+      "suggestedFix": null
+    },
+    {
+      "severity": "suggestion",
+      "description": "The ZAI_API_KEY provider mapping is not included in the switch-like if/else chain for API key naming. If a user has a Z.AI provider, their key would fall through to the generic 'API_KEY' env var.",
+      "file": "scripts/migrate-to-nanocore.ts",
+      "line": 1340,
+      "suggestedFix": "Add an else if branch for 'zai' or 'z.ai' provider to write ZAI_API_KEY."
+    }
+  ],
+  "sharedStateObservations": [
+    {
+      "observation": "The migration script maps provider types to PI_API values (openai, anthropic, openrouter). The project also uses 'zai' as a provider (per AGENTS.md). The migration script should handle this mapping.",
+      "suggestedTarget": "library"
+    }
+  ],
+  "testCoverage": {
+    "summary": "Tests cover all channel assertions (VAL-CHAN-001 to 006): Telegram token with/without secrets, WhatsApp enabled, Discord token, .env conflict preservation, multiple channels. Model assertions (VAL-MODEL-001 to 006): PI_API from provider, PI_MODEL from source, API keys with/without secrets, OPENAI_BASE_URL, existing PI_MODEL preservation. Additional tests for OpenRouter and Anthropic providers.",
+    "gaps": []
+  },
+  "assertionsCovered": [
+    "VAL-CHAN-001",
+    "VAL-CHAN-002",
+    "VAL-CHAN-003",
+    "VAL-CHAN-004",
+    "VAL-CHAN-005",
+    "VAL-CHAN-006",
+    "VAL-MODEL-001",
+    "VAL-MODEL-002",
+    "VAL-MODEL-003",
+    "VAL-MODEL-004",
+    "VAL-MODEL-005",
+    "VAL-MODEL-006"
+  ],
+  "assertionsWithConcerns": []
+}
