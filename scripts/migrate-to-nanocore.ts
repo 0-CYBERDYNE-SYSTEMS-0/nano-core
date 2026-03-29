@@ -1370,6 +1370,7 @@ ${this.config.agentPersonality}
             updatedKeys.add(key);
           } else {
             newLines.push(line); // Keep existing
+            updatedKeys.add(key); // Track so we don't add it again as duplicate
           }
         } else {
           newLines.push(line);
