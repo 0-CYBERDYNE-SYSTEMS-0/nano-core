@@ -1,0 +1,32 @@
+{
+  "flowId": "cross-area-flows",
+  "assertions": [
+    {
+      "id": "VAL-CROSS-003",
+      "status": "pass",
+      "evidence": [
+        "First run: 6 items migrated (soul, memory, user, agents, tools, env-channels). MEMORY.md has 3 entries, USER.md has 1 entry, .env has TELEGRAM_BOT_TOKEN and WHATSAPP_ENABLED.",
+        "Second run (no --overwrite): MEMORY.md shows 'All memory entries already present (3 duplicates)' — skipped, no new entries added. USER.md shows 'All user entries already present (1 duplicates)' — skipped, no new entries added.",
+        "After second run, MEMORY.md content is identical to first run (3 entries, no duplicates). USER.md content is identical (1 entry). .env has no duplicate keys (1 TELEGRAM_BOT_TOKEN, 1 WHATSAPP_ENABLED, 2 total lines).",
+        "Second run report shows 3 conflicts (soul, agents, tools — target files exist) and 9 skipped items, with 0 errors. Idempotent behavior confirmed."
+      ],
+      "frictions": [],
+      "blockers": []
+    },
+    {
+      "id": "VAL-CROSS-004",
+      "status": "pass",
+      "evidence": [
+        "OpenClaw: exit 0, 6 migrated. Target files: SOUL.md, MEMORY.md, USER.md, AGENTS.md, TOOLS.md. .env created. report.json valid with all required fields (timestamp, mode, sourceRoot, targetRoot, summary, items).",
+        "Clawdbot: exit 0, 6 migrated. Target files: SOUL.md, MEMORY.md, USER.md, AGENTS.md, TOOLS.md. .env created. report.json valid with all required fields.",
+        "Moltbot: exit 0, 7 migrated (including PRINCIPLES.md). Target files: SOUL.md, MEMORY.md, USER.md, AGENTS.md, TOOLS.md, PRINCIPLES.md. .env created. report.json valid with all required fields.",
+        "Hermes: exit 0, 7 migrated. Target files: SOUL.md, MEMORY.md, USER.md, AGENTS.md, TOOLS.md. .env created. report.json valid with all required fields.",
+        "All 4 source types produce valid, parseable target files with no errors."
+      ],
+      "frictions": [],
+      "blockers": []
+    }
+  ],
+  "toolsUsed": ["shell (direct CLI invocation)"],
+  "duration": 45
+}
