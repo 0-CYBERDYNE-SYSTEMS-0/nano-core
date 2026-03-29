@@ -970,6 +970,683 @@ channels:
     });
   });
 
+  describe('Channel settings migration (VAL-CHAN-001 to 006)', () => {
+    test('Telegram bot token is written to .env with --migrate-secrets', async () => {
+      const testHomeDir = path.join(tempDir, 'test-chan-secrets-home');
+      const testTargetDir = path.join(tempDir, 'test-chan-secrets-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with Telegram token
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          channels: {
+            telegram: {
+              enabled: true,
+              botToken: '123456789:ABCdefGHIjklMNOpqrsTUVwxyz',
+              allowedUsers: ['12345678'],
+            },
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script with --migrate-secrets
+      const outputDir = path.join(tempDir, 'report-chan-secrets');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --migrate-secrets --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env contains TELEGRAM_BOT_TOKEN
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes(
+          'TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz',
+        ),
+        '.env should contain TELEGRAM_BOT_TOKEN',
+      );
+      assert.ok(
+        envContent.includes('TELEGRAM_MAIN_CHAT_ID=12345678'),
+        '.env should contain TELEGRAM_MAIN_CHAT_ID',
+      );
+    });
+
+    test('Telegram bot token is NOT written without --migrate-secrets', async () => {
+      const testHomeDir = path.join(tempDir, 'test-chan-no-secrets-home');
+      const testTargetDir = path.join(tempDir, 'test-chan-no-secrets-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with Telegram token
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          channels: {
+            telegram: {
+              enabled: true,
+              botToken: '123456789:ABCdefGHIjklMNOpqrsTUVwxyz',
+              allowedUsers: ['12345678'],
+            },
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script WITHOUT --migrate-secrets
+      const outputDir = path.join(tempDir, 'report-chan-no-secrets');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env does NOT contain TELEGRAM_BOT_TOKEN
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        !envContent.includes('TELEGRAM_BOT_TOKEN'),
+        '.env should NOT contain TELEGRAM_BOT_TOKEN without --migrate-secrets',
+      );
+      // But TELEGRAM_MAIN_CHAT_ID should still be set (not a secret)
+      assert.ok(
+        envContent.includes('TELEGRAM_MAIN_CHAT_ID=12345678'),
+        '.env should still contain TELEGRAM_MAIN_CHAT_ID (not a secret)',
+      );
+
+      // Verify report shows skipped secrets
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      const secretsItem = report.items.find(
+        (i: { id: string }) => i.id === 'channels-secrets',
+      );
+      assert.ok(secretsItem, 'Should have channels-secrets item in report');
+      assert.ok(
+        secretsItem.reason.includes('migrate-secrets'),
+        'Skip reason should mention --migrate-secrets',
+      );
+    });
+
+    test('WHATSAPP_ENABLED=1 is written when source has WhatsApp enabled', async () => {
+      const testHomeDir = path.join(tempDir, 'test-chan-wa-home');
+      const testTargetDir = path.join(tempDir, 'test-chan-wa-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with WhatsApp enabled
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          channels: {
+            whatsapp: {
+              enabled: true,
+            },
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-chan-wa');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env contains WHATSAPP_ENABLED=1
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes('WHATSAPP_ENABLED=1'),
+        '.env should contain WHATSAPP_ENABLED=1',
+      );
+    });
+
+    test('Discord bot token is written with --migrate-secrets', async () => {
+      const testHomeDir = path.join(tempDir, 'test-chan-discord-home');
+      const testTargetDir = path.join(tempDir, 'test-chan-discord-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with Discord token
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          channels: {
+            discord: {
+              enabled: true,
+              botToken: 'discord-bot-token-test-12345',
+            },
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script with --migrate-secrets
+      const outputDir = path.join(tempDir, 'report-chan-discord');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --migrate-secrets --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env contains DISCORD_BOT_TOKEN
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes('DISCORD_BOT_TOKEN=discord-bot-token-test-12345'),
+        '.env should contain DISCORD_BOT_TOKEN',
+      );
+    });
+
+    test('Existing .env values are preserved on conflict without --overwrite', async () => {
+      const testHomeDir = path.join(tempDir, 'test-chan-conflict-home');
+      const testTargetDir = path.join(tempDir, 'test-chan-conflict-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create existing .env with TELEGRAM_BOT_TOKEN
+      const envPath = path.join(testTargetDir, '.env');
+      await fs.writeFile(
+        envPath,
+        'TELEGRAM_BOT_TOKEN=existing-token-value\nEXISTING_VAR=keep-me',
+        'utf-8',
+      );
+
+      // Create source config with different Telegram token
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          channels: {
+            telegram: {
+              enabled: true,
+              botToken: 'new-token-from-source',
+              allowedUsers: ['99999999'],
+            },
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script with --migrate-secrets but without --overwrite
+      const outputDir = path.join(tempDir, 'report-chan-conflict');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --migrate-secrets --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify existing TELEGRAM_BOT_TOKEN was preserved
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes('TELEGRAM_BOT_TOKEN=existing-token-value'),
+        'Existing TELEGRAM_BOT_TOKEN should be preserved',
+      );
+      assert.ok(
+        envContent.includes('EXISTING_VAR=keep-me'),
+        'Other existing vars should be preserved',
+      );
+      // TELEGRAM_MAIN_CHAT_ID should be added (new key)
+      assert.ok(
+        envContent.includes('TELEGRAM_MAIN_CHAT_ID=99999999'),
+        'New TELEGRAM_MAIN_CHAT_ID should be added',
+      );
+    });
+
+    test('Multiple channels from same source are migrated', async () => {
+      const testHomeDir = path.join(tempDir, 'test-chan-multi-home');
+      const testTargetDir = path.join(tempDir, 'test-chan-multi-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with multiple channels
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          channels: {
+            telegram: {
+              enabled: true,
+              botToken: 'telegram-token-123',
+              allowedUsers: ['11111111'],
+            },
+            whatsapp: {
+              enabled: true,
+            },
+            discord: {
+              enabled: true,
+              botToken: 'discord-token-456',
+            },
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script with --migrate-secrets
+      const outputDir = path.join(tempDir, 'report-chan-multi');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --migrate-secrets --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env contains all channel settings
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes('TELEGRAM_BOT_TOKEN=telegram-token-123'),
+        '.env should contain TELEGRAM_BOT_TOKEN',
+      );
+      assert.ok(
+        envContent.includes('WHATSAPP_ENABLED=1'),
+        '.env should contain WHATSAPP_ENABLED',
+      );
+      assert.ok(
+        envContent.includes('DISCORD_BOT_TOKEN=discord-token-456'),
+        '.env should contain DISCORD_BOT_TOKEN',
+      );
+    });
+  });
+
+  describe('Model/Provider migration (VAL-MODEL-001 to 006)', () => {
+    test('PI_API is set correctly based on source provider type', async () => {
+      const testHomeDir = path.join(tempDir, 'test-model-api-home');
+      const testTargetDir = path.join(tempDir, 'test-model-api-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with OpenAI provider
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          model: {
+            provider: 'openai',
+            model: 'gpt-4',
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-model-api');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env contains PI_API=openai
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes('PI_API=openai'),
+        '.env should contain PI_API=openai',
+      );
+    });
+
+    test('PI_MODEL is set from source default model', async () => {
+      const testHomeDir = path.join(tempDir, 'test-model-name-home');
+      const testTargetDir = path.join(tempDir, 'test-model-name-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with specific model
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          model: {
+            provider: 'openai',
+            model: 'gpt-4-turbo-preview',
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-model-name');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env contains PI_MODEL
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes('PI_MODEL=gpt-4-turbo-preview'),
+        '.env should contain PI_MODEL=gpt-4-turbo-preview',
+      );
+    });
+
+    test('API keys are written to .env with --migrate-secrets', async () => {
+      const testHomeDir = path.join(tempDir, 'test-model-key-home');
+      const testTargetDir = path.join(tempDir, 'test-model-key-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with API key
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          model: {
+            provider: 'openai',
+            model: 'gpt-4',
+            apiKey: 'sk-test-api-key-12345',
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script with --migrate-secrets
+      const outputDir = path.join(tempDir, 'report-model-key');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --migrate-secrets --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env contains OPENAI_API_KEY
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes('OPENAI_API_KEY=sk-test-api-key-12345'),
+        '.env should contain OPENAI_API_KEY',
+      );
+    });
+
+    test('API keys are NOT written without --migrate-secrets', async () => {
+      const testHomeDir = path.join(tempDir, 'test-model-nokey-home');
+      const testTargetDir = path.join(tempDir, 'test-model-nokey-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with API key
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          model: {
+            provider: 'openai',
+            model: 'gpt-4',
+            apiKey: 'sk-test-api-key-12345',
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script WITHOUT --migrate-secrets
+      const outputDir = path.join(tempDir, 'report-model-nokey');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env does NOT contain API key
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        !envContent.includes('OPENAI_API_KEY'),
+        '.env should NOT contain OPENAI_API_KEY without --migrate-secrets',
+      );
+      assert.ok(
+        !envContent.includes('sk-test-api-key-12345'),
+        '.env should NOT contain the API key value',
+      );
+
+      // Verify report shows skipped secrets
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      const secretsItem = report.items.find(
+        (i: { id: string }) => i.id === 'model-secrets',
+      );
+      assert.ok(secretsItem, 'Should have model-secrets item in report');
+      assert.ok(
+        secretsItem.reason.includes('migrate-secrets'),
+        'Skip reason should mention --migrate-secrets',
+      );
+    });
+
+    test('OPENAI_BASE_URL is set for custom endpoints', async () => {
+      const testHomeDir = path.join(tempDir, 'test-model-baseurl-home');
+      const testTargetDir = path.join(tempDir, 'test-model-baseurl-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with custom base URL
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          model: {
+            provider: 'openai',
+            model: 'gpt-4',
+            baseUrl: 'https://custom-api.example.com/v1',
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-model-baseurl');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env contains OPENAI_BASE_URL
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes(
+          'OPENAI_BASE_URL=https://custom-api.example.com/v1',
+        ),
+        '.env should contain OPENAI_BASE_URL',
+      );
+    });
+
+    test('Existing PI_MODEL is not overwritten without --overwrite', async () => {
+      const testHomeDir = path.join(tempDir, 'test-model-conflict-home');
+      const testTargetDir = path.join(tempDir, 'test-model-conflict-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create existing .env with PI_MODEL
+      const envPath = path.join(testTargetDir, '.env');
+      await fs.writeFile(
+        envPath,
+        'PI_MODEL=existing-model-value\nPI_API=existing-provider',
+        'utf-8',
+      );
+
+      // Create source config with different model
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          model: {
+            provider: 'new-provider',
+            model: 'new-model-from-source',
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script without --overwrite
+      const outputDir = path.join(tempDir, 'report-model-conflict');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify existing PI_MODEL was preserved
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes('PI_MODEL=existing-model-value'),
+        'Existing PI_MODEL should be preserved',
+      );
+      assert.ok(
+        envContent.includes('PI_API=existing-provider'),
+        'Existing PI_API should be preserved',
+      );
+    });
+
+    test('OpenRouter API key is written to OPENROUTER_API_KEY', async () => {
+      const testHomeDir = path.join(tempDir, 'test-model-openrouter-home');
+      const testTargetDir = path.join(tempDir, 'test-model-openrouter-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with OpenRouter provider
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          model: {
+            provider: 'openrouter',
+            model: 'anthropic/claude-3-opus',
+            apiKey: 'sk-or-v1-test-openrouter-key',
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script with --migrate-secrets
+      const outputDir = path.join(tempDir, 'report-model-openrouter');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --migrate-secrets --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env contains OPENROUTER_API_KEY
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes('PI_API=openrouter'),
+        '.env should contain PI_API=openrouter',
+      );
+      assert.ok(
+        envContent.includes('OPENROUTER_API_KEY=sk-or-v1-test-openrouter-key'),
+        '.env should contain OPENROUTER_API_KEY',
+      );
+    });
+
+    test('Anthropic API key is written to ANTHROPIC_API_KEY', async () => {
+      const testHomeDir = path.join(tempDir, 'test-model-anthropic-home');
+      const testTargetDir = path.join(tempDir, 'test-model-anthropic-target');
+      const clawdbotDir = path.join(testHomeDir, '.config', 'clawdbot');
+      await fs.mkdir(clawdbotDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with Anthropic provider (Clawdbot format)
+      await fs.writeFile(
+        path.join(clawdbotDir, 'config.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot', identity: 'A helpful bot' },
+          llm: {
+            provider: 'anthropic',
+            model: 'claude-3-opus-20240229',
+            apiKey: 'sk-ant-api03-test-anthropic-key',
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script with --migrate-secrets
+      const outputDir = path.join(tempDir, 'report-model-anthropic');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source clawdbot --execute --migrate-secrets --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env contains ANTHROPIC_API_KEY
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes('PI_API=anthropic'),
+        '.env should contain PI_API=anthropic',
+      );
+      assert.ok(
+        envContent.includes(
+          'ANTHROPIC_API_KEY=sk-ant-api03-test-anthropic-key',
+        ),
+        '.env should contain ANTHROPIC_API_KEY',
+      );
+    });
+  });
+
   describe('Workspace docs migration (VAL-DOCS-001 to 003)', () => {
     test('AGENTS.md is copied to target workspace', async () => {
       const testHomeDir = path.join(tempDir, 'test-agents-home');
