@@ -1,0 +1,33 @@
+{
+  "milestone": "tests-cli",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": { "passed": true, "command": "npm test", "exitCode": 0, "observation": "All 233 tests passed (21 suites, 0 failures, 0 cancelled, 0 skipped). Includes 76 migration-specific tests covering all categories." },
+    "typecheck": { "passed": true, "command": "tsc --noEmit", "exitCode": 0, "observation": "TypeScript compilation succeeded with no errors." },
+    "lint": { "passed": true, "command": "npx prettier --check \"src/**/*.ts\"", "exitCode": 0, "observation": "All matched files use Prettier code style." }
+  },
+  "reviewsSummary": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [
+    {
+      "target": "library",
+      "description": "Document migration test isolation pattern: use os.tmpdir() + fs.mkdtemp() for temp dirs, override HOME env, pass --target-workspace/--target-env flags to script.",
+      "sourceFeature": "migration-tests-cli"
+    }
+  ],
+  "suggestedGuidanceUpdates": [],
+  "rejectedObservations": [
+    {
+      "observation": "Document that migration-test uses a separate bash script vs node test runner",
+      "reason": "already-documented",
+      "detail": "This is already captured in services.yaml which shows both commands. No additional documentation needed."
+    }
+  ],
+  "previousRound": null
+}

@@ -25,3 +25,14 @@ This migration script is purely file-based. No databases, servers, or network ca
 - macOS and Linux supported
 - Uses `os.homedir()` for user directory detection
 - Uses `os.tmpdir()` for test fixtures
+
+## Migration Test Isolation Pattern
+
+Migration tests in `tests/migrate-to-nanocore.test.ts` use a specific pattern to avoid touching real user data:
+
+1. `fs.mkdtemp(path.join(os.tmpdir(), 'migration-test-'))` creates isolated temp directories
+2. `HOME` env var is overridden via `execSync` options to point to temp home dirs (so source detection finds fixtures there)
+3. `--target-workspace` and `--target-env` flags are passed to the migration script to direct output to temp locations
+4. Cleanup happens in `after()` via `fs.rm(tempDir, { recursive: true, force: true })`
+
+When writing new migration tests, follow this pattern rather than modifying real user directories.
