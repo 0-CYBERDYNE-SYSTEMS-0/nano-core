@@ -1,0 +1,44 @@
+{
+  "groupId": "channels",
+  "assertions": [
+    {
+      "id": "VAL-CHAN-001",
+      "status": "pass",
+      "evidence": "TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrsTUVwxyz found in .env when running with --migrate-secrets.",
+      "details": "Secret migration works correctly for Telegram bot token."
+    },
+    {
+      "id": "VAL-CHAN-002",
+      "status": "pass",
+      "evidence": "TELEGRAM_BOT_TOKEN not found in .env when running without --migrate-secrets. Report shows: channels-secrets skipped - 'Secrets not migrated (use --migrate-secrets): TELEGRAM_BOT_TOKEN, DISCORD_BOT_TOKEN'.",
+      "details": "Secrets correctly excluded when flag not set."
+    },
+    {
+      "id": "VAL-CHAN-003",
+      "status": "pass",
+      "evidence": "WHATSAPP_ENABLED=1 found in .env when source has whatsapp.enabled=true.",
+      "details": "Non-secret channel setting migrated without needing --migrate-secrets."
+    },
+    {
+      "id": "VAL-CHAN-005",
+      "status": "fail",
+      "evidence": "When .env pre-existing value TELEGRAM_BOT_TOKEN=original-token-12345 exists and migration runs with --migrate-secrets (no --overwrite), the original line is preserved BUT a duplicate TELEGRAM_BOT_TOKEN=123456789:... is appended. Result: .env has TWO TELEGRAM_BOT_TOKEN lines.",
+      "details": "Root cause: In updateEnvFile(), when !this.args.overwrite, existing lines are kept (line 1372: newLines.push(line)) but the key is NOT added to updatedKeys (only added when this.args.overwrite is true). The 'Add new keys' loop (line 1385) then appends the key again because !updatedKeys.has(key). Fix: Add updatedKeys.add(key) in the else branch at line 1372."
+    },
+    {
+      "id": "VAL-CHAN-006",
+      "status": "pass",
+      "evidence": "Both TELEGRAM_BOT_TOKEN=tg-token-123 and WHATSAPP_ENABLED=1 found in .env after migration from source with both telegram and whatsapp configured.",
+      "details": "Multiple channels migrated in single run."
+    }
+  ],
+  "frictions": [],
+  "blockers": [
+    {
+      "assertion": "VAL-CHAN-005",
+      "description": "updateEnvFile() has a bug: when --overwrite is not set, existing .env keys are preserved but NOT tracked in updatedKeys, causing duplicate key lines to be appended. Same bug affects VAL-MODEL-006.",
+      "suggestedFix": "In scripts/migrate-to-nanocore.ts updateEnvFile(), around line 1372, add updatedKeys.add(key) in the else branch (when not overwriting) so the key is not appended again."
+    }
+  ],
+  "toolsUsed": ["tuistory"]
+}

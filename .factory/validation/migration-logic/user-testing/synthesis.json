@@ -1,0 +1,48 @@
+{
+  "milestone": "migration-logic",
+  "round": 1,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 24,
+    "passed": 22,
+    "failed": 2,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-PERSONA-001",
+    "VAL-PERSONA-002",
+    "VAL-PERSONA-003",
+    "VAL-PERSONA-004",
+    "VAL-PERSONA-005",
+    "VAL-MEM-001",
+    "VAL-MEM-002",
+    "VAL-MEM-003",
+    "VAL-MEM-004",
+    "VAL-MEM-005",
+    "VAL-DOCS-001",
+    "VAL-DOCS-002",
+    "VAL-DOCS-003",
+    "VAL-CHAN-001",
+    "VAL-CHAN-002",
+    "VAL-CHAN-003",
+    "VAL-CHAN-006",
+    "VAL-MODEL-001",
+    "VAL-MODEL-002",
+    "VAL-MODEL-003",
+    "VAL-MODEL-004",
+    "VAL-MODEL-005"
+  ],
+  "failedAssertions": [
+    {
+      "id": "VAL-CHAN-005",
+      "reason": "updateEnvFile() duplicates .env keys when --overwrite not set. When a key already exists in .env and migration runs without --overwrite, the existing line is preserved but the key is NOT tracked in updatedKeys, causing the new value to be appended as a duplicate line. Root cause: scripts/migrate-to-nanocore.ts line ~1372, the else branch (when !this.args.overwrite) does newLines.push(line) but does not call updatedKeys.add(key). Fix: add updatedKeys.add(key) in the else branch."
+    },
+    {
+      "id": "VAL-MODEL-006",
+      "reason": "Same updateEnvFile() bug as VAL-CHAN-005. Existing PI_MODEL=existing-model preserved but duplicate PI_MODEL=gpt-4-new appended. Same root cause and fix."
+    }
+  ],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": null
+}

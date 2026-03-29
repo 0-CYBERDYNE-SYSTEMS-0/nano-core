@@ -1,0 +1,50 @@
+{
+  "groupId": "model-config",
+  "assertions": [
+    {
+      "id": "VAL-MODEL-001",
+      "status": "pass",
+      "evidence": "PI_API=openai found in .env for openai provider. PI_API=anthropic found for anthropic provider.",
+      "details": "Provider type correctly mapped to PI_API env var."
+    },
+    {
+      "id": "VAL-MODEL-002",
+      "status": "pass",
+      "evidence": "PI_MODEL=gpt-4 found in .env when source has model.model='gpt-4'.",
+      "details": "Model name correctly extracted and written to .env."
+    },
+    {
+      "id": "VAL-MODEL-003",
+      "status": "pass",
+      "evidence": "OPENAI_API_KEY=sk-test-key-12345 found in .env when running with --migrate-secrets.",
+      "details": "API key migration works correctly with --migrate-secrets flag."
+    },
+    {
+      "id": "VAL-MODEL-004",
+      "status": "pass",
+      "evidence": "No API key found in .env when running without --migrate-secrets. Report shows: model-secrets skipped - 'API keys not migrated (use --migrate-secrets): API_KEY'.",
+      "details": "API keys correctly excluded when flag not set."
+    },
+    {
+      "id": "VAL-MODEL-005",
+      "status": "pass",
+      "evidence": "OPENAI_BASE_URL=https://custom.api.example.com/v1 found in .env when source has model.baseUrl.",
+      "details": "Custom base URL correctly extracted and written."
+    },
+    {
+      "id": "VAL-MODEL-006",
+      "status": "fail",
+      "evidence": "When .env pre-existing PI_MODEL=existing-model exists and migration runs without --overwrite, the original line is preserved BUT a duplicate PI_MODEL=gpt-4-new is appended. Result: .env has TWO PI_MODEL lines. Same bug as VAL-CHAN-005.",
+      "details": "Root cause: In updateEnvFile(), when !this.args.overwrite, existing lines are kept but key is NOT tracked in updatedKeys, causing duplicates. See VAL-CHAN-005 for fix details."
+    }
+  ],
+  "frictions": [],
+  "blockers": [
+    {
+      "assertion": "VAL-MODEL-006",
+      "description": "Same updateEnvFile() bug as VAL-CHAN-005. Duplicate keys appended when --overwrite not set and key already exists in .env.",
+      "suggestedFix": "Same fix as VAL-CHAN-005: add updatedKeys.add(key) in the else branch of updateEnvFile()."
+    }
+  ],
+  "toolsUsed": ["tuistory"]
+}

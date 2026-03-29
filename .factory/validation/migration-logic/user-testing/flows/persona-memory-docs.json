@@ -1,0 +1,88 @@
+{
+  "groupId": "persona-memory-docs",
+  "assertions": [
+    {
+      "id": "VAL-PERSONA-001",
+      "status": "pass",
+      "evidence": "SOUL.md copied to target workspace with matching content. Verified file exists at TARGET_WS/SOUL.md with full source content.",
+      "details": "Tested with OpenClaw fixture containing SOUL.md at source root."
+    },
+    {
+      "id": "VAL-PERSONA-002",
+      "status": "pass",
+      "evidence": "Pre-existing SOUL.md preserved when running without --overwrite. Report shows conflict status. Original content unchanged.",
+      'details": "Created TARGET_WS/SOUL.md with 'ORIGINAL CONTENT', ran migration without --overwrite. File unchanged, report shows: conflict - Target SOUL.md already exists.'
+    },
+    {
+      "id": "VAL-PERSONA-003",
+      "status": "pass",
+      "evidence": "With --overwrite, SOUL.md replaced with source content. Backup file created at OUTPUT_DIR/backups/SOUL.md.",
+      "details": "Verified new content present, backup exists in backups/ directory."
+    },
+    {
+      "id": "VAL-PERSONA-004",
+      "status": "pass",
+      "evidence": "IDENTITY.md created at TARGET_WS/IDENTITY.md with agent name 'TestAssistant' and role 'Helpful test assistant'.",
+      "details": "Content includes: Name, Role, Personality fields from openclaw-config.json agent section."
+    },
+    {
+      "id": "VAL-PERSONA-005",
+      "status": "pass",
+      "evidence": "ASSISTANT_NAME=TestAssistant found in .env file.",
+      "details": "Extracted from openclaw-config.json agent.name field."
+    },
+    {
+      "id": "VAL-MEM-001",
+      "status": "pass",
+      "evidence": "MEMORY.md created at TARGET_WS/MEMORY.md containing entries from source. Report shows: Merged memory: 9 new entries (2 daily files), 0 duplicates.",
+      "details": "Source entries from MEMORY.md plus 2 daily memory files merged with --- delimiters."
+    },
+    {
+      "id": "VAL-MEM-002",
+      "status": "pass",
+      "evidence": "Section-level deduplication works correctly. Report shows: Merged memory: 1 new entries (0 daily files), 3 duplicates. Each section header appears exactly once.",
+      "details": "Script deduplicates at entry level (## sections). When source and target have identical sections (normalized comparison), they are detected as duplicates and not re-added."
+    },
+    {
+      "id": "VAL-MEM-003",
+      "status": "pass",
+      "evidence": "Created source MEMORY.md with 62897 chars (200 entries × 300 chars). Overflow file created at OUTPUT_DIR/memory-overflow.md (13238 bytes). Report shows: 201 new entries, 41 overflow.",
+      "details": "MEMORY_CHAR_LIMIT=50000 enforced. Excess entries written to overflow file."
+    },
+    {
+      "id": "VAL-MEM-004",
+      "status": "pass",
+      "evidence": "USER.md created at TARGET_WS/USER.md containing user profile entries from source.",
+      "details": "Profile section with Name, Role, Experience and Preferences section migrated."
+    },
+    {
+      "id": "VAL-MEM-005",
+      "status": "pass",
+      "evidence": "Daily memory files (2024-01-15.md, 2024-01-16.md) merged into target MEMORY.md. Report shows: 2 daily files processed.",
+      "details": "Entries from daily files included in merged MEMORY.md with <!-- From YYYY-MM-DD.md --> markers."
+    },
+    {
+      "id": "VAL-DOCS-001",
+      "status": "pass",
+      "evidence": "AGENTS.md copied to TARGET_WS/AGENTS.md with matching content from source.",
+      "details": "Full agent instructions and code style section preserved."
+    },
+    {
+      "id": "VAL-DOCS-002",
+      "status": "pass",
+      "evidence": "TOOLS.md created at TARGET_WS/TOOLS.md with tool-related content.",
+      "details": "Generated from config with 'Migrated from openclaw' marker. Contains tool configuration notes."
+    },
+    {
+      "id": "VAL-DOCS-003",
+      "status": "pass",
+      "evidence": "PRINCIPLES.md created at TARGET_WS/PRINCIPLES.md with agent principles.",
+      "details": "Generated from agent config (personality field). Contains 'friendly and efficient' as core principle."
+    }
+  ],
+  "frictions": [
+    "Source files (SOUL.md, MEMORY.md, USER.md, AGENTS.md) must be at source root (~/.openclaw/), not in workspace/ subdirectory. The script does not check workspace/ subdirectory."
+  ],
+  "blockers": [],
+  "toolsUsed": ["tuistory"]
+}
