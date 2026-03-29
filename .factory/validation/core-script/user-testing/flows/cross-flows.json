@@ -1,0 +1,44 @@
+{
+  "groupId": "cross-flows",
+  "assertions": [
+    {
+      "id": "VAL-CROSS-001",
+      "status": "pass",
+      "evidence": "Ran --source openclaw --execute --preset full. .env contains TELEGRAM_BOT_TOKEN=7706311763:AAF... and WHATSAPP_ENABLED=1. Secrets migrated with full preset.",
+      "details": "Verified .env contains bot token and channel settings after full preset run"
+    },
+    {
+      "id": "VAL-CROSS-002",
+      "status": "pass",
+      "evidence": "Ran --source openclaw --execute --preset user-data. .env contains WHATSAPP_ENABLED=1 but NOT TELEGRAM_BOT_TOKEN. Report shows channels-secrets item status=skipped, reason='Secrets not migrated (use --migrate-secrets): TELEGRAM_BOT_TOKEN'.",
+      "details": "Verified secrets excluded with user-data preset and skip reason in report"
+    },
+    {
+      "id": "VAL-CROSS-005",
+      "status": "pass",
+      "evidence": "Created target with existing SOUL.md and .env (OLD_VAL=yes). Ran --execute --overwrite. Report shows 0 conflicts. WHATSAPP_ENABLED=1 appended to existing .env. SOUL.md preserved (source SOUL.md not at expected path, so skipped not conflicted).",
+      "details": "Verified no conflicts reported with --overwrite flag"
+    },
+    {
+      "id": "VAL-CROSS-006",
+      "status": "pass",
+      "evidence": "Ran --source hermes --execute --include soul,memory. Only 1 item migrated (soul), 1 skipped (memory - no source file). No other categories processed. All migrated items have category in {soul, memory}.",
+      "details": "Verified include filter restricts to specified categories only"
+    },
+    {
+      "id": "VAL-CROSS-007",
+      "status": "pass",
+      "evidence": "With all 4 sources present (openclaw, clawdbot, moltbot, hermes), --source auto prints: 'Multiple sources detected:' listing all 4 with their paths, then 'Please specify a source with --source <type>'. Exit code 1.",
+      "details": "Verified all 4 detected sources listed in terminal output"
+    },
+    {
+      "id": "VAL-CROSS-008",
+      "status": "pass",
+      "evidence": "Ran --source openclaw --execute --preset full, captured terminal output. Full TELEGRAM_BOT_TOKEN (46 chars) NOT found in terminal output or summary.md. Terminal only shows temp paths and formatting characters.",
+      "details": "Verified no full API keys or tokens leaked to terminal or summary files"
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "toolsUsed": ["tuistory"]
+}

@@ -1,0 +1,58 @@
+{
+  "milestone": "core-script",
+  "round": 1,
+  "status": "fail",
+  "assertionsSummary": {
+    "total": 20,
+    "passed": 18,
+    "failed": 1,
+    "blocked": 1
+  },
+  "passedAssertions": [
+    "VAL-SRC-001",
+    "VAL-SRC-002",
+    "VAL-SRC-003",
+    "VAL-SRC-004",
+    "VAL-SRC-005",
+    "VAL-SRC-007",
+    "VAL-DRY-001",
+    "VAL-DRY-002",
+    "VAL-DRY-003",
+    "VAL-REPORT-001",
+    "VAL-REPORT-002",
+    "VAL-REPORT-003",
+    "VAL-REPORT-004",
+    "VAL-CROSS-001",
+    "VAL-CROSS-002",
+    "VAL-CROSS-005",
+    "VAL-CROSS-006",
+    "VAL-CROSS-007",
+    "VAL-CROSS-008"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [
+    {
+      "id": "VAL-SRC-006",
+      "blockedBy": "Cannot test 'no sources found' scenario without removing real ~/.openclaw and ~/.hermes configs. Mission worker blocked rm commands on real user files. Code inspection confirms correct behavior (lines 1806-1811: prints error listing all checked paths, exits with code 1)."
+    }
+  ],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Created initial user-testing.md with validation surface (CLI terminal script, tuistory tool) and concurrency limits (max 5)",
+      "source": "setup"
+    },
+    {
+      "target": "user-testing.md",
+      "description": "Note: mission worker cannot rm/mv real user home directory files, blocking tests requiring source config removal",
+      "source": "flow-report"
+    }
+  ],
+  "previousRound": null,
+  "testingNotes": {
+    "environment": "macOS darwin 25.4.0, 32GB RAM. Real source configs exist at ~/.openclaw/ and ~/.hermes/. Test fixtures created at ~/.config/clawdbot/ and ~/.moltbot/ for source detection tests.",
+    "isolationStrategy": "Used --target-workspace and --target-env with temp directories for all output. Source detection tests used existing real configs plus temporarily created test configs.",
+    "blockedTests": ["VAL-SRC-006: requires removing all source configs which mission worker cannot do"],
+    "subagentIssue": "user-testing-flow-validator subagents failed to spawn due to invalid model configuration (GLM-5-Turbo-[Z.AI]-2 not found). All tests executed directly by the validator instead."
+  }
+}

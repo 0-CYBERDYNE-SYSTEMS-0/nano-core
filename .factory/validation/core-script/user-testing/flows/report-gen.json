@@ -1,0 +1,32 @@
+{
+  "groupId": "report-gen",
+  "assertions": [
+    {
+      "id": "VAL-REPORT-001",
+      "status": "pass",
+      "evidence": "report.json contains all required fields: timestamp (str), mode ('dry-run'), sourceRoot (str), targetRoot (str), sourceType ('openclaw'), summary object with migrated(3)/archived(0)/skipped(11)/conflict(0)/error(0)/total(14) (all int), items (array of 14)",
+      "details": "Parsed report.json and verified every required field exists with correct types"
+    },
+    {
+      "id": "VAL-REPORT-002",
+      "status": "pass",
+      "evidence": "summary.md contains sections: '## Summary', '## Migrated Items', '## Skipped Items', '## Next Steps'. Content is human-readable markdown with itemized lists.",
+      "details": "Read summary.md and verified all required sections present"
+    },
+    {
+      "id": "VAL-REPORT-003",
+      "status": "pass",
+      "evidence": "Created target SOUL.md with '# Old SOUL content - should be backed up', ran --source hermes --execute --overwrite. Original SOUL.md replaced with hermes content. Backup found at output/backups/SOUL.md containing the original '# Old SOUL content - should be backed up'. Also .env backup created at output/backups/external/.",
+      "details": "Verified backup file exists with correct original content after overwrite"
+    },
+    {
+      "id": "VAL-REPORT-004",
+      "status": "pass",
+      "evidence": "MIGRATION_NOTES.md contains '## Manual Review Required' section listing skipped/conflicted items with status and reasons, and '## Action Items' section with actionable checklist items.",
+      "details": "Read MIGRATION_NOTES.md and verified manual review and action items sections"
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "toolsUsed": ["tuistory"]
+}

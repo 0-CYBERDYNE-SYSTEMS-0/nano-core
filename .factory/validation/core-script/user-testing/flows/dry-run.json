@@ -1,0 +1,26 @@
+{
+  "groupId": "dry-run",
+  "assertions": [
+    {
+      "id": "VAL-DRY-001",
+      "status": "pass",
+      "evidence": "After --source openclaw --dry-run, target workspace directory does not exist and target .env file does not exist. No files were created or modified.",
+      "details": "Created fresh temp dir, ran dry-run, verified target ws and .env don't exist afterward"
+    },
+    {
+      "id": "VAL-DRY-002",
+      "status": "pass",
+      "evidence": "report.json contains 3 items with status 'would_migrate': memory (reason='Would merge memory (0 daily files)'), tools (reason='Would create TOOLS.md'), env-channels (reason='Would update .env with channels settings')",
+      "details": "Parsed report.json from dry-run output, verified would_migrate status and descriptive reasons"
+    },
+    {
+      "id": "VAL-DRY-003",
+      "status": "pass",
+      "evidence": "Terminal output shows formatted summary table with Migrated/Archived/Skipped/Conflicts/Errors counts, followed by '⚠️  This was a dry run. No files were modified.' and 'Run with --execute to perform the actual migration.'",
+      "details": "Captured full terminal output from dry-run, verified summary format and dry-run message"
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "toolsUsed": ["tuistory"]
+}

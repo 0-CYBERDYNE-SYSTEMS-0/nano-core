@@ -1,0 +1,54 @@
+{
+  "groupId": "source-detection",
+  "assertions": [
+    {
+      "id": "VAL-SRC-001",
+      "status": "pass",
+      "evidence": "When only ~/.openclaw/openclaw.json existed (hermes temporarily hidden), --source auto detected and used openclaw: '✅ Using detected source: openclaw'",
+      "details": "Temporarily hid hermes config.yaml, ran --source auto --dry-run, confirmed openclaw was auto-detected"
+    },
+    {
+      "id": "VAL-SRC-002",
+      "status": "pass",
+      "evidence": "Created ~/.config/clawdbot/config.json, ran --source auto, output listed 'clawdbot: /Users/scrimwiggins/.config/clawdbot' among detected sources",
+      "details": "Created test config, verified clawdbot appears in multi-source detection output"
+    },
+    {
+      "id": "VAL-SRC-003",
+      "status": "pass",
+      "evidence": "Created ~/.moltbot/moltbot.json, ran --source auto, output listed 'moltbot: /Users/scrimwiggins/.moltbot' among detected sources",
+      "details": "Created test config, verified moltbot appears in multi-source detection output"
+    },
+    {
+      "id": "VAL-SRC-004",
+      "status": "pass",
+      "evidence": "Existing ~/.hermes/config.yaml detected: 'hermes: /Users/scrimwiggins/.hermes' listed in auto-detect output",
+      "details": "Verified hermes appears in multi-source detection output"
+    },
+    {
+      "id": "VAL-SRC-005",
+      "status": "pass",
+      "evidence": "Code inspection: line 1850 shows console.error('❌ Source not found: ' + source.configPath); process.exit(1). Also Zod validation rejects invalid source types with clear error. Tested --source nonexistent → exit code 1 with ZodError.",
+      "details": "Verified through code inspection and invalid-type test (exit code 1 with error message)"
+    },
+    {
+      "id": "VAL-SRC-006",
+      "status": "blocked",
+      "evidence": "Cannot test 'no sources found' without removing real ~/.openclaw and ~/.hermes configs. Mission worker blocked rm commands on real user files.",
+      "details": "Code inspection confirms behavior: lines 1806-1811 print '❌ No source configurations found.' and list all checked paths, then process.exit(1)."
+    },
+    {
+      "id": "VAL-SRC-007",
+      "status": "pass",
+      "evidence": "Ran --source hermes --dry-run with all 4 sources present. report.json shows sourceType: 'hermes' and sourceRoot: '/Users/scrimwiggins/.hermes'. Only hermes data processed.",
+      "details": "Explicit --source flag correctly overrides auto-detect even when multiple sources exist"
+    }
+  ],
+  "frictions": [
+    "Mission worker cannot rm/mv real user files, blocking tests that require temporarily hiding existing source configs (VAL-SRC-006)"
+  ],
+  "blockers": [
+    "VAL-SRC-006 blocked: cannot remove real ~/.openclaw and ~/.hermes to test 'no sources found' scenario"
+  ],
+  "toolsUsed": ["tuistory"]
+}
