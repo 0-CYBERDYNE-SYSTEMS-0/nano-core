@@ -1,0 +1,30 @@
+{
+  "groupId": "skills-migration",
+  "milestone": "skills-archive",
+  "assertions": ["VAL-SKILL-001", "VAL-SKILL-002", "VAL-SKILL-003", "VAL-SKILL-004", "VAL-SKILL-005"],
+  "results": {
+    "VAL-SKILL-001": {
+      "status": "pass",
+      "evidence": "Created OpenClaw source with 2 skill dirs (image-gen, web-search) containing SKILL.md files, plus 1 dir without SKILL.md (no-skill-md-dir). After migration, both skills were copied to target workspace at skills/openclaw-imports/image-gen/SKILL.md and skills/openclaw-imports/web-search/SKILL.md. The dir without SKILL.md was correctly skipped. Report showed 'migrated' status for both skills."
+    },
+    "VAL-SKILL-002": {
+      "status": "pass",
+      "evidence": "Re-ran migration against the same target (skills already exist) without --skill-conflict flag (defaults to 'skip'). Report showed both skills with status 'conflict' and reason 'Skill X already exists (use --skill-conflict overwrite or rename)'. Original SKILL.md files remained unchanged."
+    },
+    "VAL-SKILL-003": {
+      "status": "pass",
+      "evidence": "Modified source skill content to '# MODIFIED Image Gen Skill', then re-ran with --skill-conflict overwrite. Report showed both skills with status 'migrated' and backupPath pointing to backups/ directory. Target SKILL.md contained the modified content. Backup directory at output_dir/backups/skills/openclaw-imports/image-gen/ contained the original SKILL.md with original content."
+    },
+    "VAL-SKILL-004": {
+      "status": "pass",
+      "evidence": "Re-ran migration with --skill-conflict rename. Report showed skills migrated to paths ending in '-imported' (image-gen-imported, web-search-imported). Both renamed skill directories existed at target with SKILL.md files containing correct content. Original skills also preserved alongside renamed ones."
+    },
+    "VAL-SKILL-005": {
+      "status": "pass",
+      "evidence": "After successful skill migration, DESCRIPTION.md file was created at skills/openclaw-imports/DESCRIPTION.md. Content included '# Skills Imported from openclaw', migration date, total skills count (2), and list of skill names (image-gen, web-search)."
+    }
+  },
+  "toolsUsed": ["tuistory"],
+  "frictions": [],
+  "blockers": []
+}

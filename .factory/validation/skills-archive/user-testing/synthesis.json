@@ -1,0 +1,35 @@
+{
+  "milestone": "skills-archive",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 13,
+    "passed": 13,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": [
+    "VAL-SKILL-001",
+    "VAL-SKILL-002",
+    "VAL-SKILL-003",
+    "VAL-SKILL-004",
+    "VAL-SKILL-005",
+    "VAL-CMD-001",
+    "VAL-CMD-002",
+    "VAL-AGENT-001",
+    "VAL-AGENT-002",
+    "VAL-AGENT-003",
+    "VAL-ARCH-001",
+    "VAL-ARCH-002",
+    "VAL-ARCH-003"
+  ],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": null,
+  "flowReports": [
+    ".factory/validation/skills-archive/user-testing/flows/skills-migration.json",
+    ".factory/validation/skills-archive/user-testing/flows/allowlist-agent-archive.json"
+  ],
+  "testingApproach": "Direct CLI testing using tuistory (shell execution) with HOME=$(mktemp -d) isolation. Subagent spawning failed due to model configuration issue; all 13 assertions tested directly in the main worker session. Test fixtures created in temp directories with OpenClaw, Moltbot, and Hermes source configs containing skills, exec patterns, agent config, and archive-eligible items."
+}

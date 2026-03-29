@@ -1,0 +1,42 @@
+{
+  "groupId": "allowlist-agent-archive",
+  "milestone": "skills-archive",
+  "assertions": ["VAL-CMD-001", "VAL-CMD-002", "VAL-AGENT-001", "VAL-AGENT-002", "VAL-AGENT-003", "VAL-ARCH-001", "VAL-ARCH-002", "VAL-ARCH-003"],
+  "results": {
+    "VAL-CMD-001": {
+      "status": "pass",
+      "evidence": "Created OpenClaw source with exec.approvalPatterns: ['rm -rf', 'docker *', 'sudo apt *']. After migration, mount-allowlist.json at ~/.config/fft_nano/mount-allowlist.json (resolved to temp HOME) contained all 3 patterns in a JSON object with 'patterns' key. Also tested with Hermes source with exec_allowlist: ['ls *', 'cat *'] which also merged correctly."
+    },
+    "VAL-CMD-002": {
+      "status": "pass",
+      "evidence": "Re-ran migration with same source (Hermes) against same target. Report showed allowlist item with status 'skipped' and reason 'All patterns already present'. Verified mount-allowlist.json still contained exactly the original patterns with no duplicates."
+    },
+    "VAL-AGENT-001": {
+      "status": "pass",
+      "evidence": "Created OpenClaw source with heartbeat.enabled=true and heartbeat.interval='15m'. After migration, .env contained 'FFT_NANO_HEARTBEAT_EVERY=15m'. Also tested Hermes with runtime.heartbeat_interval='20m' which correctly mapped."
+    },
+    "VAL-AGENT-002": {
+      "status": "pass",
+      "evidence": "Created OpenClaw source with sandbox.runtime='docker' and sandbox.image='node:20'. After migration, .env contained 'CONTAINER_RUNTIME=docker' and 'CONTAINER_IMAGE=node:20'."
+    },
+    "VAL-AGENT-003": {
+      "status": "pass",
+      "evidence": "Created OpenClaw source with memory.flushBeforeCompaction=true. After migration, runtime.parity.json at ~/.config/fft_nano/runtime.parity.json contained { 'memory': { 'flushBeforeCompaction': true } }. Also verified with Hermes source with runtime.auto_compact=true."
+    },
+    "VAL-ARCH-001": {
+      "status": "pass",
+      "evidence": "Tested across all 4 source types: OpenClaw archived mcp-servers.json and plugins.json; Moltbot archived cron-jobs.json; Hermes archived webhooks.json and multi-agent.json. All archive items placed in output_dir/archive/ directory. Note: OpenClaw parser does not extract cron/webhooks/multiAgent fields (only Moltbot has cron, only Hermes has webhooks/multiAgent) - this is correct per-source-type behavior."
+    },
+    "VAL-ARCH-002": {
+      "status": "pass",
+      "evidence": "Validated all archive JSON files with python3 json.load(): mcp-servers.json (OpenClaw), plugins.json (OpenClaw), cron-jobs.json (Moltbot), webhooks.json (Hermes), multi-agent.json (Hermes) - all parsed successfully with no errors."
+    },
+    "VAL-ARCH-003": {
+      "status": "pass",
+      "evidence": "Report contained skipped items with reason strings. Example from OpenClaw run: soul ('Source SOUL.md not found'), memory ('No memory files found'), user ('Source USER.md not found'), agents ('Source AGENTS.md not found'), principles ('No principles found in source'), channels ('No channel configuration found'). Each skipped item had an 'id' and 'reason' field."
+    }
+  },
+  "toolsUsed": ["tuistory"],
+  "frictions": [],
+  "blockers": []
+}
