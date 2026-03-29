@@ -1,0 +1,36 @@
+{
+  "milestone": "fix-env-keys",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "node --import tsx --test $(find tests -type f -name '*.test.ts' | tr '\\n' ' ')",
+      "exitCode": 0,
+      "summary": "186 tests passed, 0 failed across 14 suites"
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "npx tsc --noEmit",
+      "exitCode": 0,
+      "summary": "No type errors"
+    },
+    "lint": {
+      "passed": true,
+      "command": "npx prettier --check \"src/**/*.ts\"",
+      "exitCode": 0,
+      "summary": "All matched files use Prettier code style"
+    }
+  },
+  "reviewsSummary": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [],
+  "suggestedGuidanceUpdates": [],
+  "rejectedObservations": [],
+  "previousRound": null
+}

@@ -1,0 +1,36 @@
+{
+  "featureId": "fix-env-duplicate-keys",
+  "milestone": "fix-env-keys",
+  "status": "pass",
+  "commitId": "93f95aa",
+  "reviewer": "scrutiny-validator",
+  "findings": [
+    {
+      "severity": "non_blocking",
+      "category": "improvement",
+      "description": "The tests for VAL-CHAN-005 and VAL-MODEL-006 verify that existing values are preserved but do not explicitly assert that no duplicate key lines exist in the resulting .env. A stronger assertion (e.g., counting occurrences of each key) would make the test more robust against regressions.",
+      "suggestion": "Add assertions like: const keyCount = (envContent.match(/^TELEGRAM_BOT_TOKEN=/gm) || []).length; assert.strictEqual(keyCount, 1, 'TELEGRAM_BOT_TOKEN should appear exactly once')"
+    }
+  ],
+  "sharedStateObservations": [],
+  "assertionsReviewed": [
+    {
+      "id": "VAL-CHAN-005",
+      "previouslyFailed": true,
+      "nowPasses": true,
+      "evidence": "The fix adds updatedKeys.add(key) in the else branch of updateEnvFile() so that when an existing key is preserved (not overwritten), it is tracked and won't be appended again. Test 'Existing .env values are preserved on conflict without --overwrite' verifies the existing TELEGRAM_BOT_TOKEN value is preserved and new keys are still added."
+    },
+    {
+      "id": "VAL-MODEL-006",
+      "previouslyFailed": true,
+      "nowPasses": true,
+      "evidence": "Same fix resolves this. Test 'Existing model not overwritten without flag' verifies PI_MODEL and PI_API are preserved when --overwrite is not set. With the fix, no duplicate keys are appended."
+    }
+  ],
+  "codeQuality": {
+    "diffSize": 1,
+    "complexity": "trivial",
+    "correctness": "The fix is minimal and correct. The root cause was clearly identified: when an existing key was encountered without --overwrite, the line was pushed to newLines but the key was not added to updatedKeys. The subsequent loop over envVars entries would then append the same key again. The one-line fix (updatedKeys.add(key) in the else branch) correctly tracks the preserved key.",
+    "style": "Follows existing code patterns. Comment on the new line explains the purpose."
+  }
+}
