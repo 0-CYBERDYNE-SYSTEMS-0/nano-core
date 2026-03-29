@@ -544,7 +544,14 @@ class Migrator {
 
     if (!this.args.dryRun) {
       await this.ensureDir(path.dirname(backupPath));
-      await fs.copyFile(targetPath, backupPath);
+      // Check if source is a directory or file
+      const stat = await fs.stat(targetPath);
+      if (stat.isDirectory()) {
+        // Use cp for recursive directory copy
+        await fs.cp(targetPath, backupPath, { recursive: true });
+      } else {
+        await fs.copyFile(targetPath, backupPath);
+      }
     }
     return backupPath;
   }

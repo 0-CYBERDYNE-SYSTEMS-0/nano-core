@@ -1785,6 +1785,986 @@ channels:
       );
     });
   });
+
+  describe('Skills migration (VAL-SKILL-001 to 005)', () => {
+    test('Skills with SKILL.md are copied to ~/nano/skills/<source>-imports/', async () => {
+      const testHomeDir = path.join(tempDir, 'test-skills-home');
+      const testTargetDir = path.join(tempDir, 'test-skills-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      const skillsDir = path.join(openclawDir, 'skills');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+      await fs.mkdir(skillsDir, { recursive: true });
+
+      // Create skill directories with SKILL.md
+      const skill1Dir = path.join(skillsDir, 'web-search');
+      const skill2Dir = path.join(skillsDir, 'code-review');
+      await fs.mkdir(skill1Dir, { recursive: true });
+      await fs.mkdir(skill2Dir, { recursive: true });
+
+      await fs.writeFile(
+        path.join(skill1Dir, 'SKILL.md'),
+        '# Web Search Skill\n\nSearch the web for information.',
+        'utf-8',
+      );
+      await fs.writeFile(
+        path.join(skill2Dir, 'SKILL.md'),
+        '# Code Review Skill\n\nReview code for issues.',
+        'utf-8',
+      );
+
+      // Create source config
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({ agent: { name: 'TestBot' } }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-skills');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify skills were copied
+      const targetSkillsDir = path.join(testTargetDir, 'skills', 'openclaw-imports');
+      const skill1Exists = await fs
+        .access(path.join(targetSkillsDir, 'web-search', 'SKILL.md'))
+        .then(() => true)
+        .catch(() => false);
+      const skill2Exists = await fs
+        .access(path.join(targetSkillsDir, 'code-review', 'SKILL.md'))
+        .then(() => true)
+        .catch(() => false);
+
+      assert.strictEqual(skill1Exists, true, 'web-search skill should be copied');
+      assert.strictEqual(skill2Exists, true, 'code-review skill should be copied');
+
+      // Verify DESCRIPTION.md was created
+      const descPath = path.join(targetSkillsDir, 'DESCRIPTION.md');
+      const descExists = await fs
+        .access(descPath)
+        .then(() => true)
+        .catch(() => false);
+      assert.strictEqual(descExists, true, 'DESCRIPTION.md should be created');
+
+      const descContent = await fs.readFile(descPath, 'utf-8');
+      assert.ok(descContent.includes('web-search'), 'DESCRIPTION.md should list web-search');
+      assert.ok(descContent.includes('code-review'), 'DESCRIPTION.md should list code-review');
+    });
+
+    test('Skill conflict skip mode preserves existing skill', async () => {
+      const testHomeDir = path.join(tempDir, 'test-skill-skip-home');
+      const testTargetDir = path.join(tempDir, 'test-skill-skip-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      const skillsDir = path.join(openclawDir, 'skills');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+      await fs.mkdir(skillsDir, { recursive: true });
+
+      // Create source skill
+      const skillDir = path.join(skillsDir, 'my-skill');
+      await fs.mkdir(skillDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillDir, 'SKILL.md'),
+        '# Source Skill\n\nSource version',
+        'utf-8',
+      );
+
+      // Create existing target skill
+      const targetSkillsDir = path.join(testTargetDir, 'skills', 'openclaw-imports');
+      const targetSkillDir = path.join(targetSkillsDir, 'my-skill');
+      await fs.mkdir(targetSkillDir, { recursive: true });
+      await fs.writeFile(
+        path.join(targetSkillDir, 'SKILL.md'),
+        '# Existing Skill\n\nExisting version',
+        'utf-8',
+      );
+
+      // Create source config
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({ agent: { name: 'TestBot' } }),
+        'utf-8',
+      );
+
+      // Run migration script with --skill-conflict skip
+      const outputDir = path.join(tempDir, 'report-skill-skip');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --skill-conflict skip --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify existing skill was preserved
+      const targetContent = await fs.readFile(
+        path.join(targetSkillDir, 'SKILL.md'),
+        'utf-8',
+      );
+      assert.ok(
+        targetContent.includes('Existing version'),
+        'Existing skill should be preserved',
+      );
+
+      // Verify report shows conflict
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      const skillItem = report.items.find((i: { id: string }) => i.id === 'skill-my-skill');
+      assert.strictEqual(skillItem?.status, 'conflict', 'Should show conflict status');
+    });
+
+    test('Skill conflict overwrite mode replaces existing skill with backup', async () => {
+      const testHomeDir = path.join(tempDir, 'test-skill-overwrite-home');
+      const testTargetDir = path.join(tempDir, 'test-skill-overwrite-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      const skillsDir = path.join(openclawDir, 'skills');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+      await fs.mkdir(skillsDir, { recursive: true });
+
+      // Create source skill
+      const skillDir = path.join(skillsDir, 'my-skill');
+      await fs.mkdir(skillDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillDir, 'SKILL.md'),
+        '# Source Skill\n\nSource version',
+        'utf-8',
+      );
+
+      // Create existing target skill
+      const targetSkillsDir = path.join(testTargetDir, 'skills', 'openclaw-imports');
+      const targetSkillDir = path.join(targetSkillsDir, 'my-skill');
+      await fs.mkdir(targetSkillDir, { recursive: true });
+      await fs.writeFile(
+        path.join(targetSkillDir, 'SKILL.md'),
+        '# Existing Skill\n\nExisting version',
+        'utf-8',
+      );
+
+      // Create source config
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({ agent: { name: 'TestBot' } }),
+        'utf-8',
+      );
+
+      // Run migration script with --skill-conflict overwrite
+      const outputDir = path.join(tempDir, 'report-skill-overwrite');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --skill-conflict overwrite --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify skill was replaced
+      const targetContent = await fs.readFile(
+        path.join(targetSkillDir, 'SKILL.md'),
+        'utf-8',
+      );
+      assert.ok(
+        targetContent.includes('Source version'),
+        'Skill should be replaced with source version',
+      );
+
+      // Verify backup was created
+      const backupDir = path.join(outputDir, 'backups');
+      const backupFiles = await fs.readdir(backupDir).catch(() => []);
+      assert.ok(backupFiles.length > 0, 'Backup should be created');
+    });
+
+    test('Skill conflict rename mode creates skill with new name', async () => {
+      const testHomeDir = path.join(tempDir, 'test-skill-rename-home');
+      const testTargetDir = path.join(tempDir, 'test-skill-rename-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      const skillsDir = path.join(openclawDir, 'skills');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+      await fs.mkdir(skillsDir, { recursive: true });
+
+      // Create source skill
+      const skillDir = path.join(skillsDir, 'my-skill');
+      await fs.mkdir(skillDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillDir, 'SKILL.md'),
+        '# Source Skill\n\nSource version',
+        'utf-8',
+      );
+
+      // Create existing target skill
+      const targetSkillsDir = path.join(testTargetDir, 'skills', 'openclaw-imports');
+      const targetSkillDir = path.join(targetSkillsDir, 'my-skill');
+      await fs.mkdir(targetSkillDir, { recursive: true });
+      await fs.writeFile(
+        path.join(targetSkillDir, 'SKILL.md'),
+        '# Existing Skill\n\nExisting version',
+        'utf-8',
+      );
+
+      // Create source config
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({ agent: { name: 'TestBot' } }),
+        'utf-8',
+      );
+
+      // Run migration script with --skill-conflict rename
+      const outputDir = path.join(tempDir, 'report-skill-rename');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --skill-conflict rename --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify existing skill still exists
+      const existingContent = await fs.readFile(
+        path.join(targetSkillDir, 'SKILL.md'),
+        'utf-8',
+      );
+      assert.ok(
+        existingContent.includes('Existing version'),
+        'Existing skill should be preserved',
+      );
+
+      // Verify renamed skill was created
+      const renamedSkillDir = path.join(targetSkillsDir, 'my-skill-imported');
+      const renamedExists = await fs
+        .access(path.join(renamedSkillDir, 'SKILL.md'))
+        .then(() => true)
+        .catch(() => false);
+      assert.strictEqual(renamedExists, true, 'Renamed skill should be created');
+
+      const renamedContent = await fs.readFile(
+        path.join(renamedSkillDir, 'SKILL.md'),
+        'utf-8',
+      );
+      assert.ok(
+        renamedContent.includes('Source version'),
+        'Renamed skill should have source content',
+      );
+    });
+
+    test('Skills without SKILL.md are skipped', async () => {
+      const testHomeDir = path.join(tempDir, 'test-skills-noskill-home');
+      const testTargetDir = path.join(tempDir, 'test-skills-noskill-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      const skillsDir = path.join(openclawDir, 'skills');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+      await fs.mkdir(skillsDir, { recursive: true });
+
+      // Create skill directory without SKILL.md
+      const skillDir = path.join(skillsDir, 'incomplete-skill');
+      await fs.mkdir(skillDir, { recursive: true });
+      await fs.writeFile(
+        path.join(skillDir, 'README.md'),
+        'Just a readme',
+        'utf-8',
+      );
+
+      // Create source config
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({ agent: { name: 'TestBot' } }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-skills-noskill');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify report shows skipped
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      const skillsItem = report.items.find((i: { id: string }) => i.id === 'skills-summary');
+      assert.ok(skillsItem, 'Should have skills-summary item');
+      assert.ok(
+        skillsItem.reason.includes('SKILL.md'),
+        'Skip reason should mention SKILL.md',
+      );
+    });
+  });
+
+  describe('Command allowlist migration (VAL-CMD-001, 002)', () => {
+    test('Exec patterns are merged into mount-allowlist.json', async () => {
+      const testHomeDir = path.join(tempDir, 'test-allowlist-home');
+      const testTargetDir = path.join(tempDir, 'test-allowlist-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with exec patterns
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          exec: {
+            approvalPatterns: ['npm test', 'npm run build', 'git status'],
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-allowlist');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify mount-allowlist.json was created
+      const allowlistPath = path.join(testHomeDir, '.config', 'fft_nano', 'mount-allowlist.json');
+      const allowlistExists = await fs
+        .access(allowlistPath)
+        .then(() => true)
+        .catch(() => false);
+      assert.strictEqual(allowlistExists, true, 'mount-allowlist.json should be created');
+
+      const allowlistContent = await fs.readFile(allowlistPath, 'utf-8');
+      const allowlist = JSON.parse(allowlistContent);
+      assert.ok(Array.isArray(allowlist.patterns), 'patterns should be an array');
+      assert.ok(allowlist.patterns.includes('npm test'), 'Should include npm test');
+      assert.ok(allowlist.patterns.includes('npm run build'), 'Should include npm run build');
+      assert.ok(allowlist.patterns.includes('git status'), 'Should include git status');
+    });
+
+    test('Allowlist patterns are deduplicated', async () => {
+      const testHomeDir = path.join(tempDir, 'test-allowlist-dedup-home');
+      const testTargetDir = path.join(tempDir, 'test-allowlist-dedup-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create existing mount-allowlist.json with some patterns
+      const configDir = path.join(testHomeDir, '.config', 'fft_nano');
+      await fs.mkdir(configDir, { recursive: true });
+      await fs.writeFile(
+        path.join(configDir, 'mount-allowlist.json'),
+        JSON.stringify({ patterns: ['npm test', 'git status'] }),
+        'utf-8',
+      );
+
+      // Create source config with overlapping patterns
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          exec: {
+            approvalPatterns: ['npm test', 'npm run build', 'git status'],
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-allowlist-dedup');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify patterns are deduplicated
+      const allowlistPath = path.join(configDir, 'mount-allowlist.json');
+      const allowlistContent = await fs.readFile(allowlistPath, 'utf-8');
+      const allowlist = JSON.parse(allowlistContent);
+
+      // Should have 3 unique patterns, not 5
+      assert.strictEqual(allowlist.patterns.length, 3, 'Should have 3 unique patterns');
+      assert.ok(allowlist.patterns.includes('npm run build'), 'Should include new pattern');
+
+      // Verify report shows only new patterns added
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      const allowlistItem = report.items.find((i: { id: string }) => i.id === 'allowlist');
+      assert.ok(
+        allowlistItem.reason.includes('1'),
+        'Should report 1 new pattern added',
+      );
+    });
+
+    test('All patterns already present shows appropriate message', async () => {
+      const testHomeDir = path.join(tempDir, 'test-allowlist-all-present-home');
+      const testTargetDir = path.join(tempDir, 'test-allowlist-all-present-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create existing mount-allowlist.json with all patterns
+      const configDir = path.join(testHomeDir, '.config', 'fft_nano');
+      await fs.mkdir(configDir, { recursive: true });
+      await fs.writeFile(
+        path.join(configDir, 'mount-allowlist.json'),
+        JSON.stringify({ patterns: ['npm test', 'npm run build'] }),
+        'utf-8',
+      );
+
+      // Create source config with same patterns
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          exec: {
+            approvalPatterns: ['npm test', 'npm run build'],
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-allowlist-all-present');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify report shows all patterns already present
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      const allowlistItem = report.items.find((i: { id: string }) => i.id === 'allowlist');
+      assert.strictEqual(allowlistItem.status, 'skipped');
+      assert.ok(
+        allowlistItem.reason.includes('already present'),
+        'Should report all patterns already present',
+      );
+    });
+  });
+
+  describe('Agent config migration (VAL-AGENT-001 to 003)', () => {
+    test('Heartbeat cadence is migrated to FFT_NANO_HEARTBEAT_EVERY', async () => {
+      const testHomeDir = path.join(tempDir, 'test-agent-hb-home');
+      const testTargetDir = path.join(tempDir, 'test-agent-hb-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with heartbeat interval
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          heartbeat: {
+            enabled: true,
+            interval: '30m',
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-agent-hb');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env contains FFT_NANO_HEARTBEAT_EVERY
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes('FFT_NANO_HEARTBEAT_EVERY=30m'),
+        '.env should contain FFT_NANO_HEARTBEAT_EVERY=30m',
+      );
+    });
+
+    test('Container runtime settings are migrated to .env', async () => {
+      const testHomeDir = path.join(tempDir, 'test-agent-container-home');
+      const testTargetDir = path.join(tempDir, 'test-agent-container-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with container settings
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          sandbox: {
+            runtime: 'docker',
+            image: 'node:20-alpine',
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-agent-container');
+      const envPath = path.join(testTargetDir, '.env');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${envPath} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env contains container settings
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(
+        envContent.includes('CONTAINER_RUNTIME=docker'),
+        '.env should contain CONTAINER_RUNTIME=docker',
+      );
+      assert.ok(
+        envContent.includes('CONTAINER_IMAGE=node:20-alpine'),
+        '.env should contain CONTAINER_IMAGE',
+      );
+    });
+
+    test('Memory flush settings are migrated to parity config', async () => {
+      const testHomeDir = path.join(tempDir, 'test-agent-parity-home');
+      const testTargetDir = path.join(tempDir, 'test-agent-parity-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with memory flush setting
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          memory: {
+            flushBeforeCompaction: true,
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-agent-parity');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify runtime.parity.json was created with memory flush setting
+      const parityPath = path.join(testHomeDir, '.config', 'fft_nano', 'runtime.parity.json');
+      const parityExists = await fs
+        .access(parityPath)
+        .then(() => true)
+        .catch(() => false);
+      assert.strictEqual(parityExists, true, 'runtime.parity.json should be created');
+
+      const parityContent = await fs.readFile(parityPath, 'utf-8');
+      const parity = JSON.parse(parityContent);
+      assert.strictEqual(
+        parity.memory?.flushBeforeCompaction,
+        true,
+        'memory.flushBeforeCompaction should be true',
+      );
+    });
+
+    test('Existing parity config is preserved and merged', async () => {
+      const testHomeDir = path.join(tempDir, 'test-agent-parity-merge-home');
+      const testTargetDir = path.join(tempDir, 'test-agent-parity-merge-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create existing parity config
+      const configDir = path.join(testHomeDir, '.config', 'fft_nano');
+      await fs.mkdir(configDir, { recursive: true });
+      await fs.writeFile(
+        path.join(configDir, 'runtime.parity.json'),
+        JSON.stringify({
+          existingField: 'value',
+          memory: {
+            existingMemorySetting: true,
+          },
+        }),
+        'utf-8',
+      );
+
+      // Create source config with memory flush setting
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          memory: {
+            flushBeforeCompaction: true,
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-agent-parity-merge');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify existing fields are preserved
+      const parityPath = path.join(configDir, 'runtime.parity.json');
+      const parityContent = await fs.readFile(parityPath, 'utf-8');
+      const parity = JSON.parse(parityContent);
+      assert.strictEqual(parity.existingField, 'value', 'Existing field should be preserved');
+      assert.strictEqual(
+        parity.memory.existingMemorySetting,
+        true,
+        'Existing memory setting should be preserved',
+      );
+      assert.strictEqual(
+        parity.memory.flushBeforeCompaction,
+        true,
+        'New memory setting should be added',
+      );
+    });
+  });
+
+  describe('Archive migration (VAL-ARCH-001 to 003)', () => {
+    test('MCP servers are archived as JSON', async () => {
+      const testHomeDir = path.join(tempDir, 'test-archive-mcp-home');
+      const testTargetDir = path.join(tempDir, 'test-archive-mcp-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with MCP servers
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          mcp: {
+            servers: [
+              { name: 'filesystem', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem'] },
+              { name: 'github', command: 'npx', args: ['-y', '@modelcontextprotocol/server-github'] },
+            ],
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-archive-mcp');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify MCP servers were archived
+      const archivePath = path.join(outputDir, 'archive', 'mcp-servers.json');
+      const archiveExists = await fs
+        .access(archivePath)
+        .then(() => true)
+        .catch(() => false);
+      assert.strictEqual(archiveExists, true, 'mcp-servers.json should be archived');
+
+      const archiveContent = await fs.readFile(archivePath, 'utf-8');
+      const mcpServers = JSON.parse(archiveContent);
+      assert.strictEqual(mcpServers.length, 2, 'Should have 2 MCP servers');
+      assert.strictEqual(mcpServers[0].name, 'filesystem');
+    });
+
+    test('Plugins are archived as JSON', async () => {
+      const testHomeDir = path.join(tempDir, 'test-archive-plugins-home');
+      const testTargetDir = path.join(tempDir, 'test-archive-plugins-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with plugins
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          plugins: ['plugin-a', 'plugin-b', 'plugin-c'],
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-archive-plugins');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify plugins were archived
+      const archivePath = path.join(outputDir, 'archive', 'plugins.json');
+      const archiveExists = await fs
+        .access(archivePath)
+        .then(() => true)
+        .catch(() => false);
+      assert.strictEqual(archiveExists, true, 'plugins.json should be archived');
+
+      const archiveContent = await fs.readFile(archivePath, 'utf-8');
+      const plugins = JSON.parse(archiveContent);
+      assert.deepStrictEqual(plugins, ['plugin-a', 'plugin-b', 'plugin-c']);
+    });
+
+    test('Cron jobs are archived as JSON', async () => {
+      const testHomeDir = path.join(tempDir, 'test-archive-cron-home');
+      const testTargetDir = path.join(tempDir, 'test-archive-cron-target');
+      const moltbotDir = path.join(testHomeDir, '.moltbot');
+      await fs.mkdir(moltbotDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with cron jobs (Moltbot format)
+      await fs.writeFile(
+        path.join(moltbotDir, 'moltbot.json'),
+        JSON.stringify({
+          agentName: 'TestBot',
+          cron: [
+            { schedule: '0 9 * * *', task: 'morning-report' },
+            { schedule: '0 17 * * *', task: 'evening-summary' },
+          ],
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-archive-cron');
+      execSync(
+        `npx tsx ${scriptPath} --source moltbot --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify cron jobs were archived
+      const archivePath = path.join(outputDir, 'archive', 'cron-jobs.json');
+      const archiveExists = await fs
+        .access(archivePath)
+        .then(() => true)
+        .catch(() => false);
+      assert.strictEqual(archiveExists, true, 'cron-jobs.json should be archived');
+
+      const archiveContent = await fs.readFile(archivePath, 'utf-8');
+      const cronJobs = JSON.parse(archiveContent);
+      assert.strictEqual(cronJobs.length, 2, 'Should have 2 cron jobs');
+      assert.strictEqual(cronJobs[0].task, 'morning-report');
+    });
+
+    test('Webhooks are archived as JSON', async () => {
+      const testHomeDir = path.join(tempDir, 'test-archive-webhooks-home');
+      const testTargetDir = path.join(tempDir, 'test-archive-webhooks-target');
+      const hermesDir = path.join(testHomeDir, '.hermes');
+      await fs.mkdir(hermesDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with webhooks (Hermes format)
+      await fs.writeFile(
+        path.join(hermesDir, 'config.yaml'),
+        `
+agent:
+  name: TestAgent
+features:
+  webhooks:
+    - path: /webhook/github
+      secret: github-secret
+    - path: /webhook/stripe
+      secret: stripe-secret
+`,
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-archive-webhooks');
+      execSync(
+        `npx tsx ${scriptPath} --source hermes --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify webhooks were archived
+      const archivePath = path.join(outputDir, 'archive', 'webhooks.json');
+      const archiveExists = await fs
+        .access(archivePath)
+        .then(() => true)
+        .catch(() => false);
+      assert.strictEqual(archiveExists, true, 'webhooks.json should be archived');
+
+      const archiveContent = await fs.readFile(archivePath, 'utf-8');
+      const webhooks = JSON.parse(archiveContent);
+      assert.strictEqual(webhooks.length, 2, 'Should have 2 webhooks');
+    });
+
+    test('Multi-agent config is archived as JSON', async () => {
+      const testHomeDir = path.join(tempDir, 'test-archive-multiagent-home');
+      const testTargetDir = path.join(tempDir, 'test-archive-multiagent-target');
+      const hermesDir = path.join(testHomeDir, '.hermes');
+      await fs.mkdir(hermesDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with multi-agent (Hermes format)
+      await fs.writeFile(
+        path.join(hermesDir, 'config.yaml'),
+        `
+agent:
+  name: TestAgent
+features:
+  multi_agent:
+    enabled: true
+    agents:
+      - name: coder
+        role: coding assistant
+      - name: researcher
+        role: research assistant
+`,
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-archive-multiagent');
+      execSync(
+        `npx tsx ${scriptPath} --source hermes --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify multi-agent config was archived
+      const archivePath = path.join(outputDir, 'archive', 'multi-agent.json');
+      const archiveExists = await fs
+        .access(archivePath)
+        .then(() => true)
+        .catch(() => false);
+      assert.strictEqual(archiveExists, true, 'multi-agent.json should be archived');
+
+      const archiveContent = await fs.readFile(archivePath, 'utf-8');
+      const multiAgent = JSON.parse(archiveContent);
+      assert.strictEqual(multiAgent.enabled, true);
+    });
+
+    test('Archive files are valid JSON', async () => {
+      const testHomeDir = path.join(tempDir, 'test-archive-valid-home');
+      const testTargetDir = path.join(tempDir, 'test-archive-valid-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with various items to archive
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          mcp: {
+            servers: [{ name: 'test-server' }],
+          },
+          plugins: ['plugin-a'],
+        }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-archive-valid');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify all archive files are valid JSON
+      const archiveDir = path.join(outputDir, 'archive');
+      const archiveFiles = await fs.readdir(archiveDir);
+
+      for (const file of archiveFiles) {
+        if (file.endsWith('.json')) {
+          const content = await fs.readFile(path.join(archiveDir, file), 'utf-8');
+          // Should not throw
+          JSON.parse(content);
+        }
+      }
+
+      assert.ok(archiveFiles.length > 0, 'Should have archive files');
+    });
+
+    test('Skipped items are reported with reasons', async () => {
+      const testHomeDir = path.join(tempDir, 'test-archive-skipped-home');
+      const testTargetDir = path.join(tempDir, 'test-archive-skipped-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config without items to archive
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({ agent: { name: 'TestBot' } }),
+        'utf-8',
+      );
+
+      // Run migration script
+      const outputDir = path.join(tempDir, 'report-archive-skipped');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify report shows skipped archive
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      const archiveItem = report.items.find((i: { id: string }) => i.id === 'archive');
+      assert.ok(archiveItem, 'Should have archive item');
+      assert.strictEqual(archiveItem.status, 'skipped');
+      assert.ok(archiveItem.reason, 'Should have skip reason');
+    });
+  });
 });
 
 // Helper function
