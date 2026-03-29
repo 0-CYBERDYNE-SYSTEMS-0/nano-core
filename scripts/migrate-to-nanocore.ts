@@ -840,12 +840,13 @@ ${this.config.agentPersonality ? `**Personality:** ${this.config.agentPersonalit
       return;
     }
 
-    const content = await fs.readFile(sourceUserPath, 'utf-8');
+    const sourceContent = await fs.readFile(sourceUserPath, 'utf-8');
+    let mergedContent = sourceContent;
 
     // Merge with existing if present
     if (existsSync(targetUserPath) && !this.args.overwrite) {
       const existingContent = await fs.readFile(targetUserPath, 'utf-8');
-      const newLines = content
+      const newLines = sourceContent
         .split('\n')
         .filter((line) => !existingContent.includes(line));
       if (newLines.length === 0) {
@@ -859,13 +860,20 @@ ${this.config.agentPersonality ? `**Personality:** ${this.config.agentPersonalit
         });
         return;
       }
+      // Build merged content: existing + new entries
+      mergedContent =
+        existingContent +
+        '\n\n<!-- Merged from ' +
+        this.source.type +
+        ' -->\n' +
+        newLines.join('\n');
     }
 
     const backupPath = await this.backupIfExists(targetUserPath);
 
     if (!this.args.dryRun) {
       await this.ensureDir(this.targetWorkspace);
-      await fs.writeFile(targetUserPath, content, 'utf-8');
+      await fs.writeFile(targetUserPath, mergedContent, 'utf-8');
     }
 
     this.addItem({
