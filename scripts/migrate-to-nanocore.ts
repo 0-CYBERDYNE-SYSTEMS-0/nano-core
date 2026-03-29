@@ -137,6 +137,9 @@ const CATEGORIES = [
   'archive',
 ] as const;
 
+// Memory limits - nano-core typically has a character limit for MEMORY.md
+const MEMORY_CHAR_LIMIT = 50000; // 50KB limit for MEMORY.md
+
 const SOURCE_PATHS: Record<
   Exclude<SourceType, 'auto'>,
   { dir: string; config: string }
@@ -376,7 +379,8 @@ async function parseOpenClawConfig(configPath: string): Promise<SourceConfig> {
     telegramToken: data.channels?.telegram?.botToken,
     telegramChatId: data.channels?.telegram?.allowedUsers?.[0],
     whatsappEnabled: data.channels?.whatsapp?.enabled,
-    discordToken: data.channels?.discord?.botToken || data.channels?.discord?.token,
+    discordToken:
+      data.channels?.discord?.botToken || data.channels?.discord?.token,
     containerRuntime: data.sandbox?.runtime,
     containerImage: data.sandbox?.image,
     heartbeatInterval: data.heartbeat?.enabled
@@ -683,6 +687,14 @@ ${this.config.agentPersonality ? `**Personality:** ${this.config.agentPersonalit
       reason: this.args.dryRun ? 'Would create IDENTITY.md' : undefined,
       backupPath,
     });
+
+    // Also set ASSISTANT_NAME in .env
+    if (this.config.agentName) {
+      await this.updateEnvFile(
+        { ASSISTANT_NAME: this.config.agentName },
+        'identity',
+      );
+    }
   }
 
   private async migrateHeartbeat(): Promise<void> {
@@ -759,56 +771,98 @@ ${this.config.agentPersonality ? `**Personality:** ${this.config.agentPersonalit
       return;
     }
 
-    let memoryContent = '';
-
-    // Read main MEMORY.md if exists
+    // Parse entries from source MEMORY.md
+    let sourceEntries: string[] = [];
     if (existsSync(sourceMemoryPath)) {
-      memoryContent = await fs.readFile(sourceMemoryPath, 'utf-8');
+      const content = await fs.readFile(sourceMemoryPath, 'utf-8');
+      sourceEntries = this.parseMemoryEntries(content);
     }
 
-    // Read daily memory files
+    // Parse entries from daily memory files
     let dailyFilesCount = 0;
     if (hasMemoryDir) {
       const files = await fs.readdir(sourceMemoryDir);
       for (const file of files.filter((f) => f.endsWith('.md'))) {
         const filePath = path.join(sourceMemoryDir, file);
         const content = await fs.readFile(filePath, 'utf-8');
-        memoryContent += `\n\n<!-- From ${file} -->\n${content}`;
+        const entries = this.parseMemoryEntries(content);
+        sourceEntries.push(
+          ...entries.map((e) => `<!-- From ${file} -->\n${e}`),
+        );
         dailyFilesCount++;
       }
     }
 
-    // Merge with existing target if present and not overwriting
+    // Get existing entries from target if present
+    let existingEntries: string[] = [];
     if (existsSync(targetMemoryPath) && !this.args.overwrite) {
       const existingContent = await fs.readFile(targetMemoryPath, 'utf-8');
-      // Simple dedup: check if content already exists
-      const newLines = memoryContent
-        .split('\n')
-        .filter((line) => !existingContent.includes(line));
-      if (newLines.length === 0) {
-        this.addItem({
-          id: 'memory',
-          category: 'memory',
-          sourcePath: sourceMemoryPath,
-          targetPath: targetMemoryPath,
-          status: 'skipped',
-          reason: 'All memory entries already present',
-        });
-        return;
+      existingEntries = this.parseMemoryEntries(existingContent);
+    }
+
+    // Deduplicate: only add entries that don't already exist
+    const existingSet = new Set(
+      existingEntries.map((e) => this.normalizeEntry(e)),
+    );
+    const newEntries: string[] = [];
+    const duplicateCount = { count: 0 };
+
+    for (const entry of sourceEntries) {
+      const normalized = this.normalizeEntry(entry);
+      if (existingSet.has(normalized)) {
+        duplicateCount.count++;
+      } else {
+        newEntries.push(entry);
+        existingSet.add(normalized);
       }
-      memoryContent =
-        existingContent +
-        '\n\n<!-- Merged from ' +
-        this.source.type +
-        ' -->\n' +
-        newLines.join('\n');
+    }
+
+    if (newEntries.length === 0 && existingEntries.length === 0) {
+      this.addItem({
+        id: 'memory',
+        category: 'memory',
+        sourcePath: sourceMemoryPath,
+        targetPath: targetMemoryPath,
+        status: 'skipped',
+        reason: 'No memory entries found',
+      });
+      return;
+    }
+
+    if (newEntries.length === 0) {
+      this.addItem({
+        id: 'memory',
+        category: 'memory',
+        sourcePath: sourceMemoryPath,
+        targetPath: targetMemoryPath,
+        status: 'skipped',
+        reason: `All memory entries already present (${duplicateCount.count} duplicates)`,
+      });
+      return;
+    }
+
+    // Combine existing and new entries
+    const allEntries = [...existingEntries, ...newEntries];
+
+    // Enforce character limit with overflow
+    const { mainContent, overflowEntries } =
+      this.enforceMemoryLimit(allEntries);
+
+    // Write overflow file if needed
+    let overflowPath: string | undefined;
+    if (overflowEntries.length > 0) {
+      overflowPath = path.join(this.reportDir, 'memory-overflow.md');
+      const overflowContent = `# Memory Overflow Entries\n\nThe following entries exceeded the character limit (${MEMORY_CHAR_LIMIT}) and were not added to MEMORY.md:\n\n---\n\n${overflowEntries.join('\n\n---\n\n')}`;
+      if (!this.args.dryRun) {
+        await fs.writeFile(overflowPath, overflowContent, 'utf-8');
+      }
     }
 
     const backupPath = await this.backupIfExists(targetMemoryPath);
 
     if (!this.args.dryRun) {
       await this.ensureDir(this.targetWorkspace);
-      await fs.writeFile(targetMemoryPath, memoryContent, 'utf-8');
+      await fs.writeFile(targetMemoryPath, mainContent, 'utf-8');
     }
 
     this.addItem({
@@ -818,10 +872,97 @@ ${this.config.agentPersonality ? `**Personality:** ${this.config.agentPersonalit
       targetPath: targetMemoryPath,
       status: this.args.dryRun ? 'would_migrate' : 'migrated',
       reason: this.args.dryRun
-        ? `Would merge memory (${dailyFilesCount} daily files)`
-        : `Merged memory (${dailyFilesCount} daily files)`,
+        ? `Would merge memory: ${newEntries.length} new entries (${dailyFilesCount} daily files), ${duplicateCount.count} duplicates`
+        : `Merged memory: ${newEntries.length} new entries (${dailyFilesCount} daily files), ${duplicateCount.count} duplicates${overflowEntries.length > 0 ? `, ${overflowEntries.length} overflow` : ''}`,
       backupPath,
     });
+
+    // Add overflow item if applicable
+    if (overflowEntries.length > 0) {
+      this.addItem({
+        id: 'memory-overflow',
+        category: 'memory',
+        sourcePath: sourceMemoryPath,
+        targetPath: overflowPath!,
+        status: this.args.dryRun ? 'would_migrate' : 'archived',
+        reason: `${overflowEntries.length} entries exceeded character limit`,
+      });
+    }
+  }
+
+  /**
+   * Parse memory entries from markdown content.
+   * Entries are separated by headers (## or ###) or horizontal rules (---)
+   */
+  private parseMemoryEntries(content: string): string[] {
+    const entries: string[] = [];
+    const lines = content.split('\n');
+    let currentEntry: string[] = [];
+
+    for (const line of lines) {
+      // Check for entry delimiter (header or horizontal rule)
+      if (line.match(/^#{2,3}\s/) || line.match(/^---+$/)) {
+        if (currentEntry.length > 0) {
+          const entryText = currentEntry.join('\n').trim();
+          if (entryText) {
+            entries.push(entryText);
+          }
+          currentEntry = [];
+        }
+        currentEntry.push(line);
+      } else {
+        currentEntry.push(line);
+      }
+    }
+
+    // Don't forget the last entry
+    if (currentEntry.length > 0) {
+      const entryText = currentEntry.join('\n').trim();
+      if (entryText) {
+        entries.push(entryText);
+      }
+    }
+
+    return entries;
+  }
+
+  /**
+   * Normalize an entry for deduplication comparison
+   */
+  private normalizeEntry(entry: string): string {
+    return entry
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .replace(/<!--.*?-->/g, '')
+      .trim();
+  }
+
+  /**
+   * Enforce character limit on memory entries.
+   * Returns main content (within limit) and overflow entries (exceeding limit)
+   */
+  private enforceMemoryLimit(entries: string[]): {
+    mainContent: string;
+    overflowEntries: string[];
+  } {
+    const overflowEntries: string[] = [];
+    const mainEntries: string[] = [];
+    let currentLength = 0;
+
+    // Add entries until we hit the limit
+    for (const entry of entries) {
+      const entryLength = entry.length;
+      if (currentLength + entryLength + 2 <= MEMORY_CHAR_LIMIT) {
+        // +2 for '\n\n'
+        mainEntries.push(entry);
+        currentLength += entryLength + 2;
+      } else {
+        overflowEntries.push(entry);
+      }
+    }
+
+    const mainContent = mainEntries.join('\n\n---\n\n');
+    return { mainContent, overflowEntries };
   }
 
   private async migrateUser(): Promise<void> {
@@ -841,32 +982,53 @@ ${this.config.agentPersonality ? `**Personality:** ${this.config.agentPersonalit
     }
 
     const sourceContent = await fs.readFile(sourceUserPath, 'utf-8');
-    let mergedContent = sourceContent;
+    const sourceEntries = this.parseMemoryEntries(sourceContent);
 
-    // Merge with existing if present
+    // Get existing entries from target if present
+    let existingEntries: string[] = [];
     if (existsSync(targetUserPath) && !this.args.overwrite) {
       const existingContent = await fs.readFile(targetUserPath, 'utf-8');
-      const newLines = sourceContent
-        .split('\n')
-        .filter((line) => !existingContent.includes(line));
-      if (newLines.length === 0) {
-        this.addItem({
-          id: 'user',
-          category: 'user',
-          sourcePath: sourceUserPath,
-          targetPath: targetUserPath,
-          status: 'skipped',
-          reason: 'All user entries already present',
-        });
-        return;
+      existingEntries = this.parseMemoryEntries(existingContent);
+    }
+
+    // Deduplicate: only add entries that don't already exist
+    const existingSet = new Set(
+      existingEntries.map((e) => this.normalizeEntry(e)),
+    );
+    const newEntries: string[] = [];
+    let duplicateCount = 0;
+
+    for (const entry of sourceEntries) {
+      const normalized = this.normalizeEntry(entry);
+      if (existingSet.has(normalized)) {
+        duplicateCount++;
+      } else {
+        newEntries.push(entry);
+        existingSet.add(normalized);
       }
-      // Build merged content: existing + new entries
+    }
+
+    // Build merged content
+    let mergedContent: string;
+    if (existingEntries.length === 0) {
+      mergedContent = sourceContent;
+    } else if (newEntries.length === 0) {
+      this.addItem({
+        id: 'user',
+        category: 'user',
+        sourcePath: sourceUserPath,
+        targetPath: targetUserPath,
+        status: 'skipped',
+        reason: `All user entries already present (${duplicateCount} duplicates)`,
+      });
+      return;
+    } else {
       mergedContent =
-        existingContent +
+        existingEntries.join('\n\n---\n\n') +
         '\n\n<!-- Merged from ' +
         this.source.type +
-        ' -->\n' +
-        newLines.join('\n');
+        ' -->\n\n---\n\n' +
+        newEntries.join('\n\n---\n\n');
     }
 
     const backupPath = await this.backupIfExists(targetUserPath);
@@ -882,7 +1044,9 @@ ${this.config.agentPersonality ? `**Personality:** ${this.config.agentPersonalit
       sourcePath: sourceUserPath,
       targetPath: targetUserPath,
       status: this.args.dryRun ? 'would_migrate' : 'migrated',
-      reason: this.args.dryRun ? 'Would copy USER.md' : undefined,
+      reason: this.args.dryRun
+        ? `Would merge USER.md: ${newEntries.length} new entries`
+        : `Merged USER.md: ${newEntries.length} new entries, ${duplicateCount} duplicates`,
       backupPath,
     });
   }
