@@ -1,0 +1,8 @@
+{
+  "featureId": "fix-discord-token-extraction",
+  "milestone": "fixes",
+  "status": "pass",
+  "issues": [],
+  "sharedStateObservations": [],
+  "summary": "Fix correctly addresses the bug identified in the core-script review. The original code `discordToken: data.channels?.discord?.enabled ? undefined : undefined` was a clear typo that always returned undefined. The fix `discordToken: data.channels?.discord?.botToken || data.channels?.discord?.token` correctly extracts the token from either field name, consistent with how other token fields (telegram, whatsapp) are handled. Two new tests verify extraction from both OpenClaw (botToken) and Clawdbot (token) config fixtures. The fixture was also updated to include the Discord botToken. No edge cases or issues found."
+}

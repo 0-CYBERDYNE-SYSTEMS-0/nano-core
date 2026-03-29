@@ -1,0 +1,16 @@
+{
+  "featureId": "fix-user-memory-merge-writing",
+  "milestone": "fixes",
+  "status": "pass",
+  "issues": [
+    {
+      "severity": "suggestion",
+      "file": "scripts/migrate-to-nanocore.ts",
+      "line": 865,
+      "description": "The dedup is line-based (filtering lines that already exist in target). This could theoretically cause issues if a line appears in a different context (e.g., same text in different sections). However, for USER.md entries which are typically short single-line facts, this is acceptable.",
+      "suggestedFix": "Consider delimiter-based dedup for more robust matching in future iterations."
+    }
+  ],
+  "sharedStateObservations": [],
+  "summary": "Fix correctly addresses the bug identified in the core-script review. The original code detected duplicate lines but then wrote the raw source content instead of the merged content. The fix properly constructs mergedContent as existingContent + merge comment + newLines when merging with an existing target. The variable rename from `content` to `sourceContent` improves clarity. The merge comment '<!-- Merged from {source} -->' is a good practice for traceability. No new tests were added (only manual testing was done), but existing tests continue to pass. The suggestion about line-based dedup is a non-blocking improvement opportunity."
+}

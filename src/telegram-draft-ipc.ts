@@ -53,7 +53,12 @@ export class TelegramDraftDisableRegistry {
   private streamStates = new Map<
     string,
     | { mode: 'draft'; lastText: string; updatedAt: number }
-    | { mode: 'message'; messageId: number; lastText: string; updatedAt: number }
+    | {
+        mode: 'message';
+        messageId: number;
+        lastText: string;
+        updatedAt: number;
+      }
   >();
   private ttlMs: number;
   private maxStreamStates: number;
@@ -88,7 +93,9 @@ export class TelegramDraftDisableRegistry {
       }
     }
     while (this.streamStates.size > this.maxStreamStates) {
-      const oldestKey = this.streamStates.keys().next().value as string | undefined;
+      const oldestKey = this.streamStates.keys().next().value as
+        | string
+        | undefined;
       if (!oldestKey) break;
       this.streamStates.delete(oldestKey);
     }
@@ -98,11 +105,14 @@ export class TelegramDraftDisableRegistry {
     return this.disabledUntil.size;
   }
 
-  getStreamState(
-    runKey: string,
-  ):
+  getStreamState(runKey: string):
     | { mode: 'draft'; lastText: string; updatedAt: number }
-    | { mode: 'message'; messageId: number; lastText: string; updatedAt: number }
+    | {
+        mode: 'message';
+        messageId: number;
+        lastText: string;
+        updatedAt: number;
+      }
     | undefined {
     return this.streamStates.get(runKey);
   }
@@ -111,7 +121,12 @@ export class TelegramDraftDisableRegistry {
     runKey: string,
     state:
       | { mode: 'draft'; lastText: string; updatedAt: number }
-      | { mode: 'message'; messageId: number; lastText: string; updatedAt: number },
+      | {
+          mode: 'message';
+          messageId: number;
+          lastText: string;
+          updatedAt: number;
+        },
   ): void {
     this.streamStates.set(runKey, state);
   }
@@ -124,7 +139,12 @@ export async function sendTelegramDraftWithFallback(params: {
   >;
   draft: TelegramDraftIpcMessage;
   registry: TelegramDraftDisableRegistry;
-}): Promise<{ runKey: string; sent: boolean; disabled: boolean; error?: string }> {
+}): Promise<{
+  runKey: string;
+  sent: boolean;
+  disabled: boolean;
+  error?: string;
+}> {
   const runKey = getTelegramDraftRunKey(
     params.draft.chatJid,
     params.draft.requestId,

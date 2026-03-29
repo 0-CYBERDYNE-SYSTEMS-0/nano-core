@@ -60,7 +60,10 @@ export interface OnboardSummary {
   gatewayPort?: number;
 }
 
-const DEFAULT_MODEL_BY_PROVIDER: Record<Exclude<OnboardAuthChoice, 'skip'>, string> = {
+const DEFAULT_MODEL_BY_PROVIDER: Record<
+  Exclude<OnboardAuthChoice, 'skip'>,
+  string
+> = {
   openai: 'gpt-4o-mini',
   anthropic: 'claude-3-5-sonnet-latest',
   gemini: 'gemini-2.0-flash',
@@ -68,7 +71,10 @@ const DEFAULT_MODEL_BY_PROVIDER: Record<Exclude<OnboardAuthChoice, 'skip'>, stri
   zai: 'glm-4.7',
 };
 
-const ENV_KEY_BY_PROVIDER: Record<Exclude<OnboardAuthChoice, 'skip'>, string> = {
+const ENV_KEY_BY_PROVIDER: Record<
+  Exclude<OnboardAuthChoice, 'skip'>,
+  string
+> = {
   openai: 'OPENAI_API_KEY',
   anthropic: 'ANTHROPIC_API_KEY',
   gemini: 'GEMINI_API_KEY',
@@ -83,7 +89,10 @@ function hasMeaningfulEnvValue(raw: string | undefined): boolean {
   return value !== 'replace-me' && value !== '...';
 }
 
-function ensureAdminSecret(updates: Record<string, string | undefined>, envMap: Record<string, string>): void {
+function ensureAdminSecret(
+  updates: Record<string, string | undefined>,
+  envMap: Record<string, string>,
+): void {
   const existing = envMap.TELEGRAM_ADMIN_SECRET;
   if (hasMeaningfulEnvValue(existing)) return;
   updates.TELEGRAM_ADMIN_SECRET = randomBytes(24).toString('hex');
@@ -163,7 +172,9 @@ function parseRuntime(raw: string | undefined): OnboardRuntime | undefined {
   throw new Error(`Invalid --runtime (use auto|docker|host): ${raw}`);
 }
 
-function parseAuthChoice(raw: string | undefined): OnboardAuthChoice | undefined {
+function parseAuthChoice(
+  raw: string | undefined,
+): OnboardAuthChoice | undefined {
   if (!raw) return undefined;
   const value = raw.trim().toLowerCase();
   if (
@@ -388,7 +399,10 @@ function normalizeBody(body: string): string {
   return body.replace(/\r\n/g, '\n').trim();
 }
 
-function shouldRewriteIdentityFile(existingBody: string, force: boolean): boolean {
+function shouldRewriteIdentityFile(
+  existingBody: string,
+  force: boolean,
+): boolean {
   if (shouldRewriteFile(existingBody, force)) return true;
   const normalized = normalizeBody(existingBody);
   if (normalized === normalizeBody(renderIdentity(ASSISTANT_NAME))) return true;
@@ -400,7 +414,11 @@ function shouldRewriteIdentityFile(existingBody: string, force: boolean): boolea
 function shouldRewriteSoulFile(existingBody: string, force: boolean): boolean {
   if (force) return true;
   if (!existingBody.trim()) return true;
-  if (/You are (?:FarmFriend|OpenClaw): concise, practical, and technically rigorous\./i.test(existingBody)) {
+  if (
+    /You are (?:FarmFriend|OpenClaw): concise, practical, and technically rigorous\./i.test(
+      existingBody,
+    )
+  ) {
     return true;
   }
   return false;
@@ -409,7 +427,10 @@ function shouldRewriteSoulFile(existingBody: string, force: boolean): boolean {
 function loadDotEnvMap(envPath: string): Record<string, string> {
   const out: Record<string, string> = {};
   if (!fs.existsSync(envPath)) return out;
-  const lines = fs.readFileSync(envPath, 'utf-8').replace(/\r\n/g, '\n').split('\n');
+  const lines = fs
+    .readFileSync(envPath, 'utf-8')
+    .replace(/\r\n/g, '\n')
+    .split('\n');
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
@@ -422,7 +443,10 @@ function loadDotEnvMap(envPath: string): Record<string, string> {
   return out;
 }
 
-function upsertDotEnv(envPath: string, updates: Record<string, string | undefined>): void {
+function upsertDotEnv(
+  envPath: string,
+  updates: Record<string, string | undefined>,
+): void {
   const existing = fs.existsSync(envPath)
     ? fs.readFileSync(envPath, 'utf-8').replace(/\r\n/g, '\n').split('\n')
     : [];
@@ -432,7 +456,8 @@ function upsertDotEnv(envPath: string, updates: Record<string, string | undefine
   const updated = new Set<string>();
   const lines = existing.map((line) => {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) return line;
+    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('='))
+      return line;
     const key = trimmed.slice(0, trimmed.indexOf('=')).trim();
     if (!keys.includes(key)) return line;
     updated.add(key);
@@ -444,7 +469,11 @@ function upsertDotEnv(envPath: string, updates: Record<string, string | undefine
     if (updated.has(key)) continue;
     lines.push(`${key}=${updates[key]}`);
   }
-  fs.writeFileSync(envPath, `${lines.filter((line, idx, arr) => !(idx === arr.length - 1 && line === '')).join('\n')}\n`, 'utf-8');
+  fs.writeFileSync(
+    envPath,
+    `${lines.filter((line, idx, arr) => !(idx === arr.length - 1 && line === '')).join('\n')}\n`,
+    'utf-8',
+  );
 }
 
 async function askText(
@@ -462,7 +491,9 @@ async function askConfirm(
   defaultValue: boolean,
 ): Promise<boolean> {
   const suffix = defaultValue ? 'Y/n' : 'y/N';
-  const answer = (await rl.question(`${message} (${suffix}): `)).trim().toLowerCase();
+  const answer = (await rl.question(`${message} (${suffix}): `))
+    .trim()
+    .toLowerCase();
   if (!answer) return defaultValue;
   if (['y', 'yes', '1', 'true'].includes(answer)) return true;
   if (['n', 'no', '0', 'false'].includes(answer)) return false;
@@ -543,7 +574,9 @@ async function resolveWizardSelections(
     const installDaemon = opts.installDaemon ?? true;
     const hatch = opts.hatch || 'tui';
     if (mode === 'remote' && !opts.remoteUrl?.trim()) {
-      throw new Error('Remote mode requires --remote-url in non-interactive onboarding');
+      throw new Error(
+        'Remote mode requires --remote-url in non-interactive onboarding',
+      );
     }
     return {
       flow,
@@ -565,7 +598,12 @@ async function resolveWizardSelections(
   try {
     const flow = opts.flow
       ? opts.flow
-      : await askSelect(rl, 'Onboarding flow', ['quickstart', 'advanced'], 'quickstart');
+      : await askSelect(
+          rl,
+          'Onboarding flow',
+          ['quickstart', 'advanced'],
+          'quickstart',
+        );
     const mode = opts.mode
       ? opts.mode
       : flow === 'quickstart'
@@ -573,7 +611,8 @@ async function resolveWizardSelections(
         : await askSelect(rl, 'Setup mode', ['local', 'remote'], 'local');
 
     if (mode === 'remote') {
-      const remoteUrlSeed = opts.remoteUrl || envMap.FFT_NANO_REMOTE_URL || 'ws://127.0.0.1:18789';
+      const remoteUrlSeed =
+        opts.remoteUrl || envMap.FFT_NANO_REMOTE_URL || 'ws://127.0.0.1:18789';
       const remoteUrl = await askText(rl, 'Remote gateway URL', remoteUrlSeed);
       const installDaemon = opts.installDaemon ?? false;
       const hatch = opts.hatch || 'later';
@@ -607,9 +646,12 @@ async function resolveWizardSelections(
       const modelSeed =
         model ||
         envMap.PI_MODEL ||
-        DEFAULT_MODEL_BY_PROVIDER[authChoice as Exclude<OnboardAuthChoice, 'skip'>];
+        DEFAULT_MODEL_BY_PROVIDER[
+          authChoice as Exclude<OnboardAuthChoice, 'skip'>
+        ];
       model = await askText(rl, 'Default model', modelSeed);
-      const keyEnv = ENV_KEY_BY_PROVIDER[authChoice as Exclude<OnboardAuthChoice, 'skip'>];
+      const keyEnv =
+        ENV_KEY_BY_PROVIDER[authChoice as Exclude<OnboardAuthChoice, 'skip'>];
       const keySeed = apiKey || envMap[keyEnv] || '';
       apiKey = await askText(
         rl,
@@ -624,7 +666,9 @@ async function resolveWizardSelections(
           await askText(
             rl,
             'Gateway/TUI port',
-            envMap.FFT_NANO_TUI_PORT || process.env.FFT_NANO_TUI_PORT || '28989',
+            envMap.FFT_NANO_TUI_PORT ||
+              process.env.FFT_NANO_TUI_PORT ||
+              '28989',
           ),
           10,
         ) || 28989;
@@ -636,7 +680,12 @@ async function resolveWizardSelections(
       ? opts.hatch
       : opts.skipUi
         ? 'later'
-        : await askSelect(rl, 'How do you want to hatch your bot?', ['tui', 'web', 'later'], 'tui');
+        : await askSelect(
+            rl,
+            'How do you want to hatch your bot?',
+            ['tui', 'web', 'later'],
+            'tui',
+          );
 
     let telegramToken = opts.telegramToken?.trim();
     let whatsappEnabled = opts.whatsappEnabled;
@@ -685,7 +734,9 @@ async function resolvePromptValues(params: {
       throw new Error('Non-interactive onboarding requires --operator <name>');
     }
     if (!assistantName) {
-      throw new Error('Non-interactive onboarding requires --assistant-name <name>');
+      throw new Error(
+        'Non-interactive onboarding requires --assistant-name <name>',
+      );
     }
     return { operator, assistantName };
   }
@@ -719,10 +770,16 @@ function writeWizardMetadata(workspace: string, summary: OnboardSummary): void {
     flow: summary.flow,
     hatch: summary.hatch,
   };
-  fs.writeFileSync(path.join(stateDir, 'wizard-state.json'), `${JSON.stringify(payload, null, 2)}\n`, 'utf-8');
+  fs.writeFileSync(
+    path.join(stateDir, 'wizard-state.json'),
+    `${JSON.stringify(payload, null, 2)}\n`,
+    'utf-8',
+  );
 }
 
-export async function runOnboarding(opts: OnboardCliOptions): Promise<OnboardSummary> {
+export async function runOnboarding(
+  opts: OnboardCliOptions,
+): Promise<OnboardSummary> {
   const riskAccepted = await resolveRiskAccepted(opts);
   if (!riskAccepted) {
     throw new Error('Onboarding cancelled: risk acknowledgement not accepted');
@@ -747,14 +804,20 @@ export async function runOnboarding(opts: OnboardCliOptions): Promise<OnboardSum
       throw new Error('Non-interactive onboarding requires --operator <name>');
     }
     if (!explicitAssistantName) {
-      throw new Error('Non-interactive onboarding requires --assistant-name <name>');
+      throw new Error(
+        'Non-interactive onboarding requires --assistant-name <name>',
+      );
     }
   }
 
   const operatorSeed =
-    explicitOperator || parseExistingOperator(userCurrent) || 'Primary Operator';
+    explicitOperator ||
+    parseExistingOperator(userCurrent) ||
+    'Primary Operator';
   const assistantSeed =
-    explicitAssistantName || parseExistingAssistant(identityCurrent) || ASSISTANT_NAME;
+    explicitAssistantName ||
+    parseExistingAssistant(identityCurrent) ||
+    ASSISTANT_NAME;
   const resolved = await resolvePromptValues({
     operatorSeed,
     assistantSeed,
@@ -762,14 +825,17 @@ export async function runOnboarding(opts: OnboardCliOptions): Promise<OnboardSum
   });
 
   if (!resolved.operator) throw new Error('Operator name cannot be empty');
-  if (!resolved.assistantName) throw new Error('Assistant name cannot be empty');
+  if (!resolved.assistantName)
+    throw new Error('Assistant name cannot be empty');
 
   const wizard = await resolveWizardSelections(opts, envMap);
 
   if (wizard.mode === 'local') {
     const updates: Record<string, string | undefined> = {
       FFT_NANO_TUI_PORT:
-        typeof wizard.gatewayPort === 'number' ? String(wizard.gatewayPort) : undefined,
+        typeof wizard.gatewayPort === 'number'
+          ? String(wizard.gatewayPort)
+          : undefined,
       CONTAINER_RUNTIME: wizard.runtime,
     };
     if (wizard.runtime === 'host') {
@@ -781,7 +847,8 @@ export async function runOnboarding(opts: OnboardCliOptions): Promise<OnboardSum
       const provider = wizard.authChoice;
       const keyEnv = ENV_KEY_BY_PROVIDER[provider];
       updates.PI_API = provider;
-      updates.PI_MODEL = wizard.model?.trim() || DEFAULT_MODEL_BY_PROVIDER[provider];
+      updates.PI_MODEL =
+        wizard.model?.trim() || DEFAULT_MODEL_BY_PROVIDER[provider];
       if (wizard.apiKey?.trim()) {
         updates[keyEnv] = wizard.apiKey.trim();
       } else if (opts.nonInteractive) {
@@ -818,10 +885,18 @@ export async function runOnboarding(opts: OnboardCliOptions): Promise<OnboardSum
     fs.writeFileSync(userPath, `${renderUser(resolved.operator)}\n`, 'utf-8');
   }
   if (shouldRewriteIdentityFile(identityCurrent, opts.force)) {
-    fs.writeFileSync(identityPath, `${renderIdentity(resolved.assistantName)}\n`, 'utf-8');
+    fs.writeFileSync(
+      identityPath,
+      `${renderIdentity(resolved.assistantName)}\n`,
+      'utf-8',
+    );
   }
   if (shouldRewriteSoulFile(soulCurrent, opts.force)) {
-    fs.writeFileSync(soulPath, `${renderSoul(resolved.operator, resolved.assistantName)}\n`, 'utf-8');
+    fs.writeFileSync(
+      soulPath,
+      `${renderSoul(resolved.operator, resolved.assistantName)}\n`,
+      'utf-8',
+    );
   }
 
   const summary: OnboardSummary = {

@@ -91,9 +91,15 @@ import {
   parseTelegramDraftIpcMessage,
   sendTelegramDraftWithFallback,
 } from './telegram-draft-ipc.js';
-import { parseDelegationTrigger, type CodingHint } from './coding-delegation.js';
+import {
+  parseDelegationTrigger,
+  type CodingHint,
+} from './coding-delegation.js';
 import { executeFarmAction } from './farm-action-gateway.js';
-import { startFarmStateCollector, stopFarmStateCollector } from './farm-state-collector.js';
+import {
+  startFarmStateCollector,
+  stopFarmStateCollector,
+} from './farm-state-collector.js';
 import { executeMemoryAction } from './memory-action-gateway.js';
 import { isValidGroupFolder, resolveGroupFolderPath } from './group-folder.js';
 import {
@@ -101,7 +107,10 @@ import {
   migrateCompactionsForGroup,
 } from './memory-maintenance.js';
 import { ensureMemoryScaffold } from './memory-paths.js';
-import { resolveCronExecutionPlan, resolveCronPolicy } from './cron/adapters.js';
+import {
+  resolveCronExecutionPlan,
+  resolveCronPolicy,
+} from './cron/adapters.js';
 import type { CronV2Schedule } from './cron/types.js';
 import {
   isHeartbeatFileEffectivelyEmpty,
@@ -150,10 +159,16 @@ const TELEGRAM_AUTO_REGISTER = !['0', 'false', 'no'].includes(
 const HEARTBEAT_PROMPT = PARITY_CONFIG.heartbeat.prompt;
 const HEARTBEAT_INTERVAL_MS =
   parseDurationMs(PARITY_CONFIG.heartbeat.every || '30m') || 30 * 60 * 1000;
-const HEARTBEAT_ENABLED = PARITY_CONFIG.heartbeat.enabled && HEARTBEAT_INTERVAL_MS > 0;
+const HEARTBEAT_ENABLED =
+  PARITY_CONFIG.heartbeat.enabled && HEARTBEAT_INTERVAL_MS > 0;
 const HEARTBEAT_ACTIVE_HOURS_RAW = resolveHeartbeatActiveHoursRaw();
-const HEARTBEAT_ACK_MAX_CHARS = Math.max(0, PARITY_CONFIG.heartbeat.ackMaxChars || 300);
-const HEARTBEAT_ACTIVE_HOURS = parseHeartbeatActiveHours(HEARTBEAT_ACTIVE_HOURS_RAW);
+const HEARTBEAT_ACK_MAX_CHARS = Math.max(
+  0,
+  PARITY_CONFIG.heartbeat.ackMaxChars || 300,
+);
+const HEARTBEAT_ACTIVE_HOURS = parseHeartbeatActiveHours(
+  HEARTBEAT_ACTIVE_HOURS_RAW,
+);
 const HEARTBEAT_TARGET = PARITY_CONFIG.heartbeat.target;
 const HEARTBEAT_TARGET_TO = PARITY_CONFIG.heartbeat.to;
 const HEARTBEAT_TARGET_ACCOUNT_ID = PARITY_CONFIG.heartbeat.accountId;
@@ -167,11 +182,19 @@ const TELEGRAM_CAPTION_MAX_CHARS = 1024;
 const TELEGRAM_ATTACHMENT_HINT_RE = /\[Attachment\b([^\]]*)\]/gi;
 const TELEGRAM_MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(([^)\n]+)\)/g;
 const TELEGRAM_MARKDOWN_LINK_RE = /\[[^\]]+\]\(([^)\n]+)\)/g;
-const TELEGRAM_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp']);
+const TELEGRAM_IMAGE_EXTENSIONS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+]);
 const TELEGRAM_DRAFT_DISABLE_MS = Math.max(
   60_000,
-  Number.parseInt(process.env.FFT_NANO_TELEGRAM_DRAFT_DISABLE_MS || '1800000', 10) ||
-    1_800_000,
+  Number.parseInt(
+    process.env.FFT_NANO_TELEGRAM_DRAFT_DISABLE_MS || '1800000',
+    10,
+  ) || 1_800_000,
 );
 
 const TELEGRAM_COMMON_COMMANDS = [
@@ -194,7 +217,10 @@ const TELEGRAM_COMMON_COMMANDS = [
 const TELEGRAM_ADMIN_COMMANDS = [
   { command: 'main', description: 'Claim this chat as main/admin' },
   { command: 'freechat', description: 'Manage non-main free-chat allowlist' },
-  { command: 'gateway', description: 'Gateway service ops: /gateway status|restart|doctor' },
+  {
+    command: 'gateway',
+    description: 'Gateway service ops: /gateway status|restart|doctor',
+  },
   { command: 'coder', description: 'Delegate coding execution' },
   { command: 'coder_plan', description: 'Delegate coding plan-only' },
   { command: 'subagents', description: 'List/stop/spawn subagent runs' },
@@ -728,8 +754,10 @@ function resolveMainOnboardingGate(chatJid: string): {
   pending: boolean;
 } {
   if (!isMainChat(chatJid)) return { active: false, pending: false };
-  if (PARITY_CONFIG.workspace.skipBootstrap) return { active: false, pending: false };
-  if (!PARITY_CONFIG.workspace.enforceBootstrapGate) return { active: false, pending: false };
+  if (PARITY_CONFIG.workspace.skipBootstrap)
+    return { active: false, pending: false };
+  if (!PARITY_CONFIG.workspace.enforceBootstrapGate)
+    return { active: false, pending: false };
 
   // Ensure first-message gate checks observe freshly seeded bootstrap state.
   ensureMainWorkspaceBootstrap({ workspaceDir: MAIN_WORKSPACE_DIR });
@@ -737,7 +765,8 @@ function resolveMainOnboardingGate(chatJid: string): {
   if (!status.pending) return { active: false, pending: false };
 
   const enforceForWorkspace =
-    status.gateEligible || PARITY_CONFIG.workspace.enforceBootstrapGateForExisting;
+    status.gateEligible ||
+    PARITY_CONFIG.workspace.enforceBootstrapGateForExisting;
   return {
     active: enforceForWorkspace,
     pending: true,
@@ -745,7 +774,9 @@ function resolveMainOnboardingGate(chatJid: string): {
 }
 
 function isCoderDelegationCommand(content: string): boolean {
-  return /^\/(?:coder|coder-plan|coder_plan)(?:@[A-Za-z0-9_]+)?(?:\s|$)/i.test(content.trim());
+  return /^\/(?:coder|coder-plan|coder_plan)(?:@[A-Za-z0-9_]+)?(?:\s|$)/i.test(
+    content.trim(),
+  );
 }
 
 function onboardingCommandBlockedText(): string {
@@ -829,9 +860,13 @@ function resolveHeartbeatTargetJid(mainChatJid: string): string | null {
   }
   if (explicitTarget === 'telegram') {
     if (HEARTBEAT_TARGET_TO?.trim()) {
-      return parseTelegramTargetJid(HEARTBEAT_TARGET_TO) || findMainTelegramChatJid();
+      return (
+        parseTelegramTargetJid(HEARTBEAT_TARGET_TO) || findMainTelegramChatJid()
+      );
     }
-    return heartbeatLastTargetByChannel.get('telegram') || findMainTelegramChatJid();
+    return (
+      heartbeatLastTargetByChannel.get('telegram') || findMainTelegramChatJid()
+    );
   }
   if (explicitTarget === 'whatsapp') {
     if (HEARTBEAT_TARGET_TO?.trim()) {
@@ -844,7 +879,8 @@ function resolveHeartbeatTargetJid(mainChatJid: string): string | null {
   if (explicitTarget === 'chat') {
     if (!HEARTBEAT_TARGET_TO?.trim()) return mainChatJid;
     const raw = HEARTBEAT_TARGET_TO.trim();
-    if (raw.startsWith('telegram:')) return parseTelegramTargetJid(raw) || mainChatJid;
+    if (raw.startsWith('telegram:'))
+      return parseTelegramTargetJid(raw) || mainChatJid;
     if (raw.includes('@')) return raw;
     const asTelegram = parseTelegramTargetJid(raw);
     if (asTelegram) return asTelegram;
@@ -899,7 +935,11 @@ async function maybeRunBootMdOnce(): Promise<void> {
       workspaceDir: MAIN_WORKSPACE_DIR,
       bootHash,
     });
-    if (run.ok && run.result?.trim() && !/^BOOT_OK\b/i.test(run.result.trim())) {
+    if (
+      run.ok &&
+      run.result?.trim() &&
+      !/^BOOT_OK\b/i.test(run.result.trim())
+    ) {
       await sendMessage(mainChatJid, `[BOOT]\n${run.result.trim()}`);
       rememberHeartbeatTarget(mainChatJid);
     }
@@ -923,7 +963,9 @@ function resolveChatJidForSessionKey(sessionKey: string): string | null {
 }
 
 function buildTuiSessionList(): TuiSessionSummary[] {
-  const chatByJid = new Map(getAllChats().map((chat) => [chat.jid, chat] as const));
+  const chatByJid = new Map(
+    getAllChats().map((chat) => [chat.jid, chat] as const),
+  );
   const sessions: TuiSessionSummary[] = [];
 
   for (const [jid, group] of Object.entries(registeredGroups)) {
@@ -954,7 +996,10 @@ function normalizeAssistantHistoryContent(content: string): string {
   return content;
 }
 
-function getTuiSessionHistory(chatJid: string, limit: number): SessionHistoryMessage[] {
+function getTuiSessionHistory(
+  chatJid: string,
+  limit: number,
+): SessionHistoryMessage[] {
   const rows = getChatHistory(chatJid, limit);
   return rows.map((row) => {
     const role = row.is_from_me ? 'assistant' : 'user';
@@ -1016,7 +1061,11 @@ function makeRunId(prefix = 'run'): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function persistAssistantHistory(chatJid: string, text: string, runId?: string): string {
+function persistAssistantHistory(
+  chatJid: string,
+  text: string,
+  runId?: string,
+): string {
   if (!registeredGroups[chatJid]) return '';
   const timestamp = new Date().toISOString();
   const content = text.startsWith(`${ASSISTANT_NAME}:`)
@@ -1035,7 +1084,11 @@ function persistAssistantHistory(chatJid: string, text: string, runId?: string):
   return timestamp;
 }
 
-function persistTuiUserHistory(chatJid: string, text: string, runId: string): string {
+function persistTuiUserHistory(
+  chatJid: string,
+  text: string,
+  runId: string,
+): string {
   const timestamp = new Date().toISOString();
   if (registeredGroups[chatJid]) {
     storeHostMessage({
@@ -1199,18 +1252,22 @@ function parseQueueArgs(argText: string): {
   return { mode, debounceMs, cap, drop, reset };
 }
 
-function compactChatRunPreferences(prefs: ChatRunPreferences): ChatRunPreferences | null {
+function compactChatRunPreferences(
+  prefs: ChatRunPreferences,
+): ChatRunPreferences | null {
   const next: ChatRunPreferences = {};
   if (prefs.provider?.trim()) next.provider = prefs.provider.trim();
   if (prefs.model?.trim()) next.model = prefs.model.trim();
-  if (prefs.thinkLevel && prefs.thinkLevel !== 'off') next.thinkLevel = prefs.thinkLevel;
+  if (prefs.thinkLevel && prefs.thinkLevel !== 'off')
+    next.thinkLevel = prefs.thinkLevel;
   if (prefs.reasoningLevel && prefs.reasoningLevel !== 'off') {
     next.reasoningLevel = prefs.reasoningLevel;
   }
   if (prefs.verboseMode && prefs.verboseMode !== 'off') {
     next.verboseMode = prefs.verboseMode;
   }
-  if (prefs.queueMode && prefs.queueMode !== 'collect') next.queueMode = prefs.queueMode;
+  if (prefs.queueMode && prefs.queueMode !== 'collect')
+    next.queueMode = prefs.queueMode;
   if (
     typeof prefs.queueDebounceMs === 'number' &&
     Number.isFinite(prefs.queueDebounceMs) &&
@@ -1225,7 +1282,8 @@ function compactChatRunPreferences(prefs: ChatRunPreferences): ChatRunPreference
   ) {
     next.queueCap = Math.floor(prefs.queueCap);
   }
-  if (prefs.queueDrop && prefs.queueDrop !== 'old') next.queueDrop = prefs.queueDrop;
+  if (prefs.queueDrop && prefs.queueDrop !== 'old')
+    next.queueDrop = prefs.queueDrop;
   if (prefs.freeChat === true) next.freeChat = true;
   if (prefs.nextRunNoContinue) next.nextRunNoContinue = true;
   return Object.keys(next).length > 0 ? next : null;
@@ -1258,7 +1316,10 @@ function getTuiSessionPrefs(chatJid: string): TuiSessionPrefs {
   };
 }
 
-function patchTuiSessionPrefs(chatJid: string, patch: TuiSessionPrefs): TuiSessionPrefs {
+function patchTuiSessionPrefs(
+  chatJid: string,
+  patch: TuiSessionPrefs,
+): TuiSessionPrefs {
   const next = updateChatRunPreferences(chatJid, (prefs) => {
     if (Object.prototype.hasOwnProperty.call(patch, 'provider')) {
       if (patch.provider?.trim()) prefs.provider = patch.provider.trim();
@@ -1297,7 +1358,10 @@ function patchTuiSessionPrefs(chatJid: string, patch: TuiSessionPrefs): TuiSessi
   };
 }
 
-function resetTuiSession(chatJid: string, reason: string): { ok: boolean; reason: string } {
+function resetTuiSession(
+  chatJid: string,
+  reason: string,
+): { ok: boolean; reason: string } {
   patchTuiSessionPrefs(chatJid, { noContinueNext: true });
   return { ok: true, reason };
 }
@@ -1341,13 +1405,16 @@ function formatChatRuntimePreferences(chatJid: string): string[] {
   ];
 }
 
-function updateChatUsage(chatJid: string, usage?: {
-  inputTokens?: number;
-  outputTokens?: number;
-  totalTokens?: number;
-  provider?: string;
-  model?: string;
-}): void {
+function updateChatUsage(
+  chatJid: string,
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    totalTokens?: number;
+    provider?: string;
+    model?: string;
+  },
+): void {
   const current = chatUsageStats[chatJid] || {
     runs: 0,
     inputTokens: 0,
@@ -1360,15 +1427,18 @@ function updateChatUsage(chatJid: string, usage?: {
   current.runs += 1;
   if (usage) {
     const inTokens =
-      typeof usage.inputTokens === 'number' && Number.isFinite(usage.inputTokens)
+      typeof usage.inputTokens === 'number' &&
+      Number.isFinite(usage.inputTokens)
         ? Math.max(0, Math.floor(usage.inputTokens))
         : 0;
     const outTokens =
-      typeof usage.outputTokens === 'number' && Number.isFinite(usage.outputTokens)
+      typeof usage.outputTokens === 'number' &&
+      Number.isFinite(usage.outputTokens)
         ? Math.max(0, Math.floor(usage.outputTokens))
         : 0;
     const totalTokens =
-      typeof usage.totalTokens === 'number' && Number.isFinite(usage.totalTokens)
+      typeof usage.totalTokens === 'number' &&
+      Number.isFinite(usage.totalTokens)
         ? Math.max(0, Math.floor(usage.totalTokens))
         : inTokens + outTokens;
 
@@ -1386,7 +1456,10 @@ function updateChatUsage(chatJid: string, usage?: {
   saveState();
 }
 
-function formatUsageText(chatJid: string, scope: 'chat' | 'all' = 'chat'): string {
+function formatUsageText(
+  chatJid: string,
+  scope: 'chat' | 'all' = 'chat',
+): string {
   if (scope === 'all') {
     const rows = Object.entries(chatUsageStats);
     if (rows.length === 0) return 'No usage data collected yet.';
@@ -1481,16 +1554,22 @@ function runPiListModels(searchText: string): { ok: boolean; text: string } {
     };
   }
 
-  const bounded = out.length > 12000 ? `${out.slice(0, 12000)}\n\n...output truncated...` : out;
+  const bounded =
+    out.length > 12000
+      ? `${out.slice(0, 12000)}\n\n...output truncated...`
+      : out;
   return {
     ok: true,
-    text: trimmed ? `Models matching "${trimmed}":\n${bounded}` : `Available models:\n${bounded}`,
+    text: trimmed
+      ? `Models matching "${trimmed}":\n${bounded}`
+      : `Available models:\n${bounded}`,
   };
 }
 
-function runGatewayServiceCommand(
-  action: 'status' | 'restart' | 'doctor',
-): { ok: boolean; text: string } {
+function runGatewayServiceCommand(action: 'status' | 'restart' | 'doctor'): {
+  ok: boolean;
+  text: string;
+} {
   if (action === 'doctor') {
     const result = spawnSync('npm', ['run', 'doctor'], {
       encoding: 'utf8',
@@ -1508,17 +1587,25 @@ function runGatewayServiceCommand(
       .join('\n')
       .trim();
     const bounded =
-      output.length > 12000 ? `${output.slice(0, 12000)}\n\n...output truncated...` : output;
+      output.length > 12000
+        ? `${output.slice(0, 12000)}\n\n...output truncated...`
+        : output;
     if (result.status !== 0 && result.status !== 1) {
       return {
         ok: false,
-        text: bounded || `Doctor command failed with exit code ${result.status ?? 'unknown'}.`,
+        text:
+          bounded ||
+          `Doctor command failed with exit code ${result.status ?? 'unknown'}.`,
       };
     }
     const warn = result.status === 1;
     return {
       ok: true,
-      text: bounded || (warn ? 'Doctor completed with warnings.' : 'Doctor command completed.'),
+      text:
+        bounded ||
+        (warn
+          ? 'Doctor completed with warnings.'
+          : 'Doctor command completed.'),
     };
   }
 
@@ -1557,18 +1644,18 @@ function runGatewayServiceCommand(
       : combined;
 
   if (result.status !== 0) {
-    const needsPrivileges = /root privileges|sudo|permission denied|operation not permitted|bootstrap failed|input\/output error/i.test(
-      bounded,
-    );
+    const needsPrivileges =
+      /root privileges|sudo|permission denied|operation not permitted|bootstrap failed|input\/output error/i.test(
+        bounded,
+      );
     const guidance = needsPrivileges
       ? '\n\nThis action likely needs interactive host privileges. Run ./scripts/service.sh <action> (or fft service <action>) directly in a shell with required permissions.'
       : '';
     return {
       ok: false,
-      text:
-        (bounded
-          ? `${bounded}${guidance}`
-          : `Gateway service command failed with exit code ${result.status ?? 'unknown'}.${guidance}`),
+      text: bounded
+        ? `${bounded}${guidance}`
+        : `Gateway service command failed with exit code ${result.status ?? 'unknown'}.${guidance}`,
     };
   }
 
@@ -1578,7 +1665,9 @@ function runGatewayServiceCommand(
   };
 }
 
-function normalizeTelegramCommandToken(token: string): TelegramCommandName | null {
+function normalizeTelegramCommandToken(
+  token: string,
+): TelegramCommandName | null {
   if (!token.startsWith('/')) return null;
   const normalized = token.split('@')[0]?.toLowerCase();
   if (!normalized) return null;
@@ -1707,7 +1796,10 @@ function formatStatusText(chatJid?: string): string {
     }
     const activeRun = activeChatRuns.get(chatJid);
     if (activeRun) {
-      const ageSeconds = Math.max(0, Math.floor((now - activeRun.startedAt) / 1000));
+      const ageSeconds = Math.max(
+        0,
+        Math.floor((now - activeRun.startedAt) / 1000),
+      );
       lines.push(`- chat_run_active: yes (${ageSeconds}s)`);
     } else {
       lines.push('- chat_run_active: no');
@@ -1762,13 +1854,17 @@ function formatTaskRunsText(taskId: string, limit = 10): string {
     const err = row.error ? ` err=${row.error.slice(0, 120)}` : '';
     return `- ${row.run_at} [${row.status}] duration_ms=${row.duration_ms}${err}`;
   });
-  return [`Task runs for ${taskId} (latest ${safeLimit}):`, ...lines].join('\n');
+  return [`Task runs for ${taskId} (latest ${safeLimit}):`, ...lines].join(
+    '\n',
+  );
 }
 
 function formatTasksText(mode: 'list' | 'due' = 'list'): string {
   const tasks = mode === 'due' ? getDueTasks() : getAllTasks();
   if (tasks.length === 0) {
-    return mode === 'due' ? 'No due tasks right now.' : 'No scheduled tasks found.';
+    return mode === 'due'
+      ? 'No due tasks right now.'
+      : 'No scheduled tasks found.';
   }
   const lines = tasks.slice(0, 30).map((task) => {
     const nextRun = task.next_run || 'n/a';
@@ -1949,7 +2045,10 @@ async function runCompactionForChat(
       return current;
     });
 
-    const preview = summary.length > 1200 ? `${summary.slice(0, 1200)}\n\n...truncated...` : summary;
+    const preview =
+      summary.length > 1200
+        ? `${summary.slice(0, 1200)}\n\n...truncated...`
+        : summary;
     return [
       `Compaction complete (${compactRequestId}).`,
       'Saved summary to /workspace/group/MEMORY.md and scheduled fresh next session.',
@@ -2026,7 +2125,11 @@ async function persistTelegramMedia(
         `Attachment rejected (${mb} MB). Max allowed is ${maxMb} MB.`,
       );
       logger.warn(
-        { chatJid: message.chatJid, type: message.media.type, size: downloaded.data.length },
+        {
+          chatJid: message.chatJid,
+          type: message.media.type,
+          size: downloaded.data.length,
+        },
         'Telegram media rejected by downloaded size',
       );
       return `${message.content}\n[Attachment rejected: size exceeds limit]`;
@@ -2095,7 +2198,9 @@ async function refreshTelegramCommandMenus(): Promise<void> {
     }));
 
     const mainTelegramJid = findMainTelegramChatJid();
-    const mainChatId = mainTelegramJid ? parseTelegramChatId(mainTelegramJid) : null;
+    const mainChatId = mainTelegramJid
+      ? parseTelegramChatId(mainTelegramJid)
+      : null;
 
     try {
       await telegramBot.deleteCommands({ type: 'default' });
@@ -2112,20 +2217,29 @@ async function refreshTelegramCommandMenus(): Promise<void> {
       );
     }
 
-    if (lastTelegramMenuMainChatId && lastTelegramMenuMainChatId !== mainChatId) {
+    if (
+      lastTelegramMenuMainChatId &&
+      lastTelegramMenuMainChatId !== mainChatId
+    ) {
       try {
         await telegramBot.setCommands(common, {
           type: 'chat',
           chatId: lastTelegramMenuMainChatId,
         });
       } catch (err) {
-        logger.debug({ err }, 'Failed resetting previous main Telegram command scope');
+        logger.debug(
+          { err },
+          'Failed resetting previous main Telegram command scope',
+        );
       }
     }
 
     if (mainChatId) {
       try {
-        await telegramBot.setCommands(admin, { type: 'chat', chatId: mainChatId });
+        await telegramBot.setCommands(admin, {
+          type: 'chat',
+          chatId: mainChatId,
+        });
       } catch (err) {
         logger.warn(
           { err, mainChatId },
@@ -2158,10 +2272,7 @@ function logTelegramCommandAudit(
   allowed: boolean,
   reason: string,
 ): void {
-  logger.info(
-    { chatJid, command, allowed, reason },
-    'Telegram command audit',
-  );
+  logger.info({ chatJid, command, allowed, reason }, 'Telegram command audit');
 }
 
 async function handleTelegramCallbackQuery(
@@ -2244,9 +2355,7 @@ async function handleTelegramCommand(m: {
     const chatId = parseTelegramChatId(m.chatJid);
     await sendMessage(
       m.chatJid,
-      chatId
-        ? `Chat id: ${chatId}`
-        : 'Could not parse chat id for this chat.',
+      chatId ? `Chat id: ${chatId}` : 'Could not parse chat id for this chat.',
     );
     return true;
   }
@@ -2309,7 +2418,10 @@ async function handleTelegramCommand(m: {
       const model = argText.slice(slash + 1).trim();
       if (!provider || !model) {
         logTelegramCommandAudit(m.chatJid, cmd, false, 'invalid model ref');
-        await sendMessage(m.chatJid, 'Usage: /model <provider/model> or /model reset');
+        await sendMessage(
+          m.chatJid,
+          'Usage: /model <provider/model> or /model reset',
+        );
         return true;
       }
       nextProvider = provider;
@@ -2465,9 +2577,7 @@ async function handleTelegramCommand(m: {
       return true;
     }
 
-    activeRun.abortController.abort(
-      new Error('Stopped by user via /stop'),
-    );
+    activeRun.abortController.abort(new Error('Stopped by user via /stop'));
     logTelegramCommandAudit(m.chatJid, cmd, true, 'aborted');
     await sendMessage(m.chatJid, 'Stopping current run...');
     return true;
@@ -2546,7 +2656,8 @@ async function handleTelegramCommand(m: {
 
     updateChatRunPreferences(m.chatJid, (prefs) => {
       if (parsed.mode) prefs.queueMode = parsed.mode;
-      if (typeof parsed.debounceMs === 'number') prefs.queueDebounceMs = parsed.debounceMs;
+      if (typeof parsed.debounceMs === 'number')
+        prefs.queueDebounceMs = parsed.debounceMs;
       if (typeof parsed.cap === 'number') prefs.queueCap = parsed.cap;
       if (parsed.drop) prefs.queueDrop = parsed.drop;
       return prefs;
@@ -2585,7 +2696,12 @@ async function handleTelegramCommand(m: {
     }
     const onboardingGate = resolveMainOnboardingGate(m.chatJid);
     if (onboardingGate.active) {
-      logTelegramCommandAudit(m.chatJid, cmd, false, 'blocked by onboarding gate');
+      logTelegramCommandAudit(
+        m.chatJid,
+        cmd,
+        false,
+        'blocked by onboarding gate',
+      );
       await sendMessage(m.chatJid, onboardingCommandBlockedText());
       return true;
     }
@@ -2619,7 +2735,12 @@ async function handleTelegramCommand(m: {
     if (!existingMain && isDirectTelegramDm && !TELEGRAM_ADMIN_SECRET) {
       promoteChatToMain(m.chatJid, m.chatName || `${ASSISTANT_NAME} (main)`);
       await refreshTelegramCommandMenus();
-      logTelegramCommandAudit(m.chatJid, cmd, true, 'first-claim without secret');
+      logTelegramCommandAudit(
+        m.chatJid,
+        cmd,
+        true,
+        'first-claim without secret',
+      );
       await sendMessage(
         m.chatJid,
         [
@@ -2631,7 +2752,12 @@ async function handleTelegramCommand(m: {
     }
 
     if (!TELEGRAM_ADMIN_SECRET) {
-      logTelegramCommandAudit(m.chatJid, cmd, false, 'missing TELEGRAM_ADMIN_SECRET');
+      logTelegramCommandAudit(
+        m.chatJid,
+        cmd,
+        false,
+        'missing TELEGRAM_ADMIN_SECRET',
+      );
       await sendMessage(
         m.chatJid,
         'TELEGRAM_ADMIN_SECRET is not set on the host. Set it, restart, then run: /main <secret>',
@@ -2642,10 +2768,7 @@ async function handleTelegramCommand(m: {
     const provided = rest.join(' ');
     if (!provided || provided !== TELEGRAM_ADMIN_SECRET) {
       logTelegramCommandAudit(m.chatJid, cmd, false, 'invalid admin secret');
-      await sendMessage(
-        m.chatJid,
-        'Unauthorized. Usage: /main <secret>',
-      );
+      await sendMessage(m.chatJid, 'Unauthorized. Usage: /main <secret>');
       return true;
     }
 
@@ -2653,10 +2776,7 @@ async function handleTelegramCommand(m: {
     await refreshTelegramCommandMenus();
     logTelegramCommandAudit(m.chatJid, cmd, true, 'ok');
 
-    await sendMessage(
-      m.chatJid,
-      'This chat is now the main/admin channel.',
-    );
+    await sendMessage(m.chatJid, 'This chat is now the main/admin channel.');
     return true;
   }
 
@@ -2678,7 +2798,7 @@ async function handleTelegramCommand(m: {
           ? 'status'
           : actionRaw === 'doctor'
             ? 'doctor'
-          : null;
+            : null;
     if (!action) {
       logTelegramCommandAudit(m.chatJid, cmd, false, 'invalid action');
       await sendMessage(m.chatJid, 'Usage: /gateway <status|restart|doctor>');
@@ -2707,7 +2827,9 @@ async function handleTelegramCommand(m: {
     );
     await sendMessage(
       m.chatJid,
-      result.ok ? `Gateway ${action}:\n${result.text}` : `Gateway ${action} failed:\n${result.text}`,
+      result.ok
+        ? `Gateway ${action}:\n${result.text}`
+        : `Gateway ${action} failed:\n${result.text}`,
     );
     return true;
   }
@@ -2842,7 +2964,11 @@ async function handleTelegramCommand(m: {
     return true;
   }
 
-  if (cmd === '/task_pause' || cmd === '/task_resume' || cmd === '/task_cancel') {
+  if (
+    cmd === '/task_pause' ||
+    cmd === '/task_resume' ||
+    cmd === '/task_cancel'
+  ) {
     const taskId = rest[0];
     if (!taskId) {
       logTelegramCommandAudit(m.chatJid, cmd, false, 'missing task id');
@@ -2914,7 +3040,9 @@ async function handleTelegramCommand(m: {
       const target = (rest[1] || 'current').toLowerCase();
       if (target === 'all') {
         for (const run of activeChatRuns.values()) {
-          run.abortController.abort(new Error('Stopped via /subagents stop all'));
+          run.abortController.abort(
+            new Error('Stopped via /subagents stop all'),
+          );
         }
         logTelegramCommandAudit(m.chatJid, cmd, true, 'stop all');
         await sendMessage(m.chatJid, 'Stopping all active subagent runs...');
@@ -2926,7 +3054,9 @@ async function handleTelegramCommand(m: {
           await sendMessage(m.chatJid, 'No active run in this chat.');
           return true;
         }
-        run.abortController.abort(new Error('Stopped via /subagents stop current'));
+        run.abortController.abort(
+          new Error('Stopped via /subagents stop current'),
+        );
         logTelegramCommandAudit(m.chatJid, cmd, true, 'stop current');
         await sendMessage(m.chatJid, 'Stopping current chat run...');
         return true;
@@ -2936,10 +3066,15 @@ async function handleTelegramCommand(m: {
         (run) => run.requestId === target,
       );
       if (!matched) {
-        await sendMessage(m.chatJid, `No active subagent run found for: ${target}`);
+        await sendMessage(
+          m.chatJid,
+          `No active subagent run found for: ${target}`,
+        );
         return true;
       }
-      matched.abortController.abort(new Error('Stopped via /subagents stop <id>'));
+      matched.abortController.abort(
+        new Error('Stopped via /subagents stop <id>'),
+      );
       logTelegramCommandAudit(m.chatJid, cmd, true, 'stop id');
       await sendMessage(m.chatJid, `Stopping run ${target}...`);
       return true;
@@ -2947,10 +3082,7 @@ async function handleTelegramCommand(m: {
     if (action === 'spawn' || action === 'run' || action === 'start') {
       const task = rest.slice(1).join(' ').trim();
       if (!task) {
-        await sendMessage(
-          m.chatJid,
-          'Usage: /subagents spawn <task>',
-        );
+        await sendMessage(m.chatJid, 'Usage: /subagents spawn <task>');
         return true;
       }
 
@@ -2961,7 +3093,12 @@ async function handleTelegramCommand(m: {
       }
       const existingRun = activeChatRuns.get(m.chatJid);
       if (existingRun) {
-        logTelegramCommandAudit(m.chatJid, cmd, false, 'spawn blocked: active run');
+        logTelegramCommandAudit(
+          m.chatJid,
+          cmd,
+          false,
+          'spawn blocked: active run',
+        );
         await sendMessage(
           m.chatJid,
           `Cannot spawn while another run is active (${existingRun.requestId || 'unknown'}). Use /stop first.`,
@@ -2990,7 +3127,10 @@ async function handleTelegramCommand(m: {
         runId: requestId,
         sessionKey: getSessionKeyForChat(m.chatJid),
         state: 'message',
-        message: { role: 'system', content: `Starting subagent run (${requestId})...` },
+        message: {
+          role: 'system',
+          content: `Starting subagent run (${requestId})...`,
+        },
       });
       emitTuiAgentEvent({
         runId: requestId,
@@ -3101,9 +3241,7 @@ async function startTelegram(): Promise<void> {
     if (await handleTelegramCommand(m)) return;
 
     if (registeredGroups[m.chatJid]) {
-      const finalContent = m.media
-        ? await persistTelegramMedia(m)
-        : m.content;
+      const finalContent = m.media ? await persistTelegramMedia(m) : m.content;
       storeTextMessage({
         id: m.id,
         chatJid: m.chatJid,
@@ -3133,13 +3271,15 @@ async function processMessage(msg: NewMessage): Promise<boolean> {
       ? Math.floor(queuePrefs.queueCap)
       : undefined;
   const queueDebounceMs =
-    typeof queuePrefs.queueDebounceMs === 'number' && queuePrefs.queueDebounceMs > 0
+    typeof queuePrefs.queueDebounceMs === 'number' &&
+    queuePrefs.queueDebounceMs > 0
       ? Math.floor(queuePrefs.queueDebounceMs)
       : 0;
   const freeChatEnabled = queuePrefs.freeChat === true;
 
   // Main group responds to all messages; other groups require trigger prefix
-  if (!isMainGroup && !freeChatEnabled && !TRIGGER_PATTERN.test(content)) return true;
+  if (!isMainGroup && !freeChatEnabled && !TRIGGER_PATTERN.test(content))
+    return true;
   const onboardingGate = resolveMainOnboardingGate(msg.chat_jid);
 
   if (onboardingGate.active && isCoderDelegationCommand(content)) {
@@ -3233,7 +3373,8 @@ async function processMessage(msg: NewMessage): Promise<boolean> {
     rememberHeartbeatTarget(msg.chat_jid);
   }
   const sessionKey = getSessionKeyForChat(msg.chat_jid);
-  const latestUserText = selectedMessages[selectedMessages.length - 1]?.content || content;
+  const latestUserText =
+    selectedMessages[selectedMessages.length - 1]?.content || content;
 
   let finalPrompt =
     codingHint !== 'none' && delegationMarker
@@ -3289,7 +3430,8 @@ async function processMessage(msg: NewMessage): Promise<boolean> {
   );
 
   if (
-    (codingHint === 'force_delegate_execute' || codingHint === 'force_delegate_plan') &&
+    (codingHint === 'force_delegate_execute' ||
+      codingHint === 'force_delegate_plan') &&
     requestId
   ) {
     activeCoderRuns.set(requestId, {
@@ -3384,7 +3526,11 @@ async function processMessage(msg: NewMessage): Promise<boolean> {
   // Only advance last-agent timestamp after a successful run; otherwise the
   // next loop should retry with the same context window.
   if (ok) {
-    if (!streamed && isTelegramJid(msg.chat_jid) && consumeTelegramHostStreamedRun(msg.chat_jid, requestId)) {
+    if (
+      !streamed &&
+      isTelegramJid(msg.chat_jid) &&
+      consumeTelegramHostStreamedRun(msg.chat_jid, requestId)
+    ) {
       streamed = true;
     }
     updateChatUsage(msg.chat_jid, usage);
@@ -3404,7 +3550,9 @@ async function processMessage(msg: NewMessage): Promise<boolean> {
     } else if (result) {
       persistAssistantHistory(msg.chat_jid, result, requestId);
       if (!streamed) {
-        await sendAgentResultMessage(msg.chat_jid, result, { prefixWhatsApp: true });
+        await sendAgentResultMessage(msg.chat_jid, result, {
+          prefixWhatsApp: true,
+        });
       }
       emitTuiChatEvent({
         runId: requestId,
@@ -3449,7 +3597,10 @@ async function runDirectSessionTurn(params: {
   text: string;
   runId: string;
   deliver: boolean;
-}): Promise<{ runId: string; status: 'started' | 'queued' | 'already_running' }> {
+}): Promise<{
+  runId: string;
+  status: 'started' | 'queued' | 'already_running';
+}> {
   const { chatJid, text, runId, deliver } = params;
   const group = registeredGroups[chatJid];
   if (!group) {
@@ -3579,7 +3730,11 @@ async function runDirectSessionTurn(params: {
   }
 
   updateChatUsage(chatJid, usage);
-  if (!streamed && isTelegramJid(chatJid) && consumeTelegramHostStreamedRun(chatJid, runId)) {
+  if (
+    !streamed &&
+    isTelegramJid(chatJid) &&
+    consumeTelegramHostStreamedRun(chatJid, runId)
+  ) {
     streamed = true;
   }
 
@@ -3609,7 +3764,9 @@ async function runDirectSessionTurn(params: {
     runId,
     sessionKey,
     state: 'final',
-    ...(result ? { message: { role: 'assistant' as const, content: result } } : {}),
+    ...(result
+      ? { message: { role: 'assistant' as const, content: result } }
+      : {}),
     usage,
   });
   emitTuiAgentEvent({
@@ -3642,7 +3799,7 @@ async function runAgent(
     provider?: string;
     model?: string;
   };
-  }> {
+}> {
   const isMain = group.folder === MAIN_GROUP_FOLDER;
 
   // Update tasks snapshot for container to read (filtered by group)
@@ -3730,7 +3887,10 @@ async function runAgent(
     const output = await runContainerAgent(group, input, abortSignal);
 
     if (output.status === 'error') {
-      if (typeof output.error === 'string' && /aborted by user/i.test(output.error)) {
+      if (
+        typeof output.error === 'string' &&
+        /aborted by user/i.test(output.error)
+      ) {
         return { result: null, streamed: false, ok: true };
       }
       if (options.suppressErrorReply) {
@@ -3772,12 +3932,14 @@ function createTuiGatewayAdapters(): TuiGatewayAdapters {
       activeRuns: activeChatRunsById.size,
     }),
     listSessions: () => buildTuiSessionList(),
-    resolveChatJid: (sessionKey: string) => resolveChatJidForSessionKey(sessionKey),
+    resolveChatJid: (sessionKey: string) =>
+      resolveChatJidForSessionKey(sessionKey),
     getSessionKeyForChat: (chatJid: string) => getSessionKeyForChat(chatJid),
     getSessionPrefs: (chatJid: string) => getTuiSessionPrefs(chatJid),
     patchSessionPrefs: (chatJid: string, patch: TuiSessionPrefs) =>
       patchTuiSessionPrefs(chatJid, patch),
-    resetSession: (chatJid: string, reason: string) => resetTuiSession(chatJid, reason),
+    resetSession: (chatJid: string, reason: string) =>
+      resetTuiSession(chatJid, reason),
     getHistory: async (chatJid: string, limit: number) =>
       getTuiSessionHistory(chatJid, limit),
     sendChat: async ({ chatJid, message, runId, deliver }) =>
@@ -3842,7 +4004,10 @@ async function startTuiGatewayService(): Promise<void> {
     );
   } catch (err) {
     const error = err instanceof Error ? err : new Error(String(err));
-    logger.error({ err: error }, 'TUI gateway failed to start; continuing without TUI surface');
+    logger.error(
+      { err: error },
+      'TUI gateway failed to start; continuing without TUI surface',
+    );
   }
 }
 
@@ -3931,7 +4096,10 @@ function truncateTelegramCaption(value?: string | null): string | undefined {
     : trimmed;
 }
 
-function extractAttachmentAttribute(rawAttrs: string, key: string): string | null {
+function extractAttachmentAttribute(
+  rawAttrs: string,
+  key: string,
+): string | null {
   const pattern = new RegExp(
     `\\b${key}=(?:\"([^\"]+)\"|'([^']+)'|([^\\s\\]]+))`,
     'i',
@@ -3957,22 +4125,28 @@ function parseMarkdownLocalPath(rawTarget: string): string | null {
   return token;
 }
 
-function extractTelegramAttachmentHints(
-  text: string,
-): { cleanedText: string; hints: TelegramAttachmentHint[] } {
+function extractTelegramAttachmentHints(text: string): {
+  cleanedText: string;
+  hints: TelegramAttachmentHint[];
+} {
   const hints: TelegramAttachmentHint[] = [];
   let cleaned = text;
 
-  cleaned = cleaned.replace(TELEGRAM_ATTACHMENT_HINT_RE, (_full, attrs: string) => {
-    const rawPath = extractAttachmentAttribute(attrs, 'path');
-    if (rawPath) {
-      hints.push({
-        rawPath,
-        caption: truncateTelegramCaption(extractAttachmentAttribute(attrs, 'caption')),
-      });
-    }
-    return '';
-  });
+  cleaned = cleaned.replace(
+    TELEGRAM_ATTACHMENT_HINT_RE,
+    (_full, attrs: string) => {
+      const rawPath = extractAttachmentAttribute(attrs, 'path');
+      if (rawPath) {
+        hints.push({
+          rawPath,
+          caption: truncateTelegramCaption(
+            extractAttachmentAttribute(attrs, 'caption'),
+          ),
+        });
+      }
+      return '';
+    },
+  );
 
   cleaned = cleaned.replace(
     TELEGRAM_MARKDOWN_IMAGE_RE,
@@ -3987,12 +4161,15 @@ function extractTelegramAttachmentHints(
     },
   );
 
-  cleaned = cleaned.replace(TELEGRAM_MARKDOWN_LINK_RE, (full: string, target: string) => {
-    const localPath = parseMarkdownLocalPath(target);
-    if (!localPath) return full;
-    hints.push({ rawPath: localPath });
-    return '';
-  });
+  cleaned = cleaned.replace(
+    TELEGRAM_MARKDOWN_LINK_RE,
+    (full: string, target: string) => {
+      const localPath = parseMarkdownLocalPath(target);
+      if (!localPath) return full;
+      hints.push({ rawPath: localPath });
+      return '';
+    },
+  );
 
   const deduped = new Map<string, TelegramAttachmentHint>();
   for (const hint of hints) {
@@ -4014,10 +4191,16 @@ function extractTelegramAttachmentHints(
 
 function isPathWithinBase(baseDir: string, targetPath: string): boolean {
   const relative = path.relative(baseDir, targetPath);
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+  return (
+    relative === '' ||
+    (!relative.startsWith('..') && !path.isAbsolute(relative))
+  );
 }
 
-function resolveTelegramAttachmentHostPath(chatJid: string, rawPath: string): string | null {
+function resolveTelegramAttachmentHostPath(
+  chatJid: string,
+  rawPath: string,
+): string | null {
   const group = registeredGroups[chatJid];
   if (!group) return null;
 
@@ -4043,15 +4226,24 @@ function resolveTelegramAttachmentHostPath(chatJid: string, rawPath: string): st
   if (trimmed === '/workspace/group') {
     resolved = groupRoot;
   } else if (trimmed.startsWith('/workspace/group/')) {
-    resolved = path.resolve(groupRoot, trimmed.slice('/workspace/group/'.length));
+    resolved = path.resolve(
+      groupRoot,
+      trimmed.slice('/workspace/group/'.length),
+    );
   } else if (trimmed === '/workspace/project') {
     resolved = projectRoot;
   } else if (trimmed.startsWith('/workspace/project/')) {
-    resolved = path.resolve(projectRoot, trimmed.slice('/workspace/project/'.length));
+    resolved = path.resolve(
+      projectRoot,
+      trimmed.slice('/workspace/project/'.length),
+    );
   } else if (trimmed === '/workspace/global') {
     resolved = globalRoot;
   } else if (trimmed.startsWith('/workspace/global/')) {
-    resolved = path.resolve(globalRoot, trimmed.slice('/workspace/global/'.length));
+    resolved = path.resolve(
+      globalRoot,
+      trimmed.slice('/workspace/global/'.length),
+    );
   } else if (path.isAbsolute(trimmed)) {
     resolved = path.resolve(trimmed);
   } else {
@@ -4076,7 +4268,10 @@ function resolveTelegramAttachments(
     const hostPath = resolveTelegramAttachmentHostPath(chatJid, hint.rawPath);
     if (!hostPath) {
       skipped += 1;
-      logger.warn({ chatJid, rawPath: hint.rawPath }, 'Blocked Telegram attachment path');
+      logger.warn(
+        { chatJid, rawPath: hint.rawPath },
+        'Blocked Telegram attachment path',
+      );
       continue;
     }
 
@@ -4091,14 +4286,22 @@ function resolveTelegramAttachments(
 
     if (!stat.isFile()) {
       skipped += 1;
-      logger.warn({ chatJid, hostPath }, 'Telegram attachment path is not a file');
+      logger.warn(
+        { chatJid, hostPath },
+        'Telegram attachment path is not a file',
+      );
       continue;
     }
 
     if (stat.size > TELEGRAM_MEDIA_MAX_BYTES) {
       skipped += 1;
       logger.warn(
-        { chatJid, hostPath, size: stat.size, maxBytes: TELEGRAM_MEDIA_MAX_BYTES },
+        {
+          chatJid,
+          hostPath,
+          size: stat.size,
+          maxBytes: TELEGRAM_MEDIA_MAX_BYTES,
+        },
         'Telegram attachment exceeded max size',
       );
       continue;
@@ -4120,7 +4323,10 @@ function resolveTelegramAttachments(
   return { attachments, skipped };
 }
 
-async function sendTelegramAgentReply(chatJid: string, text: string): Promise<void> {
+async function sendTelegramAgentReply(
+  chatJid: string,
+  text: string,
+): Promise<void> {
   if (!telegramBot) {
     await sendMessage(chatJid, text);
     return;
@@ -4157,13 +4363,23 @@ async function sendTelegramAgentReply(chatJid: string, text: string): Promise<vo
         );
       }
       logger.info(
-        { chatJid, kind: attachment.kind, fileName: attachment.fileName, path: attachment.hostPath },
+        {
+          chatJid,
+          kind: attachment.kind,
+          fileName: attachment.fileName,
+          path: attachment.hostPath,
+        },
         'Telegram attachment sent',
       );
     } catch (err) {
       failedSends += 1;
       logger.error(
-        { chatJid, err, fileName: attachment.fileName, path: attachment.hostPath },
+        {
+          chatJid,
+          err,
+          fileName: attachment.fileName,
+          path: attachment.hostPath,
+        },
         'Failed to send Telegram attachment',
       );
     }
@@ -4195,7 +4411,10 @@ async function sendAgentResultMessage(
 async function sendMessage(jid: string, text: string): Promise<void> {
   if (isTelegramJid(jid)) {
     if (!telegramBot) {
-      logger.error({ jid }, 'Telegram message send requested but Telegram is not configured');
+      logger.error(
+        { jid },
+        'Telegram message send requested but Telegram is not configured',
+      );
       return;
     }
     try {
@@ -4208,7 +4427,10 @@ async function sendMessage(jid: string, text: string): Promise<void> {
   }
 
   if (!sock) {
-    logger.error({ jid }, 'WhatsApp message send requested but WhatsApp is not connected');
+    logger.error(
+      { jid },
+      'WhatsApp message send requested but WhatsApp is not connected',
+    );
     return;
   }
   try {
@@ -4223,14 +4445,20 @@ function getTelegramHostStreamKey(chatJid: string, requestId: string): string {
   return `${chatJid}:${requestId}`;
 }
 
-function noteTelegramHostStreamedRun(chatJid: string, requestId: string): boolean {
+function noteTelegramHostStreamedRun(
+  chatJid: string,
+  requestId: string,
+): boolean {
   const key = getTelegramHostStreamKey(chatJid, requestId);
   const had = telegramHostStreamedRuns.has(key);
   telegramHostStreamedRuns.set(key, Date.now());
   return !had;
 }
 
-function consumeTelegramHostStreamedRun(chatJid: string, requestId: string): boolean {
+function consumeTelegramHostStreamedRun(
+  chatJid: string,
+  requestId: string,
+): boolean {
   const key = getTelegramHostStreamKey(chatJid, requestId);
   const had = telegramHostStreamedRuns.has(key);
   if (had) telegramHostStreamedRuns.delete(key);
@@ -4288,7 +4516,10 @@ function startIpcWatcher(): void {
               const draftUpdate = parseTelegramDraftIpcMessage(data);
               if (draftUpdate) {
                 const targetGroup = registeredGroups[draftUpdate.chatJid];
-                if (!isMain && (!targetGroup || targetGroup.folder !== sourceGroup)) {
+                if (
+                  !isMain &&
+                  (!targetGroup || targetGroup.folder !== sourceGroup)
+                ) {
                   logger.warn(
                     { chatJid: draftUpdate.chatJid, sourceGroup },
                     'Unauthorized IPC Telegram draft update blocked',
@@ -4326,7 +4557,11 @@ function startIpcWatcher(): void {
                       );
                     }
                   }
-                  if (!sendResult.sent && sendResult.disabled && !sendResult.error) {
+                  if (
+                    !sendResult.sent &&
+                    sendResult.disabled &&
+                    !sendResult.error
+                  ) {
                     logger.debug(
                       {
                         chatJid: draftUpdate.chatJid,
@@ -4771,8 +5006,7 @@ async function connectWhatsApp(): Promise<void> {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      const msg =
-        'WhatsApp authentication required. Run: npm run auth';
+      const msg = 'WhatsApp authentication required. Run: npm run auth';
       logger.error(msg);
       if (process.platform === 'darwin') {
         exec(
@@ -4784,7 +5018,9 @@ async function connectWhatsApp(): Promise<void> {
 
     if (connection === 'close') {
       const reason = (
-        lastDisconnect?.error as { output?: { statusCode?: number } } | undefined
+        lastDisconnect?.error as
+          | { output?: { statusCode?: number } }
+          | undefined
       )?.output?.statusCode;
       const shouldReconnect = reason !== DisconnectReason.loggedOut;
       logger.info({ reason, shouldReconnect }, 'Connection closed');
@@ -4803,7 +5039,7 @@ async function connectWhatsApp(): Promise<void> {
       sock.sendPresenceUpdate('available').catch((err) => {
         logger.debug({ err }, 'Failed to set initial available presence');
       });
-      
+
       // Build LID to phone mapping from auth state for self-chat translation
       if (sock.user) {
         const phoneUser = sock.user.id.split(':')[0];
@@ -4815,7 +5051,7 @@ async function connectWhatsApp(): Promise<void> {
       }
 
       maybeRegisterWhatsAppMainChat();
-      
+
       // Sync group metadata on startup (respects 24h cache)
       syncGroupMetadata().catch((err) =>
         logger.error({ err }, 'Initial group sync failed'),
@@ -4851,7 +5087,7 @@ async function connectWhatsApp(): Promise<void> {
 
       // Translate LID JID to phone JID if applicable
       const chatJid = translateJid(rawJid);
-      
+
       const timestamp = new Date(
         Number(msg.messageTimestamp) * 1000,
       ).toISOString();
@@ -4953,12 +5189,17 @@ async function runHeartbeatTurn(reason = 'interval'): Promise<void> {
 
   const group = registeredGroups[mainChatJid];
   if (!group || group.folder !== MAIN_GROUP_FOLDER) {
-    logHeartbeatSkip('main-group-not-registered', { chatJid: mainChatJid, reason });
+    logHeartbeatSkip('main-group-not-registered', {
+      chatJid: mainChatJid,
+      reason,
+    });
     return;
   }
   if (
     !shouldBypassEmptyHeartbeatSkip(reason) &&
-    isHeartbeatFileEffectivelyEmpty(path.join(MAIN_WORKSPACE_DIR, 'HEARTBEAT.md'))
+    isHeartbeatFileEffectivelyEmpty(
+      path.join(MAIN_WORKSPACE_DIR, 'HEARTBEAT.md'),
+    )
   ) {
     logHeartbeatSkip('empty-heartbeat-file', { chatJid: mainChatJid, reason });
     return;
@@ -5055,7 +5296,10 @@ async function runHeartbeatTurn(reason = 'interval'): Promise<void> {
         await sendMessage(destination, `Reasoning:\n${reasoning}`);
       }
     }
-    heartbeatLastSent.set(mainChatJid, { text: normalized.text, sentAt: nowMs });
+    heartbeatLastSent.set(mainChatJid, {
+      text: normalized.text,
+      sentAt: nowMs,
+    });
   } catch (err) {
     logger.warn({ err, chatJid: mainChatJid }, 'Heartbeat run failed');
   } finally {
@@ -5148,7 +5392,10 @@ function ensureContainerSystemRunning(): void {
       .filter((n) => n.startsWith('nanoclaw-'));
     if (stale.length > 0) {
       execSync(`docker rm ${stale.join(' ')}`, { stdio: 'pipe' });
-      logger.info({ runtime, count: stale.length }, 'Cleaned up stale containers');
+      logger.info(
+        { runtime, count: stale.length },
+        'Cleaned up stale containers',
+      );
     }
   } catch {
     // Ignore cleanup failures (unsupported flags/no stale containers/runtime quirks).
@@ -5165,7 +5412,10 @@ function stopFarmServicesForShutdown(signal: string): void {
   }
 }
 
-async function shutdownAndExit(signal: string, exitCode: number): Promise<void> {
+async function shutdownAndExit(
+  signal: string,
+  exitCode: number,
+): Promise<void> {
   stopFarmServicesForShutdown(signal);
   await stopWebControlCenterService();
   await stopTuiGatewayService();
@@ -5216,7 +5466,7 @@ async function main(): Promise<void> {
   const telegramEnabled = !!TELEGRAM_BOT_TOKEN;
   const farmOnlyMode =
     FEATURE_FARM && FARM_STATE_ENABLED && !WHATSAPP_ENABLED && !telegramEnabled;
-  
+
   if (!WHATSAPP_ENABLED && !telegramEnabled && !farmOnlyMode) {
     throw new Error(
       'No channels enabled. Set WHATSAPP_ENABLED=1 and/or TELEGRAM_BOT_TOKEN.',

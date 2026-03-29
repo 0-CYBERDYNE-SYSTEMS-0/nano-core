@@ -251,7 +251,9 @@ function checkStateDirs(): CheckResult {
   return {
     id: 'runtime.state',
     level: exists ? 'pass' : 'warn',
-    summary: exists ? 'Runtime state directory exists' : 'Runtime state directory missing',
+    summary: exists
+      ? 'Runtime state directory exists'
+      : 'Runtime state directory missing',
     detail: DATA_DIR,
   };
 }

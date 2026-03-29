@@ -24,7 +24,12 @@ export async function applyNonHeartbeatEmptyOutputPolicy(params: {
   retryRun: () => Promise<AgentRunResult>;
 }): Promise<{ finalRun: AgentRunResult; retried: boolean }> {
   const { isHeartbeatRun, firstRun, retryRun } = params;
-  if (isHeartbeatRun || !firstRun.ok || firstRun.streamed || hasUserVisibleText(firstRun.result)) {
+  if (
+    isHeartbeatRun ||
+    !firstRun.ok ||
+    firstRun.streamed ||
+    hasUserVisibleText(firstRun.result)
+  ) {
     return { finalRun: firstRun, retried: false };
   }
 
@@ -47,4 +52,3 @@ export async function applyNonHeartbeatEmptyOutputPolicy(params: {
 
   return { finalRun: secondRun, retried: true };
 }
-

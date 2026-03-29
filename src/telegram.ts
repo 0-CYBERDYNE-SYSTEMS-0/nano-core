@@ -3,14 +3,18 @@ import path from 'path';
 
 import { ASSISTANT_NAME, DATA_DIR } from './config.js';
 import { logger } from './logger.js';
-import { renderTelegramHtmlText, splitTelegramText as splitTelegramMarkdownText } from './telegram-format.js';
+import {
+  renderTelegramHtmlText,
+  splitTelegramText as splitTelegramMarkdownText,
+} from './telegram-format.js';
 import { loadJson, saveJson } from './utils.js';
 
 export const TELEGRAM_JID_PREFIX = 'telegram:';
 const TELEGRAM_MAX_MESSAGE_LEN = 4096;
 const TELEGRAM_SAFE_MESSAGE_LEN = 4000;
 const TELEGRAM_DRAFT_PREFIX = '...';
-const TELEGRAM_PARSE_ERROR_RE = /can't parse entities|parse entities|find end of the entity/i;
+const TELEGRAM_PARSE_ERROR_RE =
+  /can't parse entities|parse entities|find end of the entity/i;
 const TELEGRAM_MESSAGE_TOO_LONG_RE = /message is too long/i;
 const TELEGRAM_MESSAGE_NOT_MODIFIED_RE = /message is not modified/i;
 const TELEGRAM_RETRYABLE_ERROR_RE =
@@ -19,12 +23,14 @@ const TELEGRAM_RETRY_ATTEMPTS = Math.max(
   1,
   Math.min(
     10,
-    Number.parseInt(process.env.FFT_NANO_TELEGRAM_RETRY_ATTEMPTS || '4', 10) || 4,
+    Number.parseInt(process.env.FFT_NANO_TELEGRAM_RETRY_ATTEMPTS || '4', 10) ||
+      4,
   ),
 );
 const TELEGRAM_RETRY_MIN_DELAY_MS = Math.max(
   100,
-  Number.parseInt(process.env.FFT_NANO_TELEGRAM_RETRY_MIN_MS || '300', 10) || 300,
+  Number.parseInt(process.env.FFT_NANO_TELEGRAM_RETRY_MIN_MS || '300', 10) ||
+    300,
 );
 const TELEGRAM_RETRY_MAX_DELAY_MS = Math.max(
   TELEGRAM_RETRY_MIN_DELAY_MS,
@@ -33,8 +39,10 @@ const TELEGRAM_RETRY_MAX_DELAY_MS = Math.max(
 );
 const TELEGRAM_TYPING_REFRESH_MS = Math.max(
   1000,
-  Number.parseInt(process.env.FFT_NANO_TELEGRAM_TYPING_REFRESH_MS || '4000', 10) ||
-    4000,
+  Number.parseInt(
+    process.env.FFT_NANO_TELEGRAM_TYPING_REFRESH_MS || '4000',
+    10,
+  ) || 4000,
 );
 
 class TelegramApiError extends Error {
@@ -311,12 +319,15 @@ function normalizeMentionTrigger(
   return `@${assistantName} ${content}`;
 }
 
-function selectLargestPhoto(photo: TelegramPhotoSize[]): TelegramPhotoSize | null {
+function selectLargestPhoto(
+  photo: TelegramPhotoSize[],
+): TelegramPhotoSize | null {
   if (photo.length === 0) return null;
   let best = photo[0];
   let bestScore = (best.file_size || 0) + best.width * best.height;
   for (const candidate of photo.slice(1)) {
-    const score = (candidate.file_size || 0) + candidate.width * candidate.height;
+    const score =
+      (candidate.file_size || 0) + candidate.width * candidate.height;
     if (score > bestScore) {
       best = candidate;
       bestScore = score;
@@ -325,7 +336,9 @@ function selectLargestPhoto(photo: TelegramPhotoSize[]): TelegramPhotoSize | nul
   return best;
 }
 
-function buildMessageMedia(msg: TelegramMessage): TelegramInboundMedia | undefined {
+function buildMessageMedia(
+  msg: TelegramMessage,
+): TelegramInboundMedia | undefined {
   if (msg.photo?.length) {
     const photo = selectLargestPhoto(msg.photo);
     if (photo) {
@@ -469,8 +482,13 @@ export function splitTelegramTextForHtmlLimit(
       continue;
     }
 
-    const proportionalLimit = Math.floor((chunk.length * maxRenderedLen) / htmlText.length);
-    const targetLimit = Math.max(1, Math.min(chunk.length - 1, proportionalLimit));
+    const proportionalLimit = Math.floor(
+      (chunk.length * maxRenderedLen) / htmlText.length,
+    );
+    const targetLimit = Math.max(
+      1,
+      Math.min(chunk.length - 1, proportionalLimit),
+    );
     let parts = splitTelegramText(chunk, targetLimit);
     if (parts.length <= 1 && chunk.length > 1) {
       const fallbackLimit = Math.max(1, Math.floor(chunk.length / 2));
@@ -494,7 +512,10 @@ export function normalizeTelegramDraftText(text: string): string {
   const normalized = text.replace(/\r\n/g, '\n');
   if (!normalized) return '.';
   if (normalized.length <= TELEGRAM_MAX_MESSAGE_LEN) return normalized;
-  const suffixLen = Math.max(1, TELEGRAM_MAX_MESSAGE_LEN - TELEGRAM_DRAFT_PREFIX.length);
+  const suffixLen = Math.max(
+    1,
+    TELEGRAM_MAX_MESSAGE_LEN - TELEGRAM_DRAFT_PREFIX.length,
+  );
   return `${TELEGRAM_DRAFT_PREFIX}${normalized.slice(-suffixLen)}`;
 }
 
@@ -514,7 +535,9 @@ export interface TelegramBotOptions {
 }
 
 export interface TelegramBot {
-  startPolling: (onEvent: (event: TelegramInboundEvent) => Promise<void>) => void;
+  startPolling: (
+    onEvent: (event: TelegramInboundEvent) => Promise<void>,
+  ) => void;
   sendMessage: (chatJid: string, text: string) => Promise<void>;
   sendMessageDraft: (
     chatJid: string,
@@ -555,8 +578,14 @@ export interface TelegramBot {
     scope?: TelegramCommandScope,
   ) => Promise<void>;
   deleteCommands: (scope?: TelegramCommandScope) => Promise<void>;
-  setDescription: (description: string, shortDescription?: string) => Promise<void>;
-  answerCallbackQuery: (callbackQueryId: string, text?: string) => Promise<void>;
+  setDescription: (
+    description: string,
+    shortDescription?: string,
+  ) => Promise<void>;
+  answerCallbackQuery: (
+    callbackQueryId: string,
+    text?: string,
+  ) => Promise<void>;
   downloadFile: (fileId: string) => Promise<TelegramDownloadFileResult>;
 }
 
@@ -570,13 +599,15 @@ function buildCommandScopePayload(
   };
 }
 
-function buildReplyMarkup(
-  keyboard: TelegramInlineKeyboard,
-): { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> } {
+function buildReplyMarkup(keyboard: TelegramInlineKeyboard): {
+  inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
+} {
   const inlineKeyboard = keyboard.map((row) =>
     row.map((button) => {
       if (!button.text || !button.callbackData) {
-        throw new Error('Inline keyboard buttons require text and callbackData');
+        throw new Error(
+          'Inline keyboard buttons require text and callbackData',
+        );
       }
       if (Buffer.byteLength(button.callbackData, 'utf8') > 64) {
         throw new Error(
@@ -609,14 +640,19 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
   }
   const typingLoops = new Map<string, TypingLoopState>();
 
-  async function apiGet<T>(method: string, params: Record<string, string>): Promise<T> {
+  async function apiGet<T>(
+    method: string,
+    params: Record<string, string>,
+  ): Promise<T> {
     const url = new URL(`${base}/${method}`);
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
 
     const res = await fetch(url.toString());
     const body = (await res.json()) as TelegramApiResponse<T>;
     if (!body.ok || body.result === undefined) {
-      throw new Error(body.description || `Telegram API error calling ${method}`);
+      throw new Error(
+        body.description || `Telegram API error calling ${method}`,
+      );
     }
     return body.result;
   }
@@ -646,7 +682,8 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
 
     if (!res.ok || !body?.ok || body.result === undefined) {
       const description =
-        body?.description || `Telegram API error calling ${method} (status ${res.status})`;
+        body?.description ||
+        `Telegram API error calling ${method} (status ${res.status})`;
       const retryAfter =
         typeof body?.parameters?.retry_after === 'number'
           ? body.parameters.retry_after
@@ -691,15 +728,25 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
   }
 
   function resolveRetryDelayMs(err: unknown, attempt: number): number {
-    if (err instanceof TelegramApiError && typeof err.retryAfterSeconds === 'number') {
+    if (
+      err instanceof TelegramApiError &&
+      typeof err.retryAfterSeconds === 'number'
+    ) {
       const ms = err.retryAfterSeconds * 1000;
-      return Math.min(TELEGRAM_RETRY_MAX_DELAY_MS, Math.max(TELEGRAM_RETRY_MIN_DELAY_MS, ms));
+      return Math.min(
+        TELEGRAM_RETRY_MAX_DELAY_MS,
+        Math.max(TELEGRAM_RETRY_MIN_DELAY_MS, ms),
+      );
     }
-    const exp = TELEGRAM_RETRY_MIN_DELAY_MS * Math.pow(2, Math.max(0, attempt - 1));
+    const exp =
+      TELEGRAM_RETRY_MIN_DELAY_MS * Math.pow(2, Math.max(0, attempt - 1));
     return Math.min(TELEGRAM_RETRY_MAX_DELAY_MS, exp);
   }
 
-  async function apiPostWithRetry<T>(method: string, payload: object): Promise<T> {
+  async function apiPostWithRetry<T>(
+    method: string,
+    payload: object,
+  ): Promise<T> {
     let attempt = 0;
     let lastErr: unknown;
 
@@ -709,29 +756,43 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
         return await apiPost<T>(method, payload);
       } catch (err) {
         lastErr = err;
-        if (!isRetryableTelegramError(err) || attempt >= TELEGRAM_RETRY_ATTEMPTS) {
+        if (
+          !isRetryableTelegramError(err) ||
+          attempt >= TELEGRAM_RETRY_ATTEMPTS
+        ) {
           throw err;
         }
         const delayMs = resolveRetryDelayMs(err, attempt);
         logger.warn(
-          { method, attempt, delayMs, err: err instanceof Error ? err.message : String(err) },
+          {
+            method,
+            attempt,
+            delayMs,
+            err: err instanceof Error ? err.message : String(err),
+          },
           'Telegram API call failed; retrying',
         );
         await sleep(delayMs);
       }
     }
 
-    throw lastErr instanceof Error ? lastErr : new Error(`Telegram API failed (${method})`);
+    throw lastErr instanceof Error
+      ? lastErr
+      : new Error(`Telegram API failed (${method})`);
   }
 
   async function sendMessageChunk(
     chatId: string,
     chunk: string,
-    replyMarkup?: { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> },
+    replyMarkup?: {
+      inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
+    },
   ): Promise<void> {
     const pending: Array<{
       text: string;
-      replyMarkup?: { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> };
+      replyMarkup?: {
+        inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
+      };
     }> = [{ text: chunk, replyMarkup }];
 
     while (pending.length > 0) {
@@ -753,7 +814,9 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
       }
 
       const textChunk = boundedChunks[0] ?? current.text;
-      const htmlText = renderTelegramHtmlText(textChunk, { textMode: 'markdown' });
+      const htmlText = renderTelegramHtmlText(textChunk, {
+        textMode: 'markdown',
+      });
 
       try {
         await apiPostWithRetry('sendMessage', {
@@ -950,7 +1013,8 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
       chat_id: chatId,
       draft_id: draftId,
       text: normalizeTelegramDraftText(text),
-      ...(typeof opts.messageThreadId === 'number' && Number.isFinite(opts.messageThreadId)
+      ...(typeof opts.messageThreadId === 'number' &&
+      Number.isFinite(opts.messageThreadId)
         ? { message_thread_id: Math.trunc(opts.messageThreadId) }
         : {}),
     });
@@ -965,14 +1029,18 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
     if (!chatId) {
       throw new Error(`Invalid Telegram chat JID: ${chatJid}`);
     }
-    const result = await apiPostWithRetry<{ message_id?: number }>('sendMessage', {
-      chat_id: chatId,
-      text: normalizeTelegramDraftText(text),
-      disable_web_page_preview: true,
-      ...(typeof opts.messageThreadId === 'number' && Number.isFinite(opts.messageThreadId)
-        ? { message_thread_id: Math.trunc(opts.messageThreadId) }
-        : {}),
-    });
+    const result = await apiPostWithRetry<{ message_id?: number }>(
+      'sendMessage',
+      {
+        chat_id: chatId,
+        text: normalizeTelegramDraftText(text),
+        disable_web_page_preview: true,
+        ...(typeof opts.messageThreadId === 'number' &&
+        Number.isFinite(opts.messageThreadId)
+          ? { message_thread_id: Math.trunc(opts.messageThreadId) }
+          : {}),
+      },
+    );
     const messageId = Number(result?.message_id);
     if (!Number.isInteger(messageId) || messageId <= 0) {
       throw new Error('Telegram stream send did not return a valid message_id');
@@ -991,7 +1059,9 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
       throw new Error(`Invalid Telegram chat JID: ${chatJid}`);
     }
     if (!Number.isInteger(messageId) || messageId <= 0) {
-      throw new Error(`Invalid Telegram message id for stream edit: ${messageId}`);
+      throw new Error(
+        `Invalid Telegram message id for stream edit: ${messageId}`,
+      );
     }
     try {
       await apiPostWithRetry('editMessageText', {
@@ -999,12 +1069,16 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
         message_id: messageId,
         text: normalizeTelegramDraftText(text),
         disable_web_page_preview: true,
-        ...(typeof opts.messageThreadId === 'number' && Number.isFinite(opts.messageThreadId)
+        ...(typeof opts.messageThreadId === 'number' &&
+        Number.isFinite(opts.messageThreadId)
           ? { message_thread_id: Math.trunc(opts.messageThreadId) }
           : {}),
       });
     } catch (err) {
-      if (err instanceof TelegramApiError && TELEGRAM_MESSAGE_NOT_MODIFIED_RE.test(err.message)) {
+      if (
+        err instanceof TelegramApiError &&
+        TELEGRAM_MESSAGE_NOT_MODIFIED_RE.test(err.message)
+      ) {
         return;
       }
       throw err;
@@ -1046,7 +1120,10 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
     if (typingLoops.has(chatId)) return;
 
     const sendTypingAction = async (): Promise<void> => {
-      await apiPostWithRetry('sendChatAction', { chat_id: chatId, action: 'typing' });
+      await apiPostWithRetry('sendChatAction', {
+        chat_id: chatId,
+        action: 'typing',
+      });
     };
 
     const state: TypingLoopState = {
@@ -1057,7 +1134,10 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
         void sendTypingAction()
           .catch((err) => {
             logger.debug(
-              { chatJid, err: err instanceof Error ? err.message : String(err) },
+              {
+                chatJid,
+                err: err instanceof Error ? err.message : String(err),
+              },
               'Failed to refresh Telegram typing indicator',
             );
           })
@@ -1136,7 +1216,9 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
     });
   }
 
-  async function downloadFile(fileId: string): Promise<TelegramDownloadFileResult> {
+  async function downloadFile(
+    fileId: string,
+  ): Promise<TelegramDownloadFileResult> {
     const file = await apiGet<TelegramFileInfo>('getFile', { file_id: fileId });
     if (!file.file_path) {
       throw new Error(`Telegram getFile returned no file_path for ${fileId}`);
@@ -1145,7 +1227,9 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
     const url = `${fileBase}/${file.file_path}`;
     const res = await fetch(url);
     if (!res.ok) {
-      throw new Error(`Failed downloading Telegram file: ${res.status} ${res.statusText}`);
+      throw new Error(
+        `Failed downloading Telegram file: ${res.status} ${res.statusText}`,
+      );
     }
 
     const arrayBuffer = await res.arrayBuffer();
@@ -1185,7 +1269,8 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
 
     if (!res.ok) {
       const body = (await res.json()) as TelegramApiResponse<never>;
-      const description = body?.description || `Telegram API error (status ${res.status})`;
+      const description =
+        body?.description || `Telegram API error (status ${res.status})`;
       throw new Error(description);
     }
   }
@@ -1224,7 +1309,8 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
 
     if (!res.ok) {
       const body = (await res.json()) as TelegramApiResponse<never>;
-      const description = body?.description || `Telegram API error (status ${res.status})`;
+      const description =
+        body?.description || `Telegram API error (status ${res.status})`;
       throw new Error(description);
     }
   }

@@ -50,16 +50,28 @@ export interface TuiGatewayAdapters {
   getSessionKeyForChat: (chatJid: string) => string;
   getSessionPrefs: (chatJid: string) => SessionPrefs;
   patchSessionPrefs: (chatJid: string, patch: SessionPrefs) => SessionPrefs;
-  resetSession: (chatJid: string, reason: string) => { ok: boolean; reason: string };
-  getHistory: (chatJid: string, limit: number) => Promise<SessionHistoryMessage[]>;
+  resetSession: (
+    chatJid: string,
+    reason: string,
+  ) => { ok: boolean; reason: string };
+  getHistory: (
+    chatJid: string,
+    limit: number,
+  ) => Promise<SessionHistoryMessage[]>;
   sendChat: (params: {
     chatJid: string;
     sessionKey: string;
     message: string;
     runId: string;
     deliver: boolean;
-  }) => Promise<{ runId: string; status: 'started' | 'queued' | 'already_running' }>;
-  abortChat: (params: { chatJid: string; runId: string }) => Promise<{ aborted: boolean }>;
+  }) => Promise<{
+    runId: string;
+    status: 'started' | 'queued' | 'already_running';
+  }>;
+  abortChat: (params: {
+    chatJid: string;
+    runId: string;
+  }) => Promise<{ aborted: boolean }>;
   serviceGateway: (params: {
     action: 'status' | 'restart' | 'doctor';
   }) => Promise<{ ok: boolean; text: string }> | { ok: boolean; text: string };
@@ -120,7 +132,10 @@ function asBoolean(input: unknown, fallback = false): boolean {
   return fallback;
 }
 
-function sendFrame(ws: WebSocket, frame: GatewayResponseFrame | GatewayEventFrame): void {
+function sendFrame(
+  ws: WebSocket,
+  frame: GatewayResponseFrame | GatewayEventFrame,
+): void {
   if (ws.readyState !== WebSocket.OPEN) return;
   ws.send(JSON.stringify(frame));
 }
@@ -164,9 +179,7 @@ export async function startTuiGatewayServer(
   options: number | TuiGatewayOptions = {},
 ): Promise<TuiGatewayServer> {
   const resolvedOptions =
-    typeof options === 'number'
-      ? { port: options }
-      : options;
+    typeof options === 'number' ? { port: options } : options;
   const host = resolvedOptions.host || DEFAULT_HOST;
   const port = resolvedOptions.port ?? DEFAULT_PORT;
   const authToken = (resolvedOptions.authToken || '').trim();
@@ -183,7 +196,9 @@ export async function startTuiGatewayServer(
 
   const unsubscribe = eventHub.subscribe((event) => {
     const recipients = authRequired
-      ? new Set(Array.from(clients).filter((ws) => authenticatedClients.has(ws)))
+      ? new Set(
+          Array.from(clients).filter((ws) => authenticatedClients.has(ws)),
+        )
       : clients;
     if (event.kind === 'chat') {
       broadcast(recipients, { event: 'chat_event', payload: event.payload });
@@ -205,7 +220,10 @@ export async function startTuiGatewayServer(
       if (!frame) {
         sendFrame(
           ws,
-          failure('unknown', 'Invalid request frame. Expected JSON with id/method.'),
+          failure(
+            'unknown',
+            'Invalid request frame. Expected JSON with id/method.',
+          ),
         );
         return;
       }
@@ -218,7 +236,10 @@ export async function startTuiGatewayServer(
       if (frame.method !== 'connect' && !isAuthenticated) {
         sendFrame(
           ws,
-          failure(frame.id, 'Unauthorized: send connect with a valid gateway token first.'),
+          failure(
+            frame.id,
+            'Unauthorized: send connect with a valid gateway token first.',
+          ),
         );
         return;
       }
@@ -228,7 +249,10 @@ export async function startTuiGatewayServer(
           if (authRequired) {
             const providedToken = asText(params.token).trim();
             if (providedToken !== authToken) {
-              sendFrame(ws, failure(frame.id, 'Unauthorized: invalid gateway token.'));
+              sendFrame(
+                ws,
+                failure(frame.id, 'Unauthorized: invalid gateway token.'),
+              );
               setTimeout(() => {
                 try {
                   ws.close(4401, 'Unauthorized');
@@ -303,7 +327,10 @@ export async function startTuiGatewayServer(
             .catch((err) => {
               sendFrame(
                 ws,
-                failure(frame.id, err instanceof Error ? err.message : String(err)),
+                failure(
+                  frame.id,
+                  err instanceof Error ? err.message : String(err),
+                ),
               );
             });
           break;
@@ -320,7 +347,8 @@ export async function startTuiGatewayServer(
           const reasoningLevel = normalizeReasoningLevel(params.reasoningLevel);
 
           const patch: SessionPrefs = {};
-          if (provider || params.provider === '') patch.provider = provider || undefined;
+          if (provider || params.provider === '')
+            patch.provider = provider || undefined;
           if (model || params.model === '') patch.model = model || undefined;
           if (thinkLevel) patch.thinkLevel = thinkLevel;
           if (reasoningLevel) patch.reasoningLevel = reasoningLevel;
@@ -368,12 +396,18 @@ export async function startTuiGatewayServer(
           void adapters
             .abortChat({ chatJid, runId })
             .then((result) => {
-              sendFrame(ws, response(frame.id, { ok: true, aborted: result.aborted }));
+              sendFrame(
+                ws,
+                response(frame.id, { ok: true, aborted: result.aborted }),
+              );
             })
             .catch((err) => {
               sendFrame(
                 ws,
-                failure(frame.id, err instanceof Error ? err.message : String(err)),
+                failure(
+                  frame.id,
+                  err instanceof Error ? err.message : String(err),
+                ),
               );
             });
           break;
@@ -406,7 +440,10 @@ export async function startTuiGatewayServer(
             .catch((err) => {
               sendFrame(
                 ws,
-                failure(frame.id, err instanceof Error ? err.message : String(err)),
+                failure(
+                  frame.id,
+                  err instanceof Error ? err.message : String(err),
+                ),
               );
             });
           break;
@@ -419,11 +456,17 @@ export async function startTuiGatewayServer(
               ? 'restart'
               : actionRaw === 'doctor'
                 ? 'doctor'
-              : actionRaw === 'status'
-                ? 'status'
-                : null;
+                : actionRaw === 'status'
+                  ? 'status'
+                  : null;
           if (!action) {
-            sendFrame(ws, failure(frame.id, 'action must be "status", "restart", or "doctor"'));
+            sendFrame(
+              ws,
+              failure(
+                frame.id,
+                'action must be "status", "restart", or "doctor"',
+              ),
+            );
             break;
           }
 
@@ -434,7 +477,10 @@ export async function startTuiGatewayServer(
             .catch((err) => {
               sendFrame(
                 ws,
-                failure(frame.id, err instanceof Error ? err.message : String(err)),
+                failure(
+                  frame.id,
+                  err instanceof Error ? err.message : String(err),
+                ),
               );
             });
           break;

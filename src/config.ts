@@ -6,10 +6,11 @@ import { FEATURE_FARM, FFT_PROFILE, PROFILE_DETECTION } from './profile.js';
 import {
   getProfileDir,
   getProfileManifest,
-  type ProfileManifest
+  type ProfileManifest,
 } from './profile-storage.js';
 
-const DEFAULT_ASSISTANT_NAME = FFT_PROFILE === 'farm' ? 'FarmFriend' : 'OpenClaw';
+const DEFAULT_ASSISTANT_NAME =
+  FFT_PROFILE === 'farm' ? 'FarmFriend' : 'OpenClaw';
 
 /**
  * Load profile-specific configuration
@@ -31,11 +32,15 @@ function loadProfileConfig(profileName: string): Record<string, string> {
  */
 const PROFILE_CONFIG = FFT_PROFILE ? loadProfileConfig(FFT_PROFILE) : {};
 
-export const ASSISTANT_NAME = process.env.ASSISTANT_NAME || PROFILE_CONFIG.ASSISTANT_NAME || DEFAULT_ASSISTANT_NAME;
+export const ASSISTANT_NAME =
+  process.env.ASSISTANT_NAME ||
+  PROFILE_CONFIG.ASSISTANT_NAME ||
+  DEFAULT_ASSISTANT_NAME;
 export const POLL_INTERVAL = 2000;
 export const SCHEDULER_POLL_INTERVAL = 60000;
 export const SCHEDULER_MODE =
-  (process.env.FFT_NANO_SCHEDULER_MODE || 'v2').trim().toLowerCase() === 'legacy'
+  (process.env.FFT_NANO_SCHEDULER_MODE || 'v2').trim().toLowerCase() ===
+  'legacy'
     ? 'legacy'
     : 'v2';
 
@@ -66,11 +71,17 @@ export const MAIN_WORKSPACE_DIR = path.resolve(
   expandHomePath(process.env.FFT_NANO_MAIN_WORKSPACE_DIR || '~/nano'),
 );
 export const FARM_STATE_ENABLED =
-  FEATURE_FARM && envFlag(process.env.FARM_STATE_ENABLED || PROFILE_CONFIG.FARM_STATE_ENABLED, FFT_PROFILE === 'farm');
+  FEATURE_FARM &&
+  envFlag(
+    process.env.FARM_STATE_ENABLED || PROFILE_CONFIG.FARM_STATE_ENABLED,
+    FFT_PROFILE === 'farm',
+  );
 export const FARM_MODE = (process.env.FARM_MODE || 'demo').trim().toLowerCase();
 export const FARM_STATE_DIR = path.resolve(DATA_DIR, 'farm-state');
 export const FARM_PROFILE_PATH = path.resolve(
-  expandHomePath(process.env.FARM_PROFILE_PATH || path.join(DATA_DIR, 'farm-profile.json')),
+  expandHomePath(
+    process.env.FARM_PROFILE_PATH || path.join(DATA_DIR, 'farm-profile.json'),
+  ),
 );
 export const FARM_STATE_FAST_MS = envInt(
   process.env.FARM_STATE_FAST_MS,
@@ -96,7 +107,8 @@ export const HA_URL_CANDIDATES = parseHaUrlCandidates(
   process.env.HA_URL_CANDIDATES,
 );
 export const HA_TOKEN = process.env.HA_TOKEN || '';
-export const FFT_DASHBOARD_REPO_PATH = process.env.FFT_DASHBOARD_REPO_PATH || '';
+export const FFT_DASHBOARD_REPO_PATH =
+  process.env.FFT_DASHBOARD_REPO_PATH || '';
 
 export const CONTAINER_IMAGE =
   process.env.CONTAINER_IMAGE || 'fft-nano-agent:latest';
@@ -195,7 +207,10 @@ export const MEMORY_CONTEXT_CHAR_BUDGET = envInt(
 export const FFT_NANO_WEB_ACCESS_MODE = parseWebAccessMode(
   process.env.FFT_NANO_WEB_ACCESS_MODE,
 );
-export const FFT_NANO_WEB_ENABLED = envFlag(process.env.FFT_NANO_WEB_ENABLED, true);
+export const FFT_NANO_WEB_ENABLED = envFlag(
+  process.env.FFT_NANO_WEB_ENABLED,
+  true,
+);
 export const FFT_NANO_WEB_PORT = envInt(
   process.env.FFT_NANO_WEB_PORT,
   28990,
@@ -203,14 +218,19 @@ export const FFT_NANO_WEB_PORT = envInt(
   65535,
 );
 export const FFT_NANO_WEB_HOST = resolveWebHost(FFT_NANO_WEB_ACCESS_MODE);
-export const FFT_NANO_WEB_AUTH_TOKEN = (process.env.FFT_NANO_WEB_AUTH_TOKEN || '').trim();
+export const FFT_NANO_WEB_AUTH_TOKEN = (
+  process.env.FFT_NANO_WEB_AUTH_TOKEN || ''
+).trim();
 export const FFT_NANO_WEB_STATIC_DIR = path.resolve(
   PROJECT_ROOT,
   'dist-web',
   'control-center',
 );
 
-export const FFT_NANO_TUI_ENABLED = envFlag(process.env.FFT_NANO_TUI_ENABLED, true);
+export const FFT_NANO_TUI_ENABLED = envFlag(
+  process.env.FFT_NANO_TUI_ENABLED,
+  true,
+);
 export const FFT_NANO_TUI_PORT = envInt(
   process.env.FFT_NANO_TUI_PORT,
   28989,
@@ -219,8 +239,7 @@ export const FFT_NANO_TUI_PORT = envInt(
 );
 export const FFT_NANO_TUI_HOST = resolveTuiHost(FFT_NANO_WEB_ACCESS_MODE);
 export const FFT_NANO_TUI_AUTH_TOKEN = (
-  process.env.FFT_NANO_TUI_AUTH_TOKEN ||
-  FFT_NANO_WEB_AUTH_TOKEN
+  process.env.FFT_NANO_TUI_AUTH_TOKEN || FFT_NANO_WEB_AUTH_TOKEN
 ).trim();
 
 function escapeRegex(str: string): string {

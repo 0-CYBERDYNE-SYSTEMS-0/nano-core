@@ -2,7 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import { execSync } from 'child_process';
 
-import { FEATURE_FARM, FFT_PROFILE, PROFILE_DETECTION, type FFTProfile } from './profile.js';
+import {
+  FEATURE_FARM,
+  FFT_PROFILE,
+  PROFILE_DETECTION,
+  type FFTProfile,
+} from './profile.js';
 import {
   getProfilesDir,
   getWorkspacesDir,
@@ -11,11 +16,19 @@ import {
   getProfileManifest,
   listInstalledProfiles,
   ensureDirectories,
-  type ProfileManifest
+  type ProfileManifest,
 } from './profile-storage.js';
 
 interface CliArgs {
-  command: 'status' | 'set' | 'apply' | 'install' | 'list' | 'activate' | 'switch' | 'remove';
+  command:
+    | 'status'
+    | 'set'
+    | 'apply'
+    | 'install'
+    | 'list'
+    | 'activate'
+    | 'switch'
+    | 'remove';
   profile?: string;
   source?: string;
   writeEnv: boolean;
@@ -120,7 +133,11 @@ function upsertEnvValue(envPath: string, key: string, value: string): void {
   });
 
   if (!updated) next.push(`${key}=${value}`);
-  fs.writeFileSync(envPath, `${next.filter((line, idx, arr) => !(idx === arr.length - 1 && line === '')).join('\n')}\n`, 'utf-8');
+  fs.writeFileSync(
+    envPath,
+    `${next.filter((line, idx, arr) => !(idx === arr.length - 1 && line === '')).join('\n')}\n`,
+    'utf-8',
+  );
 }
 
 function copyRecursive(source: string, dest: string): void {
@@ -150,7 +167,9 @@ async function installProfile(source: string): Promise<void> {
   // Detect source type
   if (source.startsWith('http://') || source.startsWith('https://')) {
     console.log('Source is URL - downloading...');
-    throw new Error('URL download not yet implemented - use GitHub or local path');
+    throw new Error(
+      'URL download not yet implemented - use GitHub or local path',
+    );
   } else if (source.includes(path.sep)) {
     // Local path
     sourceDir = path.resolve(source);
@@ -163,7 +182,10 @@ async function installProfile(source: string): Promise<void> {
     console.log(`Cloning from GitHub: ${source}`);
     const tempDir = path.join(getProfilesDir(), `temp_${Date.now()}`);
     try {
-      execSync(`git clone --depth 1 https://github.com/${source}.git ${tempDir}`, { stdio: 'inherit' });
+      execSync(
+        `git clone --depth 1 https://github.com/${source}.git ${tempDir}`,
+        { stdio: 'inherit' },
+      );
       sourceDir = tempDir;
     } catch (err) {
       throw new Error(`Failed to clone GitHub repo: ${err}`);
@@ -284,7 +306,10 @@ function switchProfile(targetProfile: string): void {
 
     const currentWorkspace = getWorkspaceDir(currentProfile);
     if (fs.existsSync(currentWorkspace)) {
-      const backupDir = path.join(getWorkspacesDir(), `${currentProfile}_backup_${Date.now()}`);
+      const backupDir = path.join(
+        getWorkspacesDir(),
+        `${currentProfile}_backup_${Date.now()}`,
+      );
       console.log(`Backing up to: ${backupDir}`);
       copyRecursive(currentWorkspace, backupDir);
       console.log('✅ Backup complete');
@@ -352,7 +377,7 @@ async function removeProfile(profileName: string): Promise<void> {
 async function prompt(question: string): Promise<string> {
   const readline = (await import('readline')).createInterface({
     input: process.stdin,
-    output: process.stdout
+    output: process.stdout,
   });
 
   return new Promise((resolve) => {
@@ -420,10 +445,14 @@ async function main(): Promise<void> {
     // Legacy commands (set, apply) - DISABLED for now
     // Use new activate/switch commands instead
     if (args.command === 'set' || args.command === 'apply') {
-      throw new Error(`Legacy command "${args.command}" is deprecated. Use "activate" or "switch" instead.`);
+      throw new Error(
+        `Legacy command "${args.command}" is deprecated. Use "activate" or "switch" instead.`,
+      );
     }
 
-    console.log(`Set profile=${args.profile}${args.writeEnv ? ' (persisted in .env)' : ''}`);
+    console.log(
+      `Set profile=${args.profile}${args.writeEnv ? ' (persisted in .env)' : ''}`,
+    );
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err));
     console.error('');

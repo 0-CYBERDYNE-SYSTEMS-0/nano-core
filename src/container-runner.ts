@@ -53,7 +53,10 @@ function envPositiveInt(name: string, fallback: number): number {
 const DOCKER_REUSE_ENABLED = !['0', 'false', 'no'].includes(
   (process.env.FFT_NANO_DOCKER_REUSE || '1').trim().toLowerCase(),
 );
-const DOCKER_REUSE_MAX_RUNS = envPositiveInt('FFT_NANO_DOCKER_REUSE_MAX_RUNS', 200);
+const DOCKER_REUSE_MAX_RUNS = envPositiveInt(
+  'FFT_NANO_DOCKER_REUSE_MAX_RUNS',
+  200,
+);
 const DOCKER_REUSE_MAX_AGE_MS = envPositiveInt(
   'FFT_NANO_DOCKER_REUSE_MAX_AGE_MS',
   6 * 60 * 60 * 1000,
@@ -85,7 +88,10 @@ function resolveReusableContainerName(groupFolder: string): string {
 
 function mountSignature(mounts: VolumeMount[]): string {
   return mounts
-    .map((mount) => `${mount.hostPath}->${mount.containerPath}${mount.readonly ? ':ro' : ':rw'}`)
+    .map(
+      (mount) =>
+        `${mount.hostPath}->${mount.containerPath}${mount.readonly ? ':ro' : ':rw'}`,
+    )
     .sort()
     .join('|');
 }
@@ -155,7 +161,10 @@ function getNewestFileMtimeMs(dirPath: string): number {
   return newest;
 }
 
-function ensureHostAgentRunnerBuildFresh(projectRoot: string): { ok: boolean; error?: string } {
+function ensureHostAgentRunnerBuildFresh(projectRoot: string): {
+  ok: boolean;
+  error?: string;
+} {
   const runnerDir = path.join(projectRoot, 'container', 'agent-runner');
   const srcDir = path.join(runnerDir, 'src');
   const distIndexPath = path.join(runnerDir, 'dist', 'index.js');
@@ -165,7 +174,9 @@ function ensureHostAgentRunnerBuildFresh(projectRoot: string): { ok: boolean; er
   }
 
   const newestSrcMtime = getNewestFileMtimeMs(srcDir);
-  const distMtime = fs.existsSync(distIndexPath) ? fs.statSync(distIndexPath).mtimeMs : 0;
+  const distMtime = fs.existsSync(distIndexPath)
+    ? fs.statSync(distIndexPath).mtimeMs
+    : 0;
   if (distMtime >= newestSrcMtime && distMtime > 0) {
     return { ok: true };
   }
@@ -189,13 +200,18 @@ function ensureHostAgentRunnerBuildFresh(projectRoot: string): { ok: boolean; er
     const details = (build.stderr || build.stdout || '').trim();
     return {
       ok: false,
-      error: details || `Failed to build host runtime agent-runner (code=${build.status ?? 'unknown'})`,
+      error:
+        details ||
+        `Failed to build host runtime agent-runner (code=${build.status ?? 'unknown'})`,
     };
   }
   return { ok: true };
 }
 
-function runDockerCtl(args: string[], timeoutMs = 15_000): {
+function runDockerCtl(
+  args: string[],
+  timeoutMs = 15_000,
+): {
   ok: boolean;
   code: number | null;
   stdout: string;
@@ -215,7 +231,10 @@ function runDockerCtl(args: string[], timeoutMs = 15_000): {
 }
 
 function dockerContainerRunning(name: string): boolean {
-  const inspect = runDockerCtl(['inspect', '-f', '{{.State.Running}}', name], 10_000);
+  const inspect = runDockerCtl(
+    ['inspect', '-f', '{{.State.Running}}', name],
+    10_000,
+  );
   return inspect.ok && inspect.stdout.trim() === 'true';
 }
 
@@ -291,7 +310,9 @@ function createReusableContainer(params: {
   if (!run.ok) {
     return {
       ok: false,
-      error: run.stderr.trim() || `docker run failed with code ${run.code ?? 'unknown'}`,
+      error:
+        run.stderr.trim() ||
+        `docker run failed with code ${run.code ?? 'unknown'}`,
     };
   }
   return { ok: true };
@@ -326,7 +347,12 @@ function ensureReusableDockerContainer(params: {
     const liveSignature = dockerContainerMountSignature(name);
     if (!liveSignature || liveSignature !== signature) {
       logger.warn(
-        { group: group.name, name, expectedSignature: signature, liveSignature },
+        {
+          group: group.name,
+          name,
+          expectedSignature: signature,
+          liveSignature,
+        },
         'Reusable container mount signature mismatch; recycling container',
       );
       dockerStopAndRemove(name);
@@ -429,7 +455,11 @@ export interface ContainerInput {
   isScheduledTask?: boolean;
   assistantName?: string;
   secrets?: Record<string, string>;
-  codingHint?: 'none' | 'auto' | 'force_delegate_execute' | 'force_delegate_plan';
+  codingHint?:
+    | 'none'
+    | 'auto'
+    | 'force_delegate_execute'
+    | 'force_delegate_plan';
   requestId?: string;
   memoryContext?: string;
   extraSystemPrompt?: string;
@@ -562,9 +592,13 @@ function buildVolumeMounts(
   const runtimeSkillSourceDirs = isMain
     ? [path.join(MAIN_WORKSPACE_DIR, 'skills')]
     : [];
-  const skillSync = syncProjectPiSkillsToGroupPiHome(projectRoot, groupPiHomeDir, {
-    additionalSkillSourceDirs: runtimeSkillSourceDirs,
-  });
+  const skillSync = syncProjectPiSkillsToGroupPiHome(
+    projectRoot,
+    groupPiHomeDir,
+    {
+      additionalSkillSourceDirs: runtimeSkillSourceDirs,
+    },
+  );
   if (skillSync.sourceDirExists) {
     logger.debug(
       {
@@ -609,7 +643,12 @@ function buildVolumeMounts(
 
   // Persist Codex config per group so nested Codex runs inside the container
   // resolve a stable ~/.codex/config.toml with required feature flags.
-  const groupCodexHomeDir = path.join(DATA_DIR, 'codex', group.folder, '.codex');
+  const groupCodexHomeDir = path.join(
+    DATA_DIR,
+    'codex',
+    group.folder,
+    '.codex',
+  );
   fs.mkdirSync(groupCodexHomeDir, { recursive: true });
   ensureCodexMultiAgentConfig(path.join(groupCodexHomeDir, 'config.toml'));
   mounts.push({
@@ -651,7 +690,10 @@ function buildVolumeMounts(
       });
     }
 
-    const templatesPath = path.join(FFT_DASHBOARD_REPO_PATH, 'dashboard-templates');
+    const templatesPath = path.join(
+      FFT_DASHBOARD_REPO_PATH,
+      'dashboard-templates',
+    );
     if (fs.existsSync(templatesPath)) {
       mounts.push({
         hostPath: templatesPath,
@@ -664,8 +706,18 @@ function buildVolumeMounts(
   // Copy agent-runner source into a per-group writable location so agents
   // can customize it (add tools, change behavior) without affecting other
   // groups. Recompiled on container startup via entrypoint.sh.
-  const agentRunnerSrc = path.join(projectRoot, 'container', 'agent-runner', 'src');
-  const groupAgentRunnerDir = path.join(DATA_DIR, 'sessions', group.folder, 'agent-runner-src');
+  const agentRunnerSrc = path.join(
+    projectRoot,
+    'container',
+    'agent-runner',
+    'src',
+  );
+  const groupAgentRunnerDir = path.join(
+    DATA_DIR,
+    'sessions',
+    group.folder,
+    'agent-runner-src',
+  );
   if (fs.existsSync(agentRunnerSrc)) {
     const syncStats = syncAgentRunnerSourceFiles({
       sourceDir: agentRunnerSrc,
@@ -786,7 +838,9 @@ function collectRuntimeSecrets(params: {
 
   // Keep runtime env stable without mounting env files.
   merged.TZ = TIMEZONE;
-  merged.FFT_NANO_PROMPT_FILE_MAX_CHARS = String(PARITY_CONFIG.workspace.bootstrapMaxChars);
+  merged.FFT_NANO_PROMPT_FILE_MAX_CHARS = String(
+    PARITY_CONFIG.workspace.bootstrapMaxChars,
+  );
   merged.FFT_NANO_PROMPT_TOTAL_MAX_CHARS = String(
     PARITY_CONFIG.workspace.bootstrapTotalMaxChars,
   );
@@ -819,7 +873,10 @@ function collectRuntimeSecrets(params: {
     merged.FFT_AGENT_WORKSPACE_IPC_DIR = hostPaths.ipcDir;
     merged.FFT_AGENT_PI_HOME_DIR = hostPaths.piHomeDir;
     merged.FFT_AGENT_PI_AGENT_DIR = path.join(hostPaths.piHomeDir, 'agent-fft');
-    merged.FFT_AGENT_CODER_AGENT_DIR = path.join(hostPaths.piHomeDir, 'agent-coder');
+    merged.FFT_AGENT_CODER_AGENT_DIR = path.join(
+      hostPaths.piHomeDir,
+      'agent-coder',
+    );
     merged.FFT_AGENT_PI_ON_PI_EXTENSION_PATH = path.join(
       projectRoot,
       'container',
@@ -922,12 +979,19 @@ export async function runContainerAgent(
   const safeName = group.folder.replace(/[^a-zA-Z0-9-]/g, '-');
   const ephemeralRuntimeName = `nanoclaw-${safeName}-${Date.now()}`;
   let runtimeName = ephemeralRuntimeName;
-  const runtimeCmd =
-    runtime === 'docker' ? 'docker' : process.execPath;
+  const runtimeCmd = runtime === 'docker' ? 'docker' : process.execPath;
   let runtimeArgs: string[] =
     runtime === 'docker'
       ? buildContainerArgs(runtime, mounts, runtimeName)
-      : [path.join(projectRoot, 'container', 'agent-runner', 'dist', 'index.js')];
+      : [
+          path.join(
+            projectRoot,
+            'container',
+            'agent-runner',
+            'dist',
+            'index.js',
+          ),
+        ];
 
   if (runtime === 'docker' && DOCKER_REUSE_ENABLED) {
     const ensured = ensureReusableDockerContainer({ group, mounts });
@@ -983,7 +1047,9 @@ export async function runContainerAgent(
       return {
         status: 'error',
         result: null,
-        error: ensureBuild.error || 'Failed to ensure host runtime agent-runner build',
+        error:
+          ensureBuild.error ||
+          'Failed to ensure host runtime agent-runner build',
       };
     }
     const hostRunnerPath = runtimeArgs[0];
@@ -996,8 +1062,16 @@ export async function runContainerAgent(
     }
   }
 
-  const hostProjectDir = resolveMountedHostPath(mounts, '/workspace/project', projectRoot);
-  const hostGroupDir = resolveMountedHostPath(mounts, '/workspace/group', groupDir);
+  const hostProjectDir = resolveMountedHostPath(
+    mounts,
+    '/workspace/project',
+    projectRoot,
+  );
+  const hostGroupDir = resolveMountedHostPath(
+    mounts,
+    '/workspace/group',
+    groupDir,
+  );
   const hostGlobalDir = resolveMountedHostPath(
     mounts,
     '/workspace/global',
@@ -1034,7 +1108,10 @@ export async function runContainerAgent(
       stdio: ['pipe', 'pipe', 'pipe'],
       cwd: runtime === 'host' ? projectRoot : undefined,
       // Host runner loads workspace paths at process startup; inject now.
-      env: runtime === 'host' ? { ...process.env, ...runtimeSecrets } : process.env,
+      env:
+        runtime === 'host'
+          ? { ...process.env, ...runtimeSecrets }
+          : process.env,
     });
     let settled = false;
     let onAbort: (() => void) | null = null;
@@ -1124,14 +1201,18 @@ export async function runContainerAgent(
           dockerContainerStates.delete(group.folder);
           runtimeProc.kill('SIGKILL');
         } else {
-          exec(`${runtimeCmd} stop ${runtimeName}`, { timeout: 15000 }, (err) => {
-            if (!err) return;
-            logger.warn(
-              { group: group.name, runtimeName, runtime, err },
-              'Graceful runtime stop failed; escalating to SIGKILL',
-            );
-            runtimeProc.kill('SIGKILL');
-          });
+          exec(
+            `${runtimeCmd} stop ${runtimeName}`,
+            { timeout: 15000 },
+            (err) => {
+              if (!err) return;
+              logger.warn(
+                { group: group.name, runtimeName, runtime, err },
+                'Graceful runtime stop failed; escalating to SIGKILL',
+              );
+              runtimeProc.kill('SIGKILL');
+            },
+          );
         }
       } else {
         runtimeProc.kill('SIGTERM');
@@ -1150,7 +1231,10 @@ export async function runContainerAgent(
     });
 
     onAbort = () => {
-      logger.info({ group: group.name, runtime }, 'Agent runtime run aborted by signal');
+      logger.info(
+        { group: group.name, runtime },
+        'Agent runtime run aborted by signal',
+      );
       if (!exited) {
         runtimeProc.kill('SIGTERM');
       }
@@ -1223,16 +1307,16 @@ export async function runContainerAgent(
 
       const isError = code !== 0;
 
-        if (isVerbose || isError) {
-          logLines.push(
-            `=== Input ===`,
-            JSON.stringify(payload, null, 2),
-            ``,
-            `=== Runtime Args ===`,
-            runtimeArgs.join(' '),
-            ``,
-            `=== Mounts ===`,
-            mounts
+      if (isVerbose || isError) {
+        logLines.push(
+          `=== Input ===`,
+          JSON.stringify(payload, null, 2),
+          ``,
+          `=== Runtime Args ===`,
+          runtimeArgs.join(' '),
+          ``,
+          `=== Mounts ===`,
+          mounts
             .map(
               (m) =>
                 `${m.hostPath} -> ${m.containerPath}${m.readonly ? ' (ro)' : ''}`,
@@ -1331,7 +1415,10 @@ export async function runContainerAgent(
     runtimeProc.on('error', (err) => {
       if (settled) return;
       clearTimeout(timeout);
-      logger.error({ group: group.name, runtime, error: err }, 'Agent runtime spawn error');
+      logger.error(
+        { group: group.name, runtime, error: err },
+        'Agent runtime spawn error',
+      );
       finish({
         status: 'error',
         result: null,
