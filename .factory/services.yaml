@@ -1,0 +1,9 @@
+commands:
+  install: npm install
+  typecheck: tsc --noEmit
+  build: npm run build
+  lint: npx prettier --check "src/**/*.ts"
+  test: node --import tsx --test $(find tests -type f -name '*.test.ts' | tr '\n' ' ')
+  migration-test: bash tests/test-migration.sh
+
+services: {}

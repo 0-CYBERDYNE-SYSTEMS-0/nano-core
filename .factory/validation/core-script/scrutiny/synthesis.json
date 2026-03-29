@@ -1,0 +1,62 @@
+{
+  "milestone": "core-script",
+  "round": 1,
+  "status": "pass",
+  "validatorsRun": {
+    "test": {
+      "passed": true,
+      "command": "node --import tsx --test $(find tests -type f -name '*.test.ts' | tr '\\n' ' ')",
+      "exitCode": 0,
+      "observation": "157 tests passed, 0 failed across 9 test suites"
+    },
+    "typecheck": {
+      "passed": true,
+      "command": "npx tsc --noEmit",
+      "exitCode": 0,
+      "observation": "No type errors"
+    },
+    "lint": {
+      "passed": false,
+      "command": "npx prettier --check \"src/**/*.ts\"",
+      "exitCode": 1,
+      "observation": "44 files in src/ have pre-existing formatting issues (not from this feature). The migration script itself (scripts/migrate-to-nanocore.ts) was fixed. The src/ formatting issues pre-date this feature."
+    }
+  },
+  "reviewsSummary": {
+    "total": 1,
+    "passed": 1,
+    "failed": 0,
+    "failedFeatures": []
+  },
+  "blockingIssues": [],
+  "appliedUpdates": [
+    {
+      "target": "services.yaml",
+      "description": "Added migration-test command for running shell integration tests (bash tests/test-migration.sh)",
+      "sourceFeature": "migration-script-core"
+    }
+  ],
+  "suggestedGuidanceUpdates": [
+    {
+      "target": "AGENTS.md",
+      "suggestion": "Add guidance: when writing migration-related tests, prefer shell integration tests (tests/test-migration.sh pattern using HOME= overrides and temp directories) over shallow unit tests that only verify argument parsing. The Migrator class should be refactored to be independently importable for direct unit testing.",
+      "evidence": "Feature migration-script-core has unit tests that only verify argument values exist in arrays rather than testing actual Migrator behavior. The shell integration test provides much better coverage.",
+      "isSystemic": false
+    }
+  ],
+  "rejectedObservations": [
+    {
+      "observation": "Document removeComments and trailing comma utilities in library/",
+      "reason": "These are implementation details of a single script, not patterns needed across the codebase. Too low-level for library documentation."
+    },
+    {
+      "observation": "Document maskSecret pattern in library/",
+      "reason": "maskSecret is a single utility function in one script. Not a cross-cutting pattern that workers need to know about."
+    },
+    {
+      "observation": "Document migration source paths in library/",
+      "reason": "Migration source paths are specific to the migration script and already documented in mission.md. Not operational knowledge needed by workers."
+    }
+  ],
+  "previousRound": null
+}
