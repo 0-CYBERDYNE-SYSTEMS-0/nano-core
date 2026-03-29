@@ -1,12 +1,12 @@
 {
   "milestone": "core-script",
-  "round": 1,
-  "status": "fail",
+  "round": 2,
+  "status": "pass",
   "assertionsSummary": {
     "total": 20,
-    "passed": 18,
-    "failed": 1,
-    "blocked": 1
+    "passed": 20,
+    "failed": 0,
+    "blocked": 0
   },
   "passedAssertions": [
     "VAL-SRC-001",
@@ -14,6 +14,7 @@
     "VAL-SRC-003",
     "VAL-SRC-004",
     "VAL-SRC-005",
+    "VAL-SRC-006",
     "VAL-SRC-007",
     "VAL-DRY-001",
     "VAL-DRY-002",
@@ -30,29 +31,19 @@
     "VAL-CROSS-008"
   ],
   "failedAssertions": [],
-  "blockedAssertions": [
-    {
-      "id": "VAL-SRC-006",
-      "blockedBy": "Cannot test 'no sources found' scenario without removing real ~/.openclaw and ~/.hermes configs. Mission worker blocked rm commands on real user files. Code inspection confirms correct behavior (lines 1806-1811: prints error listing all checked paths, exits with code 1)."
-    }
-  ],
+  "blockedAssertions": [],
   "appliedUpdates": [
     {
       "target": "user-testing.md",
-      "description": "Created initial user-testing.md with validation surface (CLI terminal script, tuistory tool) and concurrency limits (max 5)",
-      "source": "setup"
-    },
-    {
-      "target": "user-testing.md",
-      "description": "Note: mission worker cannot rm/mv real user home directory files, blocking tests requiring source config removal",
+      "description": "Updated: added temp HOME approach for testing 'no sources found' scenario (HOME=<tmpdir> overrides source detection paths without touching real user files)",
       "source": "flow-report"
     }
   ],
-  "previousRound": null,
+  "previousRound": ".factory/validation/core-script/user-testing/synthesis.json (round 1)",
   "testingNotes": {
-    "environment": "macOS darwin 25.4.0, 32GB RAM. Real source configs exist at ~/.openclaw/ and ~/.hermes/. Test fixtures created at ~/.config/clawdbot/ and ~/.moltbot/ for source detection tests.",
-    "isolationStrategy": "Used --target-workspace and --target-env with temp directories for all output. Source detection tests used existing real configs plus temporarily created test configs.",
-    "blockedTests": ["VAL-SRC-006: requires removing all source configs which mission worker cannot do"],
-    "subagentIssue": "user-testing-flow-validator subagents failed to spawn due to invalid model configuration (GLM-5-Turbo-[Z.AI]-2 not found). All tests executed directly by the validator instead."
+    "environment": "macOS darwin 25.4.0. Re-run of core-script milestone to resolve 1 blocked assertion from round 1.",
+    "retestedAssertions": ["VAL-SRC-006"],
+    "resolution": "VAL-SRC-006 was blocked in round 1 because removing real user source configs was not possible. Resolved in round 2 by using HOME=<tmpdir> environment variable override, which makes detectSources() check temp paths instead of real user home. The script correctly printed 'No source configurations found.', listed all 4 checked paths, and exited with code 1.",
+    "technique": "HOME env var override provides clean isolation for source detection tests without modifying real user files"
   }
 }

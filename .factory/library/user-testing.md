@@ -31,7 +31,7 @@ This mission has ONE surface: **CLI terminal script**.
 - NEVER modify real user files (~/nano/, ~/.config/fft_nano/, real .env)
 - Source configs at ~/.openclaw/, ~/.hermes/ are REAL user data - do not delete or move them
 - For tests requiring source config creation (clawdbot, moltbot), create in ~/.config/clawdbot/ and ~/.moltbot/
-- For tests requiring source config removal, use code inspection instead
+- For tests requiring source config removal, use `HOME=<tmpdir>` env var override instead of deleting real files. This makes detectSources() check temp paths. Example: `HOME=$(mktemp -d) npx tsx scripts/migrate-to-nanocore.ts --source auto ...`
 
 ### Key Paths
 - OpenClaw: `~/.openclaw/openclaw.json` (EXISTS - real data)
