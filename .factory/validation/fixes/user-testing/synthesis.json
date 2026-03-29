@@ -1,0 +1,22 @@
+{
+  "milestone": "fixes",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": ["VAL-CHAN-004", "VAL-MEM-006"],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [
+    {
+      "target": "user-testing.md",
+      "description": "Confirmed CLI-only testing surface. Migration script uses os.homedir() for source paths; testing requires HOME env var override to temp directories.",
+      "source": "setup"
+    }
+  ],
+  "previousRound": null
+}

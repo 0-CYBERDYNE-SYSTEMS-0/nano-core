@@ -1,0 +1,32 @@
+{
+  "assertionId": "VAL-MEM-006",
+  "status": "pass",
+  "evidence": {
+    "description": "Tested USER.md merge logic with two test cases:\n\nTest Case 1 (partial overlap): Created a target USER.md with entries 'Name: Test User' and 'Role: Developer' plus unique entries 'Company: Acme Corp' and 'Position: Senior Engineer'. Source USER.md had overlapping entries plus unique entries '## Preferences', '- Editor: VS Code', '- OS: macOS'. After migration WITHOUT --overwrite, the target USER.md correctly preserved all original entries and appended only the new unique entries from source. No duplicate lines were found.\n\nTest Case 2 (full overlap): Created a target USER.md identical to the source. Migration correctly reported 'skipped' with reason 'All user entries already present' and the target USER.md was unchanged.",
+    "commands": [
+      {
+        "command": "HOME=$FAKE_HOME_2 npx tsx scripts/migrate-to-nanocore.ts --source openclaw --execute --target-workspace $TEST_TARGET_MEM --target-env $TEST_TARGET_MEM/.env --output-dir $TEST_OUTPUT_MEM (Test Case 1: partial overlap)",
+        "output": "Migration Report: openclaw\nMode: execute\nMigrated: 10, Archived: 2, Skipped: 6, Conflicts: 0, Errors: 0\n\nTarget USER.md after migration contained original entries + merged comment + only new unique entries from source.",
+        "exitCode": 0
+      },
+      {
+        "command": "sort $TEST_TARGET_MEM/USER.md | uniq -d",
+        "output": "(no duplicates found)",
+        "exitCode": 0
+      },
+      {
+        "command": "HOME=$FAKE_HOME_2 npx tsx scripts/migrate-to-nanocore.ts --source openclaw --execute --target-workspace $TEST_TARGET_MEM2 --target-env $TEST_TARGET_MEM2/.env --output-dir $TEST_OUTPUT_MEM2 (Test Case 2: full overlap)",
+        "output": "Migration Report: openclaw\nMode: execute\nMigrated: 8, Archived: 2, Skipped: 8, Conflicts: 0, Errors: 0",
+        "exitCode": 0
+      },
+      {
+        "command": "python3 -c \"import json; data=json.load(open('report.json')); [print(json.dumps(i,indent=2)) for i in data['items'] if i['id']=='user']\"",
+        "output": "{\"status\": \"skipped\", \"id\": \"user\", \"category\": \"user\", \"reason\": \"All user entries already present\"}",
+        "exitCode": 0
+      }
+    ]
+  },
+  "frictions": [],
+  "blockers": [],
+  "toolsUsed": ["tuistory"]
+}

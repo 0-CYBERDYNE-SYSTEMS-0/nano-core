@@ -1,0 +1,22 @@
+{
+  "assertionId": "VAL-CHAN-004",
+  "status": "pass",
+  "evidence": {
+    "description": "Created a temporary OpenClaw source directory with a config containing discord.botToken='discord-bot-token-test-12345'. Ran migration with --source openclaw --execute --migrate-secrets. Verified DISCORD_BOT_TOKEN was correctly written to the target .env file.",
+    "commands": [
+      {
+        "command": "HOME=$FAKE_HOME npx tsx scripts/migrate-to-nanocore.ts --source openclaw --execute --migrate-secrets --target-workspace $TEST_TARGET_DIR --target-env $TEST_TARGET_DIR/.env --output-dir $TEST_OUTPUT_DIR/chan-004",
+        "output": "Migration Report: openclaw\nMode: execute\nMigrated: 9, Archived: 2, Skipped: 5, Conflicts: 0, Errors: 0",
+        "exitCode": 0
+      },
+      {
+        "command": "grep DISCORD_BOT_TOKEN $TEST_TARGET_DIR/.env",
+        "output": "DISCORD_BOT_TOKEN=discord-bot-token-test-12345",
+        "exitCode": 0
+      }
+    ]
+  },
+  "frictions": [],
+  "blockers": [],
+  "toolsUsed": ["tuistory"]
+}
