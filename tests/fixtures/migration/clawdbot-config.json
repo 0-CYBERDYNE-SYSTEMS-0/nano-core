@@ -1,0 +1,30 @@
+{
+  "name": "Clawdbot Test Config",
+  "agent": {
+    "name": "ClawdAssistant",
+    "identity": "A helpful clawd bot"
+  },
+  "llm": {
+    "provider": "anthropic",
+    "model": "claude-3-opus-20240229",
+    "apiKey": "sk-ant-api03-test-clawdbot-key"
+  },
+  "telegram": {
+    "token": "876543210:ZYXwvutsRQponmlKJIHgfedCBA",
+    "mainChatId": "87654321"
+  },
+  "whatsapp": {
+    "enabled": true
+  },
+  "discord": {
+    "token": "discord-bot-token-here"
+  },
+  "container": {
+    "runtime": "podman",
+    "image": "node:18"
+  },
+  "memory": {
+    "flushInterval": "1h"
+  },
+  "allowedCommands": ["git *", "npm *"]
+}

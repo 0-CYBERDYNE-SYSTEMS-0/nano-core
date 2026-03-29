@@ -1,0 +1,31 @@
+{
+  "agentName": "MoltBot",
+  "persona": "Energetic and helpful assistant",
+  "ai": {
+    "service": "openrouter",
+    "model": "anthropic/claude-3.5-sonnet",
+    "apiKey": "sk-or-v1-test-moltbot-key",
+    "baseUrl": "https://openrouter.ai/api/v1"
+  },
+  "channels": {
+    "telegram": {
+      "botToken": "555555555:TESTtestTESTtestTEST",
+      "enabled": true
+    },
+    "signal": {
+      "enabled": false
+    }
+  },
+  "workspace": {
+    "path": "~/clawd"
+  },
+  "sandbox": {
+    "type": "docker"
+  },
+  "cron": [
+    {
+      "schedule": "0 9 * * *",
+      "task": "morning-briefing"
+    }
+  ]
+}

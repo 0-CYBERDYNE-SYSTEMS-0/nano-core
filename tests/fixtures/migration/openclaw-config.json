@@ -1,0 +1,55 @@
+{
+  "name": "OpenClaw Test Config",
+  "version": "1.0.0",
+  "agent": {
+    "name": "TestAssistant",
+    "role": "Helpful test assistant",
+    "theme": "professional",
+    "personality": "friendly and efficient"
+  },
+  "model": {
+    "provider": "openai",
+    "model": "gpt-4",
+    "apiKey": "sk-test-openclaw-key",
+    "baseUrl": "https://api.openai.com/v1"
+  },
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "botToken": "123456789:ABCdefGHIjklMNOpqrsTUVwxyz",
+      "allowedUsers": ["12345678"]
+    },
+    "whatsapp": {
+      "enabled": false
+    },
+    "discord": {
+      "enabled": false
+    }
+  },
+  "memory": {
+    "backend": "local",
+    "maxEntries": 1000,
+    "flushBeforeCompaction": true
+  },
+  "sandbox": {
+    "runtime": "docker",
+    "image": "node:20-alpine"
+  },
+  "heartbeat": {
+    "enabled": true,
+    "interval": "30m"
+  },
+  "exec": {
+    "approvalPatterns": ["rm -rf", "docker system prune"]
+  },
+  "mcp": {
+    "servers": [
+      {
+        "name": "filesystem",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem"]
+      }
+    ]
+  },
+  "plugins": ["web-search", "image-gen"]
+}

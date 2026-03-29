@@ -1,0 +1,40 @@
+agent:
+  name: HermesAssistant
+  role: Knowledgeable messenger bot
+  description: A helpful assistant inspired by the Greek messenger god
+
+llm:
+  provider: openai
+  model: gpt-4-turbo-preview
+  api_key: sk-hermes-test-key
+  base_url: null
+
+channels:
+  telegram:
+    enabled: true
+    bot_token: "999999999:HERMEShermesHERMEShermes"
+    main_chat_id: "99999999"
+  whatsapp:
+    enabled: true
+  slack:
+    enabled: true
+    bot_token: "xoxb-slack-bot-token"
+    app_token: "xapp-slack-app-token"
+
+runtime:
+  container: docker
+  heartbeat_interval: 45m
+  auto_compact: true
+
+security:
+  exec_allowlist:
+    - "ls *"
+    - "cat *"
+    - "grep *"
+
+features:
+  webhooks:
+    - name: github
+      url: "https://example.com/webhook"
+  multi_agent:
+    enabled: false
