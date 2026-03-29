@@ -1,0 +1,30 @@
+{
+  "flowId": "fix-env-keys",
+  "assertions": [
+    {
+      "id": "VAL-CHAN-005",
+      "status": "pass",
+      "reason": "TELEGRAM_BOT_TOKEN appears exactly once in .env after migration without --overwrite. Original value (ORIGINAL-TOKEN-99999) preserved, source value (NEW-TOKEN-12345) not appended as duplicate. The updateEnvFile() fix correctly tracks keys in updatedKeys set in the else branch.",
+      "evidence": [
+        ".env contains TELEGRAM_BOT_TOKEN=ORIGINAL-TOKEN-99999 (exactly once)",
+        "grep -c TELEGRAM_BOT_TOKEN returns 1 (no duplicates)",
+        "grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' | sort | uniq -d returns empty (no duplicate keys at all)",
+        "report.json shows env-channels as 'migrated' status"
+      ]
+    },
+    {
+      "id": "VAL-MODEL-006",
+      "status": "pass",
+      "reason": "PI_MODEL appears exactly once in .env after migration without --overwrite. Original value (claude-3-opus-20240229) preserved, source value (gpt-4) not appended as duplicate. The updateEnvFile() fix correctly prevents duplicate key insertion.",
+      "evidence": [
+        ".env contains PI_MODEL=claude-3-opus-20240229 (exactly once)",
+        "grep -c PI_MODEL returns 1 (no duplicates)",
+        "No duplicate keys found across entire .env file",
+        "report.json shows env-model as 'migrated' status"
+      ]
+    }
+  ],
+  "frictions": [],
+  "blockers": [],
+  "toolsUsed": ["tuistory"]
+}

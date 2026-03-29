@@ -1,0 +1,16 @@
+{
+  "milestone": "fix-env-keys",
+  "round": 1,
+  "status": "pass",
+  "assertionsSummary": {
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "blocked": 0
+  },
+  "passedAssertions": ["VAL-CHAN-005", "VAL-MODEL-006"],
+  "failedAssertions": [],
+  "blockedAssertions": [],
+  "appliedUpdates": [],
+  "previousRound": null
+}
