@@ -2765,6 +2765,847 @@ features:
       assert.ok(archiveItem.reason, 'Should have skip reason');
     });
   });
+
+  describe('Idempotent re-run (VAL-CROSS-003)', () => {
+    test('Running migration twice produces no duplicate entries in MEMORY.md', async () => {
+      const testHomeDir = path.join(tempDir, 'test-idempotent-mem-home');
+      const testTargetDir = path.join(tempDir, 'test-idempotent-mem-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source MEMORY.md
+      const sourceMemory = `## Entry 1
+- First memory entry
+
+## Entry 2
+- Second memory entry`;
+      await fs.writeFile(
+        path.join(openclawDir, 'MEMORY.md'),
+        sourceMemory,
+        'utf-8',
+      );
+
+      // Create source config
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({ agent: { name: 'TestBot' } }),
+        'utf-8',
+      );
+
+      // First migration run
+      const outputDir1 = path.join(tempDir, 'report-idempotent-1');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir1}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Get MEMORY.md content after first run
+      const memoryAfterFirst = await fs.readFile(
+        path.join(testTargetDir, 'MEMORY.md'),
+        'utf-8',
+      );
+
+      // Second migration run
+      const outputDir2 = path.join(tempDir, 'report-idempotent-2');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir2}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Get MEMORY.md content after second run
+      const memoryAfterSecond = await fs.readFile(
+        path.join(testTargetDir, 'MEMORY.md'),
+        'utf-8',
+      );
+
+      // Content should be identical (no duplicates added)
+      assert.strictEqual(
+        memoryAfterFirst,
+        memoryAfterSecond,
+        'MEMORY.md should not change on second run',
+      );
+
+      // Verify second run report shows duplicates
+      const reportPath = path.join(outputDir2, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      const memItem = report.items.find((i: { id: string }) => i.id === 'memory');
+      assert.ok(
+        memItem?.reason?.includes('already') || memItem?.reason?.includes('duplicate'),
+        'Second run should report entries already present',
+      );
+    });
+
+    test('Running migration twice produces no duplicate entries in USER.md', async () => {
+      const testHomeDir = path.join(tempDir, 'test-idempotent-user-home');
+      const testTargetDir = path.join(tempDir, 'test-idempotent-user-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source USER.md
+      const sourceUser = `## User Profile
+- Name: Test User
+- Role: Developer`;
+      await fs.writeFile(
+        path.join(openclawDir, 'USER.md'),
+        sourceUser,
+        'utf-8',
+      );
+
+      // Create source config
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({ agent: { name: 'TestBot' } }),
+        'utf-8',
+      );
+
+      // First migration run
+      const outputDir1 = path.join(tempDir, 'report-idempotent-user-1');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir1}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Get USER.md content after first run
+      const userAfterFirst = await fs.readFile(
+        path.join(testTargetDir, 'USER.md'),
+        'utf-8',
+      );
+
+      // Second migration run
+      const outputDir2 = path.join(tempDir, 'report-idempotent-user-2');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir2}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Get USER.md content after second run
+      const userAfterSecond = await fs.readFile(
+        path.join(testTargetDir, 'USER.md'),
+        'utf-8',
+      );
+
+      // Content should be identical (no duplicates added)
+      assert.strictEqual(
+        userAfterFirst,
+        userAfterSecond,
+        'USER.md should not change on second run',
+      );
+    });
+
+    test('Running migration twice produces no duplicate entries in .env', async () => {
+      const testHomeDir = path.join(tempDir, 'test-idempotent-env-home');
+      const testTargetDir = path.join(tempDir, 'test-idempotent-env-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          model: { provider: 'openai', model: 'gpt-4' },
+        }),
+        'utf-8',
+      );
+
+      // First migration run
+      const outputDir1 = path.join(tempDir, 'report-idempotent-env-1');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir1}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Get .env content after first run
+      const envAfterFirst = await fs.readFile(
+        path.join(testTargetDir, '.env'),
+        'utf-8',
+      );
+      const envLineCountFirst = envAfterFirst.split('\n').filter((l) => l.trim()).length;
+
+      // Second migration run
+      const outputDir2 = path.join(tempDir, 'report-idempotent-env-2');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir2}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Get .env content after second run
+      const envAfterSecond = await fs.readFile(
+        path.join(testTargetDir, '.env'),
+        'utf-8',
+      );
+      const envLineCountSecond = envAfterSecond.split('\n').filter((l) => l.trim()).length;
+
+      // Line count should be identical (no duplicates added)
+      assert.strictEqual(
+        envLineCountFirst,
+        envLineCountSecond,
+        '.env should not have duplicate entries on second run',
+      );
+    });
+
+    test('Running migration twice produces no duplicate patterns in allowlist', async () => {
+      const testHomeDir = path.join(tempDir, 'test-idempotent-allowlist-home');
+      const testTargetDir = path.join(tempDir, 'test-idempotent-allowlist-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with exec patterns
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          exec: {
+            approvalPatterns: ['npm test', 'git status'],
+          },
+        }),
+        'utf-8',
+      );
+
+      // First migration run
+      const outputDir1 = path.join(tempDir, 'report-idempotent-allowlist-1');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir1}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Get allowlist content after first run
+      const allowlistPath = path.join(testHomeDir, '.config', 'fft_nano', 'mount-allowlist.json');
+      const allowlistAfterFirst = JSON.parse(await fs.readFile(allowlistPath, 'utf-8'));
+
+      // Second migration run
+      const outputDir2 = path.join(tempDir, 'report-idempotent-allowlist-2');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir2}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Get allowlist content after second run
+      const allowlistAfterSecond = JSON.parse(await fs.readFile(allowlistPath, 'utf-8'));
+
+      // Pattern count should be identical
+      assert.strictEqual(
+        allowlistAfterFirst.patterns.length,
+        allowlistAfterSecond.patterns.length,
+        'Allowlist should not have duplicate patterns on second run',
+      );
+
+      // Verify report shows all patterns already present
+      const reportPath = path.join(outputDir2, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      const allowlistItem = report.items.find((i: { id: string }) => i.id === 'allowlist');
+      assert.strictEqual(allowlistItem.status, 'skipped');
+      assert.ok(
+        allowlistItem.reason.includes('already present'),
+        'Should report all patterns already present',
+      );
+    });
+  });
+
+  describe('All 4 source types produce valid output (VAL-CROSS-004)', () => {
+    test('OpenClaw source produces valid target files', async () => {
+      const testHomeDir = path.join(tempDir, 'test-source-openclaw-home');
+      const testTargetDir = path.join(tempDir, 'test-source-openclaw-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create full OpenClaw source structure using fixture
+      const fixturePath = path.join(repoRoot, 'tests/fixtures/migration/openclaw-config.json');
+      const fixtureContent = await fs.readFile(fixturePath, 'utf-8');
+      await fs.writeFile(path.join(openclawDir, 'openclaw.json'), fixtureContent, 'utf-8');
+
+      // Create SOUL.md
+      await fs.writeFile(
+        path.join(openclawDir, 'SOUL.md'),
+        '# OpenClaw SOUL\n\nTest content',
+        'utf-8',
+      );
+
+      // Run migration
+      const outputDir = path.join(tempDir, 'report-source-openclaw');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --migrate-secrets --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify target files exist and are valid
+      const soulPath = path.join(testTargetDir, 'SOUL.md');
+      const envPath = path.join(testTargetDir, '.env');
+      const identityPath = path.join(testTargetDir, 'IDENTITY.md');
+
+      assert.strictEqual(
+        await fs.access(soulPath).then(() => true).catch(() => false),
+        true,
+        'SOUL.md should exist',
+      );
+      assert.strictEqual(
+        await fs.access(envPath).then(() => true).catch(() => false),
+        true,
+        '.env should exist',
+      );
+      assert.strictEqual(
+        await fs.access(identityPath).then(() => true).catch(() => false),
+        true,
+        'IDENTITY.md should exist',
+      );
+
+      // Verify .env has valid format
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(envContent.includes('ASSISTANT_NAME=TestAssistant'), '.env should have ASSISTANT_NAME');
+      assert.ok(envContent.includes('PI_API=openai'), '.env should have PI_API');
+      assert.ok(envContent.includes('TELEGRAM_BOT_TOKEN='), '.env should have TELEGRAM_BOT_TOKEN');
+
+      // Verify report is valid JSON
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      assert.strictEqual(report.sourceType, 'openclaw');
+      assert.ok(report.summary.migrated > 0, 'Should have migrated items');
+    });
+
+    test('Clawdbot source produces valid target files', async () => {
+      const testHomeDir = path.join(tempDir, 'test-source-clawdbot-home');
+      const testTargetDir = path.join(tempDir, 'test-source-clawdbot-target');
+      const clawdbotDir = path.join(testHomeDir, '.config', 'clawdbot');
+      await fs.mkdir(clawdbotDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create full Clawdbot source structure using fixture
+      const fixturePath = path.join(repoRoot, 'tests/fixtures/migration/clawdbot-config.json');
+      const fixtureContent = await fs.readFile(fixturePath, 'utf-8');
+      await fs.writeFile(path.join(clawdbotDir, 'config.json'), fixtureContent, 'utf-8');
+
+      // Run migration
+      const outputDir = path.join(tempDir, 'report-source-clawdbot');
+      execSync(
+        `npx tsx ${scriptPath} --source clawdbot --execute --migrate-secrets --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify target files exist and are valid
+      const envPath = path.join(testTargetDir, '.env');
+      const identityPath = path.join(testTargetDir, 'IDENTITY.md');
+
+      assert.strictEqual(
+        await fs.access(envPath).then(() => true).catch(() => false),
+        true,
+        '.env should exist',
+      );
+      assert.strictEqual(
+        await fs.access(identityPath).then(() => true).catch(() => false),
+        true,
+        'IDENTITY.md should exist',
+      );
+
+      // Verify .env has valid format
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(envContent.includes('ASSISTANT_NAME=ClawdAssistant'), '.env should have ASSISTANT_NAME');
+      assert.ok(envContent.includes('PI_API=anthropic'), '.env should have PI_API=anthropic');
+      assert.ok(envContent.includes('ANTHROPIC_API_KEY='), '.env should have ANTHROPIC_API_KEY');
+      assert.ok(envContent.includes('WHATSAPP_ENABLED=1'), '.env should have WHATSAPP_ENABLED');
+
+      // Verify report is valid JSON
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      assert.strictEqual(report.sourceType, 'clawdbot');
+      assert.ok(report.summary.migrated > 0, 'Should have migrated items');
+    });
+
+    test('Moltbot source produces valid target files', async () => {
+      const testHomeDir = path.join(tempDir, 'test-source-moltbot-home');
+      const testTargetDir = path.join(tempDir, 'test-source-moltbot-target');
+      const moltbotDir = path.join(testHomeDir, '.moltbot');
+      await fs.mkdir(moltbotDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create full Moltbot source structure using fixture
+      const fixturePath = path.join(repoRoot, 'tests/fixtures/migration/moltbot-config.json');
+      const fixtureContent = await fs.readFile(fixturePath, 'utf-8');
+      await fs.writeFile(path.join(moltbotDir, 'moltbot.json'), fixtureContent, 'utf-8');
+
+      // Run migration
+      const outputDir = path.join(tempDir, 'report-source-moltbot');
+      execSync(
+        `npx tsx ${scriptPath} --source moltbot --execute --migrate-secrets --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify target files exist and are valid
+      const envPath = path.join(testTargetDir, '.env');
+      const identityPath = path.join(testTargetDir, 'IDENTITY.md');
+
+      assert.strictEqual(
+        await fs.access(envPath).then(() => true).catch(() => false),
+        true,
+        '.env should exist',
+      );
+      assert.strictEqual(
+        await fs.access(identityPath).then(() => true).catch(() => false),
+        true,
+        'IDENTITY.md should exist',
+      );
+
+      // Verify .env has valid format
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(envContent.includes('ASSISTANT_NAME=MoltBot'), '.env should have ASSISTANT_NAME');
+      assert.ok(envContent.includes('PI_API=openrouter'), '.env should have PI_API=openrouter');
+      assert.ok(envContent.includes('OPENROUTER_API_KEY='), '.env should have OPENROUTER_API_KEY');
+
+      // Verify archive has cron jobs
+      const cronArchivePath = path.join(outputDir, 'archive', 'cron-jobs.json');
+      assert.strictEqual(
+        await fs.access(cronArchivePath).then(() => true).catch(() => false),
+        true,
+        'Cron jobs should be archived',
+      );
+
+      // Verify report is valid JSON
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      assert.strictEqual(report.sourceType, 'moltbot');
+      assert.ok(report.summary.migrated > 0, 'Should have migrated items');
+    });
+
+    test('Hermes source produces valid target files', async () => {
+      const testHomeDir = path.join(tempDir, 'test-source-hermes-home');
+      const testTargetDir = path.join(tempDir, 'test-source-hermes-target');
+      const hermesDir = path.join(testHomeDir, '.hermes');
+      await fs.mkdir(hermesDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create full Hermes source structure using fixture
+      const fixturePath = path.join(repoRoot, 'tests/fixtures/migration/hermes-config.yaml');
+      const fixtureContent = await fs.readFile(fixturePath, 'utf-8');
+      await fs.writeFile(path.join(hermesDir, 'config.yaml'), fixtureContent, 'utf-8');
+
+      // Run migration
+      const outputDir = path.join(tempDir, 'report-source-hermes');
+      execSync(
+        `npx tsx ${scriptPath} --source hermes --execute --migrate-secrets --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify target files exist and are valid
+      const envPath = path.join(testTargetDir, '.env');
+      const identityPath = path.join(testTargetDir, 'IDENTITY.md');
+
+      assert.strictEqual(
+        await fs.access(envPath).then(() => true).catch(() => false),
+        true,
+        '.env should exist',
+      );
+      assert.strictEqual(
+        await fs.access(identityPath).then(() => true).catch(() => false),
+        true,
+        'IDENTITY.md should exist',
+      );
+
+      // Verify .env has valid format
+      const envContent = await fs.readFile(envPath, 'utf-8');
+      assert.ok(envContent.includes('ASSISTANT_NAME=HermesAssistant'), '.env should have ASSISTANT_NAME');
+      assert.ok(envContent.includes('PI_API=openai'), '.env should have PI_API');
+      assert.ok(envContent.includes('WHATSAPP_ENABLED=1'), '.env should have WHATSAPP_ENABLED');
+      assert.ok(envContent.includes('SLACK_BOT_TOKEN='), '.env should have SLACK_BOT_TOKEN');
+
+      // Verify archive has webhooks
+      const webhooksArchivePath = path.join(outputDir, 'archive', 'webhooks.json');
+      assert.strictEqual(
+        await fs.access(webhooksArchivePath).then(() => true).catch(() => false),
+        true,
+        'Webhooks should be archived',
+      );
+
+      // Verify report is valid JSON
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      assert.strictEqual(report.sourceType, 'hermes');
+      assert.ok(report.summary.migrated > 0, 'Should have migrated items');
+    });
+  });
+
+  describe('Cross-area flows (VAL-CROSS-001, 002, 005, 006)', () => {
+    test('Full preset automatically enables --migrate-secrets', async () => {
+      const testHomeDir = path.join(tempDir, 'test-preset-full-home');
+      const testTargetDir = path.join(tempDir, 'test-preset-full-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with secrets
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          model: {
+            provider: 'openai',
+            model: 'gpt-4',
+            apiKey: 'sk-test-full-preset-key',
+          },
+          channels: {
+            telegram: {
+              enabled: true,
+              botToken: 'full-preset-token',
+            },
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration with --preset full (should include secrets)
+      const outputDir = path.join(tempDir, 'report-preset-full');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --preset full --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env contains API keys (secrets were migrated)
+      const envContent = await fs.readFile(
+        path.join(testTargetDir, '.env'),
+        'utf-8',
+      );
+      assert.ok(
+        envContent.includes('OPENAI_API_KEY=sk-test-full-preset-key'),
+        'Full preset should migrate API keys',
+      );
+      assert.ok(
+        envContent.includes('TELEGRAM_BOT_TOKEN=full-preset-token'),
+        'Full preset should migrate tokens',
+      );
+    });
+
+    test('User-data preset excludes secrets', async () => {
+      const testHomeDir = path.join(tempDir, 'test-preset-userdata-home');
+      const testTargetDir = path.join(tempDir, 'test-preset-userdata-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source config with secrets
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({
+          agent: { name: 'TestBot' },
+          model: {
+            provider: 'openai',
+            model: 'gpt-4',
+            apiKey: 'sk-test-userdata-key',
+          },
+          channels: {
+            telegram: {
+              enabled: true,
+              botToken: 'userdata-token',
+            },
+          },
+        }),
+        'utf-8',
+      );
+
+      // Run migration with --preset user-data (should exclude secrets)
+      const outputDir = path.join(tempDir, 'report-preset-userdata');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --preset user-data --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify .env does NOT contain API keys
+      const envContent = await fs.readFile(
+        path.join(testTargetDir, '.env'),
+        'utf-8',
+      );
+      assert.ok(
+        !envContent.includes('OPENAI_API_KEY'),
+        'User-data preset should NOT migrate API keys',
+      );
+      assert.ok(
+        !envContent.includes('TELEGRAM_BOT_TOKEN'),
+        'User-data preset should NOT migrate tokens',
+      );
+
+      // Verify report shows skipped secrets
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      const secretsItems = report.items.filter(
+        (i: { id: string; status: string }) =>
+          i.id.includes('secrets') && i.status === 'skipped',
+      );
+      assert.ok(secretsItems.length > 0, 'Should have skipped secrets items');
+    });
+
+    test('--overwrite flag applies globally to all categories', async () => {
+      const testHomeDir = path.join(tempDir, 'test-overwrite-global-home');
+      const testTargetDir = path.join(tempDir, 'test-overwrite-global-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source files
+      await fs.writeFile(
+        path.join(openclawDir, 'SOUL.md'),
+        '# New SOUL',
+        'utf-8',
+      );
+      await fs.writeFile(
+        path.join(openclawDir, 'AGENTS.md'),
+        '# New AGENTS',
+        'utf-8',
+      );
+      await fs.writeFile(
+        path.join(openclawDir, 'MEMORY.md'),
+        '## New Memory',
+        'utf-8',
+      );
+
+      // Create existing target files
+      await fs.writeFile(
+        path.join(testTargetDir, 'SOUL.md'),
+        '# Old SOUL',
+        'utf-8',
+      );
+      await fs.writeFile(
+        path.join(testTargetDir, 'AGENTS.md'),
+        '# Old AGENTS',
+        'utf-8',
+      );
+      await fs.writeFile(
+        path.join(testTargetDir, 'MEMORY.md'),
+        '## Old Memory',
+        'utf-8',
+      );
+
+      // Create source config
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({ agent: { name: 'TestBot' } }),
+        'utf-8',
+      );
+
+      // Run migration with --overwrite
+      const outputDir = path.join(tempDir, 'report-overwrite-global');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --overwrite --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify all files were overwritten
+      const soulContent = await fs.readFile(
+        path.join(testTargetDir, 'SOUL.md'),
+        'utf-8',
+      );
+      const agentsContent = await fs.readFile(
+        path.join(testTargetDir, 'AGENTS.md'),
+        'utf-8',
+      );
+
+      assert.ok(soulContent.includes('New'), 'SOUL.md should be overwritten');
+      assert.ok(agentsContent.includes('New'), 'AGENTS.md should be overwritten');
+
+      // Verify report shows migrated (not conflict) for overwritten items
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      const soulItem = report.items.find((i: { id: string }) => i.id === 'soul');
+      const agentsItem = report.items.find((i: { id: string }) => i.id === 'agents');
+
+      assert.strictEqual(soulItem.status, 'migrated', 'SOUL.md should show migrated');
+      assert.strictEqual(agentsItem.status, 'migrated', 'AGENTS.md should show migrated');
+    });
+
+    test('--include filters to specified categories only', async () => {
+      const testHomeDir = path.join(tempDir, 'test-include-home');
+      const testTargetDir = path.join(tempDir, 'test-include-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source files
+      await fs.writeFile(
+        path.join(openclawDir, 'SOUL.md'),
+        '# SOUL',
+        'utf-8',
+      );
+      await fs.writeFile(
+        path.join(openclawDir, 'AGENTS.md'),
+        '# AGENTS',
+        'utf-8',
+      );
+      await fs.writeFile(
+        path.join(openclawDir, 'MEMORY.md'),
+        '## Memory',
+        'utf-8',
+      );
+
+      // Create source config
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({ agent: { name: 'TestBot' } }),
+        'utf-8',
+      );
+
+      // Run migration with --include soul,memory
+      const outputDir = path.join(tempDir, 'report-include');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --include soul,memory --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify SOUL.md and MEMORY.md were migrated
+      assert.strictEqual(
+        await fs.access(path.join(testTargetDir, 'SOUL.md')).then(() => true).catch(() => false),
+        true,
+        'SOUL.md should exist',
+      );
+      assert.strictEqual(
+        await fs.access(path.join(testTargetDir, 'MEMORY.md')).then(() => true).catch(() => false),
+        true,
+        'MEMORY.md should exist',
+      );
+
+      // Verify AGENTS.md was NOT migrated
+      assert.strictEqual(
+        await fs.access(path.join(testTargetDir, 'AGENTS.md')).then(() => true).catch(() => false),
+        false,
+        'AGENTS.md should NOT exist',
+      );
+
+      // Verify report shows skipped for non-included categories
+      const reportPath = path.join(outputDir, 'report.json');
+      const report = JSON.parse(await fs.readFile(reportPath, 'utf-8'));
+      const agentsItem = report.items.find((i: { id: string }) => i.id === 'agents');
+      assert.ok(
+        agentsItem?.status === 'skipped' || !agentsItem,
+        'AGENTS.md should be skipped or not in report',
+      );
+    });
+
+    test('--exclude removes specified categories', async () => {
+      const testHomeDir = path.join(tempDir, 'test-exclude-home');
+      const testTargetDir = path.join(tempDir, 'test-exclude-target');
+      const openclawDir = path.join(testHomeDir, '.openclaw');
+      await fs.mkdir(openclawDir, { recursive: true });
+      await fs.mkdir(testTargetDir, { recursive: true });
+
+      // Create source files
+      await fs.writeFile(
+        path.join(openclawDir, 'SOUL.md'),
+        '# SOUL',
+        'utf-8',
+      );
+      await fs.writeFile(
+        path.join(openclawDir, 'AGENTS.md'),
+        '# AGENTS',
+        'utf-8',
+      );
+      await fs.writeFile(
+        path.join(openclawDir, 'MEMORY.md'),
+        '## Memory',
+        'utf-8',
+      );
+
+      // Create source config
+      await fs.writeFile(
+        path.join(openclawDir, 'openclaw.json'),
+        JSON.stringify({ agent: { name: 'TestBot' } }),
+        'utf-8',
+      );
+
+      // Run migration with --exclude agents
+      const outputDir = path.join(tempDir, 'report-exclude');
+      execSync(
+        `npx tsx ${scriptPath} --source openclaw --execute --exclude agents --target-workspace ${testTargetDir} --target-env ${path.join(testTargetDir, '.env')} --output-dir ${outputDir}`,
+        {
+          encoding: 'utf-8',
+          cwd: repoRoot,
+          env: { ...process.env, HOME: testHomeDir },
+        },
+      );
+
+      // Verify SOUL.md and MEMORY.md were migrated
+      assert.strictEqual(
+        await fs.access(path.join(testTargetDir, 'SOUL.md')).then(() => true).catch(() => false),
+        true,
+        'SOUL.md should exist',
+      );
+      assert.strictEqual(
+        await fs.access(path.join(testTargetDir, 'MEMORY.md')).then(() => true).catch(() => false),
+        true,
+        'MEMORY.md should exist',
+      );
+
+      // Verify AGENTS.md was NOT migrated
+      assert.strictEqual(
+        await fs.access(path.join(testTargetDir, 'AGENTS.md')).then(() => true).catch(() => false),
+        false,
+        'AGENTS.md should NOT exist',
+      );
+    });
+  });
 });
 
 // Helper function
