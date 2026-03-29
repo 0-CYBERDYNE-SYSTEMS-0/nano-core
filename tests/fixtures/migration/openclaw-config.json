@@ -23,7 +23,8 @@
       "enabled": false
     },
     "discord": {
-      "enabled": false
+      "enabled": true,
+      "botToken": "discord-bot-token-test-12345"
     }
   },
   "memory": {

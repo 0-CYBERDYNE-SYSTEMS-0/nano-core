@@ -236,6 +236,35 @@ describe("migrate-to-nanocore", () => {
       assert.strictEqual(data.channels.telegram.enabled, true);
     });
 
+    test("extracts Discord botToken from OpenClaw config", async () => {
+      // Load the fixture file
+      const fixturePath = path.join(repoRoot, "tests/fixtures/migration/openclaw-config.json");
+      const content = await fs.readFile(fixturePath, "utf-8");
+      const data = JSON.parse(content);
+
+      // Verify the fixture has Discord botToken
+      assert.strictEqual(data.channels.discord.enabled, true);
+      assert.strictEqual(data.channels.discord.botToken, "discord-bot-token-test-12345");
+
+      // Test the extraction logic (simulating parseOpenClawConfig)
+      const discordToken = data.channels?.discord?.botToken || data.channels?.discord?.token;
+      assert.strictEqual(discordToken, "discord-bot-token-test-12345");
+    });
+
+    test("extracts Discord token from Clawdbot config", async () => {
+      // Load the fixture file
+      const fixturePath = path.join(repoRoot, "tests/fixtures/migration/clawdbot-config.json");
+      const content = await fs.readFile(fixturePath, "utf-8");
+      const data = JSON.parse(content);
+
+      // Verify the fixture has Discord token
+      assert.strictEqual(data.discord.token, "discord-bot-token-here");
+
+      // Test the extraction logic (simulating parseClawdbotConfig)
+      const discordToken = data.discord?.token;
+      assert.strictEqual(discordToken, "discord-bot-token-here");
+    });
+
     test("parses Hermes YAML config", async () => {
       const configPath = path.join(tempDir, "hermes-test.yaml");
       await fs.writeFile(

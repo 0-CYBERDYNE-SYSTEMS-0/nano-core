@@ -376,7 +376,7 @@ async function parseOpenClawConfig(configPath: string): Promise<SourceConfig> {
     telegramToken: data.channels?.telegram?.botToken,
     telegramChatId: data.channels?.telegram?.allowedUsers?.[0],
     whatsappEnabled: data.channels?.whatsapp?.enabled,
-    discordToken: data.channels?.discord?.enabled ? undefined : undefined,
+    discordToken: data.channels?.discord?.botToken || data.channels?.discord?.token,
     containerRuntime: data.sandbox?.runtime,
     containerImage: data.sandbox?.image,
     heartbeatInterval: data.heartbeat?.enabled
