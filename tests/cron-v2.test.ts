@@ -1,0 +1,634 @@
+import assert from 'node:assert/strict';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
+import test from 'node:test';
+
+import {
+  resolveCronExecutionPlan,
+  resolveCronPolicy,
+  resolveNoContinueForTask,
+} from '../src/cron/adapters.ts';
+import {
+  computeErrorBackoffMs,
+  getTaskDeliveryMode,
+  resolveTaskNextRun,
+  runScheduledTaskV2,
+  shouldTriggerWakeNow,
+} from '../src/cron/service.ts';
+import { PARITY_CONFIG, TIMEZONE } from '../src/config.ts';
+import { closeDatabase, createTask, getTaskById, initDatabaseAtPath } from '../src/db.ts';
+import type { RegisteredGroup, ScheduledTask } from '../src/types.ts';
+import type { ContainerInput } from '../src/pi-runner.js';
+
+function makeTempDbPath(): string {
+  const projectTmp = path.join(process.cwd(), 'data', 'test-db-temp');
+  fs.mkdirSync(projectTmp, { recursive: true });
+  const dirName = `fft-test-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  const dir = path.join(projectTmp, dirName);
+  fs.mkdirSync(dir, { recursive: true });
+  return path.join(dir, 'messages.db');
+}
+
+function makeTask(
+  overrides: Partial<ScheduledTask>,
+): Omit<ScheduledTask, 'last_run' | 'last_result'> {
+  const now = new Date().toISOString();
+  return {
+    id: overrides.id || `task-${Date.now()}`,
+    group_folder: overrides.group_folder || 'main',
+    chat_jid: overrides.chat_jid || 'telegram:1',
+    prompt: overrides.prompt || 'ping',
+    schedule_type: overrides.schedule_type || 'once',
+    schedule_value: overrides.schedule_value || now,
+    context_mode: overrides.context_mode || 'isolated',
+    schedule_json: overrides.schedule_json || null,
+    session_target: overrides.session_target || 'isolated',
+    wake_mode: overrides.wake_mode || 'next-heartbeat',
+    delivery_mode: overrides.delivery_mode || 'none',
+    delivery_channel: overrides.delivery_channel || null,
+    delivery_to: overrides.delivery_to || null,
+    delivery_webhook_url: overrides.delivery_webhook_url || null,
+    timeout_seconds: overrides.timeout_seconds || null,
+    stagger_ms: overrides.stagger_ms || null,
+    delete_after_run: overrides.delete_after_run || 0,
+    consecutive_errors: overrides.consecutive_errors || 0,
+    next_run: overrides.next_run || now,
+    status: overrides.status || 'active',
+    created_at: overrides.created_at || now,
+  };
+}
+
+test('cron adapter accepts v2 schedule payload and computes next run', () => {
+  const plan = resolveCronExecutionPlan({
+    schedule: { kind: 'every', everyMs: 120000 },
+  });
+  assert.equal(plan.scheduleType, 'interval');
+  assert.equal(plan.scheduleValue, '120000');
+  assert.ok(plan.nextRun);
+});
+
+test('cron adapter rejects non-positive everyMs (0)', () => {
+  assert.throws(
+    () =>
+      resolveCronExecutionPlan({
+        schedule: { kind: 'every', everyMs: 0 },
+      }),
+    /Invalid schedule payload/,
+  );
+});
+
+test('cron adapter rejects non-positive everyMs (-1)', () => {
+  assert.throws(
+    () =>
+      resolveCronExecutionPlan({
+        schedule: { kind: 'every', everyMs: -1 },
+      }),
+    /Invalid schedule payload/,
+  );
+});
+
+test('cron adapter rejects malformed schedule payload when schedule is present', () => {
+  assert.throws(
+    () =>
+      resolveCronExecutionPlan({
+        schedule: { kind: 'every' } as unknown as { kind: 'every'; everyMs: number },
+      }),
+    /Invalid schedule payload/,
+  );
+});
+
+test('cron adapter rejects timezone-suffixed once/at timestamps', () => {
+  assert.throws(
+    () =>
+      resolveCronExecutionPlan({
+        schedule: { kind: 'at', at: '2026-02-01T15:30:00Z' },
+      }),
+    /local time without timezone suffix/,
+  );
+
+  assert.throws(
+    () =>
+      resolveCronExecutionPlan({
+        schedule_type: 'once',
+        schedule_value: '2026-02-01T15:30:00+02:00',
+      }),
+    /local time without timezone suffix/,
+  );
+});
+
+test('cron policy defaults isolated runs to announce when delivery omitted', () => {
+  const policy = resolveCronPolicy({
+    session_target: 'isolated',
+  });
+  assert.equal(policy.delivery.mode, 'announce');
+});
+
+test('context_mode isolated forces noContinue while group mode reuses session', () => {
+  assert.equal(
+    resolveNoContinueForTask(makeTask({ context_mode: 'isolated' }) as ScheduledTask),
+    true,
+  );
+  assert.equal(
+    resolveNoContinueForTask(makeTask({ context_mode: 'group' }) as ScheduledTask),
+    false,
+  );
+});
+
+test('cron error backoff schedule grows with consecutive errors', () => {
+  assert.equal(computeErrorBackoffMs(1), 30000);
+  assert.equal(computeErrorBackoffMs(2), 60000);
+  assert.equal(computeErrorBackoffMs(5), 3600000);
+  assert.equal(computeErrorBackoffMs(8), 3600000);
+});
+
+test('resolveTaskNextRun applies backoff on errors for recurring tasks', () => {
+  const now = Date.now();
+  const task = makeTask({
+    schedule_type: 'interval',
+    schedule_value: '1000',
+  }) as ScheduledTask;
+  const nextNormal = resolveTaskNextRun(task, now, false, 0);
+  const nextError = resolveTaskNextRun(task, now, true, 1);
+  assert.ok(nextNormal);
+  assert.ok(nextError);
+  assert.ok(new Date(nextError!).getTime() - now >= 30000);
+});
+
+test('resolveTaskNextRun applies deterministic top-of-hour stagger when enabled', () => {
+  const originalEnabled = PARITY_CONFIG.cron.deterministicTopOfHourStagger.enabled;
+  const originalMax = PARITY_CONFIG.cron.deterministicTopOfHourStagger.maxMs;
+  PARITY_CONFIG.cron.deterministicTopOfHourStagger.enabled = true;
+  PARITY_CONFIG.cron.deterministicTopOfHourStagger.maxMs = 300000;
+  try {
+    const task = makeTask({
+      id: 'stagger-task',
+      schedule_type: 'cron',
+      schedule_value: '0 * * * *',
+      schedule_json: JSON.stringify({ kind: 'cron', expr: '0 * * * *' }),
+    }) as ScheduledTask;
+    const now = new Date('2026-02-23T10:05:00.000Z').getTime();
+    const nextA = resolveTaskNextRun(task, now, false, 0);
+    const nextB = resolveTaskNextRun(task, now, false, 0);
+    assert.ok(nextA);
+    assert.equal(nextA, nextB);
+
+    const base = new Date('2026-02-23T11:00:00.000Z').getTime();
+    const shifted = new Date(nextA!).getTime();
+    assert.ok(shifted >= base);
+    assert.ok(shifted <= base + 300000);
+  } finally {
+    PARITY_CONFIG.cron.deterministicTopOfHourStagger.enabled = originalEnabled;
+    PARITY_CONFIG.cron.deterministicTopOfHourStagger.maxMs = originalMax;
+  }
+});
+
+test('runScheduledTaskV2 triggers wake_mode=now and announce delivery', async () => {
+  const dbPath = makeTempDbPath();
+  initDatabaseAtPath(dbPath);
+
+  const task = makeTask({
+    id: 'wake-now-task',
+    schedule_type: 'once',
+    delivery_mode: 'announce',
+    delivery_to: 'telegram:99',
+    wake_mode: 'now',
+  });
+  createTask(task);
+
+  const sentMessages: string[] = [];
+  const sentJids: string[] = [];
+  const wakeReasons: string[] = [];
+  const group: RegisteredGroup = {
+    name: 'main',
+    folder: 'main',
+    trigger: '@FarmFriend',
+    added_at: new Date().toISOString(),
+  };
+
+  const latest = getTaskById(task.id);
+  assert.ok(latest);
+  await runScheduledTaskV2(latest!, {
+    sendMessage: async (jid, text) => {
+      sentJids.push(jid);
+      sentMessages.push(text);
+    },
+    registeredGroups: () => ({ 'telegram:1': group }),
+    requestHeartbeatNow: (reason) => {
+      if (reason) wakeReasons.push(reason);
+    },
+    runContainerTask: async () => ({
+      status: 'success',
+      result: 'done',
+    }),
+  });
+
+  const postRun = getTaskById(task.id);
+  assert.equal(postRun?.status, 'completed');
+  assert.equal(getTaskDeliveryMode(task as ScheduledTask), 'announce');
+  assert.equal(shouldTriggerWakeNow(task as ScheduledTask), true);
+  assert.equal(sentMessages.length, 1);
+  assert.deepEqual(sentJids, ['telegram:99']);
+  assert.match(sentMessages[0], /\[scheduled:wake-now-task\]/);
+  assert.deepEqual(wakeReasons, ['cron:wake-now-task']);
+
+  closeDatabase();
+});
+
+test('runScheduledTaskV2 keeps recurring tasks active when group is missing', async () => {
+  const dbPath = makeTempDbPath();
+  initDatabaseAtPath(dbPath);
+
+  const task = makeTask({
+    id: 'missing-group-recurring',
+    group_folder: 'ghost-group',
+    schedule_type: 'interval',
+    schedule_value: '60000',
+    next_run: new Date(Date.now() - 1000).toISOString(),
+  });
+  createTask(task);
+
+  const latest = getTaskById(task.id);
+  assert.ok(latest);
+  await runScheduledTaskV2(latest!, {
+    sendMessage: async () => {},
+    registeredGroups: () => ({}),
+  });
+
+  const postRun = getTaskById(task.id);
+  assert.equal(postRun?.status, 'active');
+  assert.ok(postRun?.next_run);
+  assert.ok(new Date(postRun!.next_run!).getTime() > Date.now());
+  assert.equal(postRun?.consecutive_errors, 1);
+
+  closeDatabase();
+});
+
+test('runScheduledTaskV2 preserves typed subagent jobs from older task rows', async () => {
+  const dbPath = makeTempDbPath();
+  initDatabaseAtPath(dbPath);
+
+  const task = {
+    ...makeTask({
+      id: 'typed-subagent-task',
+      schedule_type: 'once',
+    }),
+    subagent_type: 'nightly-analyst',
+  } as Omit<ScheduledTask, 'last_run' | 'last_result'>;
+  createTask(task);
+
+  const group: RegisteredGroup = {
+    name: 'main',
+    folder: 'main',
+    trigger: '@FarmFriend',
+    added_at: new Date().toISOString(),
+  };
+
+  let subagentCalls = 0;
+  let containerCalls = 0;
+
+  const latest = getTaskById(task.id);
+  assert.ok(latest);
+  await runScheduledTaskV2(latest!, {
+    sendMessage: async () => {},
+    registeredGroups: () => ({ 'telegram:1': group }),
+    runSubagentTask: async (type, groupFolder, prompt, options) => {
+      subagentCalls += 1;
+      assert.equal(type, 'nightly-analyst');
+      assert.equal(groupFolder, 'main');
+      assert.equal(prompt, task.prompt);
+      assert.equal(options?.chatJid, task.chat_jid);
+      return 'typed subagent done';
+    },
+    runContainerTask: async () => {
+      containerCalls += 1;
+      return {
+        status: 'success',
+        result: 'wrong path',
+      };
+    },
+  });
+
+  assert.equal(subagentCalls, 1);
+  assert.equal(containerCalls, 0);
+  assert.equal(getTaskById(task.id)?.status, 'completed');
+
+  closeDatabase();
+});
+
+test('runScheduledTaskV2 passes explicit schedule_json.tz as effectiveTimezone (VAL-TIME-007)', async () => {
+  const dbPath = makeTempDbPath();
+  initDatabaseAtPath(dbPath);
+
+  const task = makeTask({
+    id: 'explicit-tz-task',
+    schedule_type: 'cron',
+    schedule_value: '0 8 * * *',
+    schedule_json: JSON.stringify({ kind: 'cron', expr: '0 8 * * *', tz: 'Europe/Paris' }),
+    context_mode: 'isolated',
+  });
+  createTask(task);
+
+  let capturedInput: ContainerInput | undefined;
+  const group: RegisteredGroup = {
+    name: 'main',
+    folder: 'main',
+    trigger: '@FarmFriend',
+    added_at: new Date().toISOString(),
+  };
+
+  const latest = getTaskById(task.id);
+  assert.ok(latest);
+  await runScheduledTaskV2(latest!, {
+    sendMessage: async () => {},
+    registeredGroups: () => ({ 'telegram:1': group }),
+    runContainerTask: async (_group, input) => {
+      capturedInput = input;
+      return { status: 'success', result: 'done' };
+    },
+  });
+
+  assert.ok(capturedInput);
+  assert.equal(capturedInput!.effectiveTimezone, 'Europe/Paris');
+
+  closeDatabase();
+});
+
+test('runScheduledTaskV2 falls back to host TIMEZONE when schedule_json has no tz (VAL-TIME-008)', async () => {
+  const dbPath = makeTempDbPath();
+  initDatabaseAtPath(dbPath);
+
+  const task = makeTask({
+    id: 'no-tz-task',
+    schedule_type: 'cron',
+    schedule_value: '0 8 * * *',
+    schedule_json: JSON.stringify({ kind: 'cron', expr: '0 8 * * *' }),
+    context_mode: 'isolated',
+  });
+  createTask(task);
+
+  let capturedInput: ContainerInput | undefined;
+  const group: RegisteredGroup = {
+    name: 'main',
+    folder: 'main',
+    trigger: '@FarmFriend',
+    added_at: new Date().toISOString(),
+  };
+
+  const latest = getTaskById(task.id);
+  assert.ok(latest);
+  await runScheduledTaskV2(latest!, {
+    sendMessage: async () => {},
+    registeredGroups: () => ({ 'telegram:1': group }),
+    runContainerTask: async (_group, input) => {
+      capturedInput = input;
+      return { status: 'success', result: 'done' };
+    },
+  });
+
+  assert.ok(capturedInput);
+  assert.equal(capturedInput!.effectiveTimezone, TIMEZONE);
+
+  closeDatabase();
+});
+
+test('runScheduledTaskV2 with invalid tz falls back to validated host TIMEZONE (VAL-TIME-009)', async () => {
+  const dbPath = makeTempDbPath();
+  initDatabaseAtPath(dbPath);
+
+  const task = makeTask({
+    id: 'invalid-tz-task',
+    schedule_type: 'cron',
+    schedule_value: '0 8 * * *',
+    schedule_json: JSON.stringify({ kind: 'cron', expr: '0 8 * * *', tz: 'Invalid/Timezone' }),
+    context_mode: 'isolated',
+  });
+  createTask(task);
+
+  let capturedInput: ContainerInput | undefined;
+  const group: RegisteredGroup = {
+    name: 'main',
+    folder: 'main',
+    trigger: '@FarmFriend',
+    added_at: new Date().toISOString(),
+  };
+
+  const latest = getTaskById(task.id);
+  assert.ok(latest);
+  await runScheduledTaskV2(latest!, {
+    sendMessage: async () => {},
+    registeredGroups: () => ({ 'telegram:1': group }),
+    runContainerTask: async (_group, input) => {
+      capturedInput = input;
+      return { status: 'success', result: 'done' };
+    },
+  });
+
+  assert.ok(capturedInput);
+  // Invalid tz should fall back to host TIMEZONE (validated by getEffectiveTimezone)
+  assert.equal(capturedInput!.effectiveTimezone, TIMEZONE);
+
+  closeDatabase();
+});
+
+test('runScheduledTaskV2 suppresses failed evaluator details from delivered output', async () => {
+  const dbPath = makeTempDbPath();
+  initDatabaseAtPath(dbPath);
+
+  const task = makeTask({
+    id: 'cron-evaluator-no-leak',
+    schedule_type: 'once',
+    schedule_value: new Date().toISOString(),
+    context_mode: 'isolated',
+    delivery_mode: 'announce',
+    delivery_to: 'telegram:13',
+  });
+  createTask(task);
+
+  const group: RegisteredGroup = {
+    name: 'main',
+    folder: 'main',
+    trigger: '@FarmFriend',
+    added_at: new Date().toISOString(),
+  };
+
+  const sentMessages: string[] = [];
+  const latest = getTaskById(task.id);
+  assert.ok(latest);
+  await runScheduledTaskV2(latest!, {
+    sendMessage: async (_jid, text) => {
+      sentMessages.push(text);
+    },
+    registeredGroups: () => ({ 'telegram:1': group }),
+    runContainerTask: async () => ({
+      status: 'success',
+      result: 'cron operator-safe result',
+    }),
+    runEvaluatorPass: async () => ({
+      pass: false,
+      score: 3,
+      issues: ['internal cron issue'],
+      feedback: 'internal cron feedback',
+      skipped: false,
+    }),
+  });
+
+  const postRun = getTaskById(task.id);
+  assert.equal(postRun?.last_result, 'cron operator-safe result');
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0], /cron operator-safe result/);
+  assert.doesNotMatch(
+    sentMessages[0],
+    /Evaluator|score 3\/10|internal cron issue|internal cron feedback/,
+  );
+
+  closeDatabase();
+});
+
+// ---------------------------------------------------------------------------
+// VAL-TIME-013: Invalid task timezone does not break prompt assembly
+// ---------------------------------------------------------------------------
+
+test('runScheduledTaskV2 with invalid schedule_json.tz still completes task successfully (VAL-TIME-013)', async () => {
+  const dbPath = makeTempDbPath();
+  initDatabaseAtPath(dbPath);
+
+  const task = makeTask({
+    id: 'invalid-tz-prompt-task',
+    schedule_type: 'cron',
+    schedule_value: '0 8 * * *',
+    schedule_json: JSON.stringify({ kind: 'cron', expr: '0 8 * * *', tz: 'Totally/Fake/Zone' }),
+    context_mode: 'isolated',
+    delivery_mode: 'announce',
+    delivery_to: 'telegram:13',
+  });
+  createTask(task);
+
+  const group: RegisteredGroup = {
+    name: 'main',
+    folder: 'main',
+    trigger: '@FarmFriend',
+    added_at: new Date().toISOString(),
+  };
+
+  const sentMessages: string[] = [];
+  const latest = getTaskById(task.id);
+  assert.ok(latest);
+  await runScheduledTaskV2(latest!, {
+    sendMessage: async (_jid, text) => {
+      sentMessages.push(text);
+    },
+    registeredGroups: () => ({ 'telegram:1': group }),
+    runContainerTask: async (_group, input) => {
+      // Task still executed with a valid fallback timezone
+      assert.ok(input.effectiveTimezone);
+      // Verify the timezone is valid (not the invalid one)
+      assert.notEqual(input.effectiveTimezone, 'Totally/Fake/Zone');
+      return { status: 'success', result: 'task completed despite invalid tz' };
+    },
+  });
+
+  // Task should complete successfully
+  const postRun = getTaskById(task.id);
+  assert.equal(postRun?.status, 'completed');
+  assert.equal(sentMessages.length, 1);
+  assert.match(sentMessages[0], /\[scheduled:invalid-tz-prompt-task\]/);
+
+  closeDatabase();
+});
+
+test('runScheduledTaskV2 with invalid schedule_json.tz produces valid machine time in prompt (VAL-TIME-013)', async () => {
+  const dbPath = makeTempDbPath();
+  initDatabaseAtPath(dbPath);
+
+  const task = makeTask({
+    id: 'invalid-tz-machine-time-task',
+    schedule_type: 'cron',
+    schedule_value: '0 8 * * *',
+    schedule_json: JSON.stringify({ kind: 'cron', expr: '0 8 * * *', tz: 'NoSuch/Timezone' }),
+    context_mode: 'isolated',
+  });
+  createTask(task);
+
+  let capturedInput: ContainerInput | undefined;
+  const group: RegisteredGroup = {
+    name: 'main',
+    folder: 'main',
+    trigger: '@FarmFriend',
+    added_at: new Date().toISOString(),
+  };
+
+  const latest = getTaskById(task.id);
+  assert.ok(latest);
+  await runScheduledTaskV2(latest!, {
+    sendMessage: async () => {},
+    registeredGroups: () => ({ 'telegram:1': group }),
+    runContainerTask: async (_group, input) => {
+      capturedInput = input;
+      return { status: 'success', result: 'done' };
+    },
+  });
+
+  assert.ok(capturedInput);
+  // effectiveTimezone should be the validated host timezone (fallback from invalid)
+  assert.equal(capturedInput!.effectiveTimezone, TIMEZONE);
+
+  closeDatabase();
+});
+
+// ---------------------------------------------------------------------------
+// VAL-CROSS-003: Invalid TZ env var does not crash host
+// ---------------------------------------------------------------------------
+
+test('runScheduledTaskV2 with invalid process.env.TZ still executes tasks (VAL-CROSS-003)', async () => {
+  const priorTz = process.env.TZ;
+  process.env.TZ = 'Invalid/Timezone';
+
+  try {
+    const dbPath = makeTempDbPath();
+    initDatabaseAtPath(dbPath);
+
+    const task = makeTask({
+      id: 'invalid-env-tz-task',
+      schedule_type: 'once',
+      schedule_value: new Date().toISOString(),
+      context_mode: 'isolated',
+      delivery_mode: 'announce',
+      delivery_to: 'telegram:99',
+    });
+    createTask(task);
+
+    const group: RegisteredGroup = {
+      name: 'main',
+      folder: 'main',
+      trigger: '@FarmFriend',
+      added_at: new Date().toISOString(),
+    };
+
+    const sentMessages: string[] = [];
+    const latest = getTaskById(task.id);
+    assert.ok(latest);
+
+    // runScheduledTaskV2 should NOT throw even with invalid process.env.TZ
+    await runScheduledTaskV2(latest!, {
+      sendMessage: async (_jid, text) => {
+        sentMessages.push(text);
+      },
+      registeredGroups: () => ({ 'telegram:1': group }),
+      runContainerTask: async (_group, input) => {
+        // Should still receive a valid effective timezone
+        assert.ok(input.effectiveTimezone);
+        return { status: 'success', result: 'task ran with invalid env TZ' };
+      },
+    });
+
+    const postRun = getTaskById(task.id);
+    assert.equal(postRun?.status, 'completed');
+    assert.equal(sentMessages.length, 1);
+
+    closeDatabase();
+  } finally {
+    if (priorTz === undefined) delete process.env.TZ;
+    else process.env.TZ = priorTz;
+  }
+});
