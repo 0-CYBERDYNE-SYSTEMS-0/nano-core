@@ -1,6 +1,6 @@
 # NANO
 
-FarmFriend runtime contract for shared/global contexts.
+nano-core runtime contract for shared/global contexts.
 
 ## What You Can Do
 

@@ -1,7 +1,7 @@
 # FFT Nano — Whitepaper Architecture Facts
 
 **Version:** 0.1.0
-**Repository:** https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano.git
+**Repository:** https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git
 **License:** MIT
 **Runtime:** Node.js >= 20, TypeScript, ESM
 **Codebase:** 88 TypeScript source files, 9,333 lines across the three core modules alone
@@ -71,7 +71,7 @@ Two-layer skill system:
 1. **Repo layer:** `skills/runtime/` — version-controlled, available to all groups
 2. **Personal layer:** `~/nano/skills/` — untracked, workspace-scoped, only available to main/admin
 
-On each run, both layers merge into `data/pi/<group>/.pi/skills/`, then mount to container at `/home/node/.pi/skills/`. Non-main groups get repo layer only. Managed via manifest file `.fft_nano_managed_skills.json`.
+On each run, both layers merge into `data/pi/<group>/.pi/skills/`, then mount to container at `/home/node/.pi/skills/`. Non-main groups get repo layer only. Managed via manifest file `.nano-core_managed_skills.json`.
 
 ---
 
@@ -151,7 +151,7 @@ Plus a **manual mode** for any OpenAI-compatible endpoint via `PI_API_KEY` + `PI
 **Key details:**
 - Telegram: supports photo, video, audio, document, voice message types; streaming text delivery; tool progress indicators; inline keyboard settings panels
 - WhatsApp: uses Baileys (web API); QR code auth; group metadata sync; LID JID support
-- Main/admin chat concept: one designated chat gets full bot access; non-main chats require trigger word (`@FarmFriend` or configured aliases)
+- Main/admin chat concept: one designated chat gets full bot access; non-main chats require trigger word (`@nano-core` or configured aliases)
 - Chat JID format: Telegram uses `telegram:<numeric_id>`, WhatsApp uses `<phone>@s.whatsapp.net` or `<gid>@g.whatsapp.net`
 
 ### UI Channels
@@ -268,7 +268,7 @@ Each group gets:
 
 **File:** `src/mount-security.ts`
 
-- External allowlist at `~/.config/fft_nano/mount-allowlist.json`
+- External allowlist at `~/.config/nano-core/mount-allowlist.json`
 - Default blocked patterns (SSH keys, cloud credentials, wallet files, etc.)
 - Path traversal prevention
 - Read-only enforcement for sensitive paths
@@ -406,7 +406,7 @@ Three collection cadences:
 
 ### Directory Layout
 ```
-fft_nano/                     ← project root
+nano-core/                     ← project root
   skills/
     setup/                    ← 8 operator-facing guides
     runtime/                  ← 12 repo-tracked agent skills
@@ -449,7 +449,7 @@ metadata:                     # Optional key/value map
 2. If main group, also scan `~/nano/skills/`
 3. Validate all skills
 4. Sync to `data/pi/<group>/.pi/skills/`
-5. Track managed skills in `.fft_nano_managed_skills.json`
+5. Track managed skills in `.nano-core_managed_skills.json`
 6. Personal skills never overwritten by sync
 
 ### Catalog Injection

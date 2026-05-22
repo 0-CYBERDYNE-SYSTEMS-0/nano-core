@@ -6,18 +6,17 @@ import path from 'path';
 
 function printUsage() {
   process.stdout.write(`Usage:
-  fft onboard [--workspace <dir>] [--operator <name>] [--assistant-name <name>] [--runtime auto|docker|host] [--non-interactive] [--force]
-  fft profile <status|set|apply> [core|farm]
-  fft start [telegram-only]
-  fft dev [telegram-only]
-  fft tui [--url ws://127.0.0.1:28989] [--session main] [--deliver]
-  fft web [--open]
-  fft doctor [--json]
-  fft skill-manager <status|run|dry-run|pause|resume|pin|unpin|archive|restore|backup> [skill]
-  fft service <install|uninstall|start|stop|restart|status|logs>
+  nano onboard [--workspace <dir>] [--operator <name>] [--assistant-name <name>] [--runtime auto|docker|host] [--non-interactive] [--force]
+  nano start [telegram-only]
+  nano dev [telegram-only]
+  nano tui [--url ws://127.0.0.1:28989] [--session main] [--deliver]
+  nano web [--open]
+  nano doctor [--json]
+  nano skill-manager <status|run|dry-run|pause|resume|pin|unpin|archive|restore|backup> [skill]
+  nano service <install|uninstall|start|stop|restart|status|logs>
 
 Options:
-  --repo <path>   Run against a specific FFT_nano repo path.
+  --repo <path>   Run against a specific nano-core repo path.
   -h, --help      Show this help.
 `);
 }
@@ -30,7 +29,7 @@ function findRepoRoot(startDir) {
     if (fs.existsSync(pkgPath) && fs.existsSync(startScriptPath)) {
       try {
         const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-        if (pkg && pkg.name === 'fft_nano') return current;
+        if (pkg && pkg.name === 'nano-core') return current;
       } catch {
         // continue walking
       }
@@ -91,7 +90,7 @@ function main() {
     process.exit(0);
   }
 
-  if (!['onboard', 'profile', 'start', 'dev', 'tui', 'web', 'service', 'doctor', 'skill-manager', 'curator'].includes(command)) {
+  if (!['onboard', 'start', 'dev', 'tui', 'web', 'service', 'doctor', 'skill-manager', 'curator'].includes(command)) {
     process.stderr.write(`Unknown command: ${command}\n`);
     printUsage();
     process.exit(2);
@@ -103,7 +102,7 @@ function main() {
 
   if (!repoRoot) {
     process.stderr.write(
-      'FFT_nano repo not found. Run inside the repo or pass --repo /absolute/path/to/FFT_nano.\n',
+      'nano-core repo not found. Run inside the repo or pass --repo /absolute/path/to/nano-core.\n',
     );
     process.exit(2);
   }
@@ -135,16 +134,6 @@ function main() {
 
   if (command === 'curator') {
     const result = spawnSync('npm', ['run', 'curator', '--', ...commandArgs], {
-      cwd: repoRoot,
-      env: process.env,
-      stdio: 'inherit',
-    });
-    if (result.error) throw result.error;
-    process.exit(result.status ?? 1);
-  }
-
-  if (command === 'profile') {
-    const result = spawnSync('npm', ['run', 'profile', '--', ...commandArgs], {
       cwd: repoRoot,
       env: process.env,
       stdio: 'inherit',

@@ -8,7 +8,7 @@ Primary files:
 
 ## Purpose
 
-FFT_nano no longer uses a separate in-container delegated coder worker file.
+nano-core no longer uses a separate in-container delegated coder worker file.
 
 The host now has two layers:
 - `runContainerAgent(...)` in `src/pi-runner.ts` is the low-level `pi` process launcher.

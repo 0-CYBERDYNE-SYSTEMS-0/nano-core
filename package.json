@@ -1,7 +1,7 @@
 {
-  "name": "fft_nano",
+  "name": "nano-core",
   "version": "0.3.0",
-  "description": "FFT_nano: autonomous AI coworker that runs on your farm's hardware, learns your operation, and texts you updates. No subscriptions. MIT licensed.",
+  "description": "nano-core: industry-agnostic AI coworker runtime. Receives messages, runs an agent subprocess, persists state. No subscriptions. MIT licensed.",
   "keywords": [
     "autonomous-agents",
     "ai-agents",
@@ -13,8 +13,6 @@
     "whatsapp-bot",
     "raspberry-pi",
     "open-source",
-    "agriculture",
-    "farming",
     "automation",
     "persistent-memory",
     "local-first-ai"
@@ -23,24 +21,24 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano.git"
+    "url": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git"
   },
   "bugs": {
-    "url": "https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano/issues"
+    "url": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core/issues"
   },
-  "homepage": "https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano#readme",
+  "homepage": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core#readme",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "fft": "./bin/fft.js",
-    "fft-nano": "./bin/fft.js"
+    "nano": "./bin/nano.js",
+    "nano-core": "./bin/nano.js"
   },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "test": "node --import tsx --test $(find tests -type f -name '*.test.ts' | tr '\\n' ' ')",
-    "fft": "node ./bin/fft.js",
+    "nano": "node ./bin/nano.js",
     "web:install": "npm --prefix web/control-center ci",
     "web:build": "npm --prefix web/control-center run build",
     "web:dev": "npm --prefix web/control-center run dev",
@@ -50,14 +48,12 @@
     "tui:client:dev": "tsx src/tui/client.ts",
     "onboard": "tsx src/onboard-cli.ts",
     "onboard:full": "bash scripts/onboard-all.sh",
-    "profile": "tsx src/profile-cli.ts",
     "backup:state": "bash scripts/backup-state.sh",
     "restore:state": "bash scripts/restore-state.sh",
     "auth": "tsx src/whatsapp-auth.ts",
     "doctor": "tsx src/doctor.ts",
     "curator": "tsx src/skill-curator-cli.ts",
     "skill-manager": "tsx src/skill-manager-cli.ts",
-    "farm:doctor": "bash scripts/farm-doctor.sh",
     "validate:skills": "tsx scripts/validate-pi-skills.ts",
     "validate:personal-skills": "tsx scripts/validate-personal-pi-skills.ts",
     "secret-scan": "bash scripts/secret-scan.sh",

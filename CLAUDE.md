@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# FFT_nano — Project Instructions
+# nano-core — Project Instructions
 
 ## Architecture
 
@@ -39,7 +39,7 @@ import { state, activeChatRuns, hostEventBus } from './app-state.js';
 
 Use a two-checkout model:
 
-1. Implement in the dev checkout/worktree (e.g. `fft_nano-dev`).
+1. Implement in the dev checkout/worktree (e.g. `nano-core-dev`).
 2. Merge via PR to `origin/main`.
 3. Fast-forward the runtime/release checkout on `main`.
 4. Build and restart the installed launchd service from that `main` checkout.

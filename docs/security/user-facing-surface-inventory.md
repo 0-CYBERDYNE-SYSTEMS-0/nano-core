@@ -16,7 +16,7 @@
 
 ## Internal-only surfaces
 
-- Runtime process logs on disk (`logs/fft_nano.log`, `logs/fft_nano.error.log`)
+- Runtime process logs on disk (`logs/nano-core.log`, `logs/nano-core.error.log`)
 - Evaluator raw verdict output inside evaluator run context
 - Internal telemetry structures before formatting
 - IPC files prior to boundary translation/rejection

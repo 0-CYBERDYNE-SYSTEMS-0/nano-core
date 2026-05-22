@@ -9,7 +9,7 @@ import type { FileDeliveryRequest, RegisteredGroup } from '../src/types.js';
 
 function makeRequest(filePath: string): FileDeliveryRequest {
   return {
-    type: 'farm_action',
+    type: 'file_delivery',
     action: 'deliver_file',
     requestId: `deliver-${Date.now().toString(36)}`,
     params: {

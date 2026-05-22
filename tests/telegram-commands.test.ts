@@ -56,7 +56,7 @@ function createBaseDeps(): TelegramCommandDeps {
       chatUsageStats: {},
     },
     constants: {
-      assistantName: 'FarmFriend',
+      assistantName: 'nano-core',
       mainGroupFolder: 'main',
       telegramAdminSecret: 'secret',
       telegramSettingsPanelPrefix: 'settings:',
@@ -325,7 +325,7 @@ test('handleTelegramCallbackQuery starts a coder plan from approval actions', as
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
   };
   deps.getTelegramSettingsPanelAction = () => ({
     kind: 'coder-approve-plan',
@@ -526,7 +526,7 @@ test('handleTelegramCommand registers spawned subagent runs in both active maps'
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
   };
   deps.isMainChat = () => true;
   deps.activeChatRunsById = new Map();
@@ -562,7 +562,7 @@ test('handleTelegramCallbackQuery sends terminal failure message when coder run 
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
   };
   deps.getTelegramSettingsPanelAction = () => ({
     kind: 'coder-approve-execute',
@@ -600,7 +600,7 @@ test('handleTelegramCallbackQuery sends terminal completion message when coder r
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
   };
   deps.getTelegramSettingsPanelAction = () => ({
     kind: 'coder-approve-execute',
@@ -634,7 +634,7 @@ test('handleTelegramCallbackQuery reports aborted when fallback runAgent returns
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
   };
   deps.getTelegramSettingsPanelAction = () => ({
     kind: 'coder-approve-execute',
@@ -675,7 +675,7 @@ test('handleTelegramCommand reports aborted when subagent fallback runAgent is s
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
   };
   deps.isMainChat = () => true;
   deps.runCodingTask = undefined;

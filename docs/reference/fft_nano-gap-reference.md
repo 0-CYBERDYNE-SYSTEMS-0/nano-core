@@ -1,18 +1,18 @@
-# FFT_nano vs OpenClaw Gap Reference
+# nano-core vs OpenClaw Gap Reference
 
 Last updated: 2026-02-23
 
 Snapshot commits:
-- `fft_nano`: `bb1aeee`
+- `nano-core`: `bb1aeee`
 - `nanoclaw` upstream (`qwibitai/main`): `226b520`
 - `openclaw/openclaw`: `5196565`
 
 ## Why this file exists
 
 This is the persistent reference doc for:
-- The 3-repo comparison (`fft_nano`, `nanoclaw`, `openclaw`)
-- The deep gap analysis between `fft_nano` and `openclaw`
-- A practical plan to make `fft_nano` as close as possible to `openclaw` behavior while preserving farm customizations
+- The 3-repo comparison (`nano-core`, `nanoclaw`, `openclaw`)
+- The deep gap analysis between `nano-core` and `openclaw`
+- A practical plan to make `nano-core` as close as possible to `openclaw` behavior while preserving farm customizations
 
 ---
 
@@ -22,45 +22,45 @@ This is the persistent reference doc for:
 
 - `nanoclaw`: small, minimal, "edit the code directly" personal assistant.
 - `openclaw`: full gateway platform with many channels, agents, policies, tools, and docs.
-- `fft_nano`: farm/operator-focused fork that keeps the small-host idea but adds structured workspace/memory and farm flows.
+- `nano-core`: farm/operator-focused fork that keeps the small-host idea but adds structured workspace/memory and farm flows.
 
 ### Onboarding
 
 - `nanoclaw`: setup skill + scripts (`/setup` flow).
 - `openclaw`: first-class wizard (`openclaw onboard`) for workspace, channels, daemon, skills, health.
-- `fft_nano`: deterministic onboarding CLI (`scripts/onboard.sh`) with workspace-state tracking in `.fft_nano/workspace-state.json`.
+- `nano-core`: deterministic onboarding CLI (`scripts/onboard.sh`) with workspace-state tracking in `.nano-core/workspace-state.json`.
 
 ### Workspace files
 
 - `nanoclaw`: primarily `CLAUDE.md` (root + per-group/global).
 - `openclaw`: standard workspace set (`AGENTS.md`, `SOUL.md`, `USER.md`, `IDENTITY.md`, `TOOLS.md`, `HEARTBEAT.md`, `BOOTSTRAP.md`, optional `BOOT.md`, `MEMORY.md`, `memory/`).
-- `fft_nano`: similar structured set, plus `PRINCIPLES.md`; seeds `NANO.md`, `SOUL.md`, `TODOS.md`, `HEARTBEAT.md`, `BOOTSTRAP.md`, `MEMORY.md`, `memory/`, `skills/` for the main workspace while retaining legacy compatibility docs/templates.
+- `nano-core`: similar structured set, plus `PRINCIPLES.md`; seeds `NANO.md`, `SOUL.md`, `TODOS.md`, `HEARTBEAT.md`, `BOOTSTRAP.md`, `MEMORY.md`, `memory/`, `skills/` for the main workspace while retaining legacy compatibility docs/templates.
 
 ### Memory model
 
 - `nanoclaw`: durable but simple (`CLAUDE.md` + files), no broad memory subsystem docs.
 - `openclaw`: full memory system (`MEMORY.md` + `memory/YYYY-MM-DD.md`, `memory_search`, `memory_get`, compaction memory flush, vector options).
-- `fft_nano`: canonical `MEMORY.md` per-group/global + `memory/`; explicit `SOUL.md` split; includes migration from legacy `CLAUDE.md`.
+- `nano-core`: canonical `MEMORY.md` per-group/global + `memory/`; explicit `SOUL.md` split; includes migration from legacy `CLAUDE.md`.
 
 ### Heartbeat
 
 - `nanoclaw`: no first-class heartbeat subsystem contract.
 - `openclaw`: first-class heartbeat with targeting, visibility controls, per-agent config, active-hours timezone handling.
-- `fft_nano`: first-class heartbeat loop, `HEARTBEAT.md` reading, empty-file skip, ack stripping, active-hours gate.
+- `nano-core`: first-class heartbeat loop, `HEARTBEAT.md` reading, empty-file skip, ack stripping, active-hours gate.
 
 ### Cron
 
 - `nanoclaw`: simpler scheduler loop over `scheduled_tasks`.
 - `openclaw`: full cron jobs/wakeups with delivery/session modes and dedicated persisted cron store.
-- `fft_nano`: cron v2 compatibility layer over DB tasks with schedule/session/wake/delivery/backoff/stagger/delete-after-run support.
+- `nano-core`: cron v2 compatibility layer over DB tasks with schedule/session/wake/delivery/backoff/stagger/delete-after-run support.
 
 ---
 
-## Part 2: Deep Compare (`fft_nano` vs `openclaw`)
+## Part 2: Deep Compare (`nano-core` vs `openclaw`)
 
 ELI vibe-coder framing:
 - `openclaw` is an assistant operating system.
-- `fft_nano` is a tuned assistant appliance.
+- `nano-core` is a tuned assistant appliance.
 - Goal state = keep appliance ergonomics, but copy OS-grade primitives where they matter.
 
 ## 2.1 Memory
@@ -73,7 +73,7 @@ ELI vibe-coder framing:
 - Vector memory paths and optional QMD sidecar flow.
 - Missing-file-safe memory reads in docs/behavior.
 
-### What `fft_nano` has today
+### What `nano-core` has today
 
 - Canonical `MEMORY.md` and `memory/*.md` per group.
 - `memory_action` gateway exposing `memory_search` + `memory_get`.
@@ -98,7 +98,7 @@ ELI vibe-coder framing:
 - Optional `BOOT.md` startup ritual file.
 - Strong documentation for workspace backup/migration and drift control.
 
-### What `fft_nano` has today
+### What `nano-core` has today
 
 - Main workspace default `~/nano` with auto-seeded files and onboarding state tracking.
 - Main workspace + group folder separation.
@@ -121,7 +121,7 @@ ELI vibe-coder framing:
 - Visibility controls for OK vs alerts by channel/account.
 - Active-hours with explicit timezone control.
 
-### What `fft_nano` has today
+### What `nano-core` has today
 
 - Global env-based heartbeat cadence and prompt.
 - Main-session heartbeat only.
@@ -146,7 +146,7 @@ ELI vibe-coder framing:
 - Rich CLI/API surface and strong operational docs.
 - Deterministic anti-thundering behavior for recurring top-of-hour jobs.
 
-### What `fft_nano` has today
+### What `nano-core` has today
 
 - Cron v2-compatible fields in DB.
 - `schedule` kinds (`at`, `every`, `cron`) plus legacy compatibility.
@@ -167,7 +167,7 @@ ELI vibe-coder framing:
 - Full wizard-first onboarding and reconfiguration flows.
 - Broader control-plane mental model across channels/agents.
 
-### What `fft_nano` has today
+### What `nano-core` has today
 
 - Strong deterministic onboarding for the main workspace identity.
 - Farm-specific workflow integration and practical defaults.
@@ -218,7 +218,7 @@ ELI vibe-coder framing:
 
 ## Bottom line
 
-`fft_nano` is already ahead of `nanoclaw` in structured memory/workspace discipline and has a capable cron/heartbeat core.
+`nano-core` is already ahead of `nanoclaw` in structured memory/workspace discipline and has a capable cron/heartbeat core.
 
 To become "as close as possible" to `openclaw`, the biggest missing blocks are:
 - memory backend + compaction-flush parity

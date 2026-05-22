@@ -56,7 +56,7 @@ if [[ -z "${TELEGRAM_BOT_TOKEN:-}" ]]; then
   if [[ -z "${ACCOUNT}" ]]; then
     ACCOUNT="${USER:-local-user}"
   fi
-  TELEGRAM_BOT_TOKEN="$(security find-generic-password -a "${ACCOUNT}" -s "FFT_nano:TELEGRAM_BOT_TOKEN" -w 2>/dev/null || true)"
+  TELEGRAM_BOT_TOKEN="$(security find-generic-password -a "${ACCOUNT}" -s "nano-core:TELEGRAM_BOT_TOKEN" -w 2>/dev/null || true)"
   export TELEGRAM_BOT_TOKEN
 fi
 

@@ -16,7 +16,7 @@ Host process controls:
 
 ## 2. Single-Instance Lock
 
-`acquireSingletonLock(data/fft_nano.lock)` prevents concurrent host polling loops.
+`acquireSingletonLock(data/nano-core.lock)` prevents concurrent host polling loops.
 
 Behavior:
 - stale lock cleanup when pid no longer exists
@@ -25,7 +25,7 @@ Behavior:
 ## 3. Mount Allowlist (External, Tamper-Resistant)
 
 Allowlist path:
-- `~/.config/fft_nano/mount-allowlist.json`
+- `~/.config/nano-core/mount-allowlist.json`
 
 Why external:
 - file lives outside mounted project tree, so runtime agent cannot modify policy through workspace access.

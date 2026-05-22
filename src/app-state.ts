@@ -368,7 +368,7 @@ export function pruneStaleState(): {
 // ---------------------------------------------------------------------------
 
 export const TUI_SENDER_ID = '__fft_tui__';
-export const TUI_SENDER_NAME = 'FFT_nano TUI';
+export const TUI_SENDER_NAME = 'nano-core TUI';
 export const SERVICE_STARTED_AT = new Date().toISOString();
 export const APP_VERSION = process.env.npm_package_version || 'unknown';
 export const TELEGRAM_SETTINGS_PANEL_PREFIX = 'cfg:';

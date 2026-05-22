@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="${FFT_NANO_REPO:-0-CYBERDYNE-SYSTEMS-0/FFT_nano}"
+REPO="${FFT_NANO_REPO:-0-CYBERDYNE-SYSTEMS-0/nano-core}"
 REF="${FFT_NANO_REF:-latest}"
-INSTALL_DIR="${FFT_NANO_INSTALL_DIR:-$HOME/FFT_nano}"
+INSTALL_DIR="${FFT_NANO_INSTALL_DIR:-$HOME/nano-core}"
 FORCE="${FFT_NANO_FORCE:-0}"
 AUTO_LINK="${FFT_NANO_AUTO_LINK:-1}"
 
@@ -149,7 +149,7 @@ download_archive() {
     url="https://github.com/${REPO}/archive/${ref}.tar.gz"
   fi
 
-  say "Downloading FFT_nano ${ref}..."
+  say "Downloading nano-core ${ref}..."
   curl -fsSL "$url" -o "$out"
 }
 
@@ -222,7 +222,7 @@ seed_env_from_shell() {
 }
 
 main() {
-  say "FFT_nano installer"
+  say "nano-core installer"
   say "Install directory: ${INSTALL_DIR}"
 
   need_cmd curl
@@ -264,8 +264,8 @@ main() {
 
   mkdir -p "$(dirname "$INSTALL_DIR")"
   tar -xzf "$archive" -C "$tmpdir"
-  extracted="$(find "$tmpdir" -mindepth 1 -maxdepth 1 -type d -name 'FFT_nano-*' -print -quit)"
-  [[ -n "$extracted" ]] || fail "Downloaded archive did not contain an FFT_nano source directory."
+  extracted="$(find "$tmpdir" -mindepth 1 -maxdepth 1 -type d -name 'nano-core-*' -print -quit)"
+  [[ -n "$extracted" ]] || fail "Downloaded archive did not contain an nano-core source directory."
   if [[ -d "$INSTALL_DIR" ]]; then
     rmdir "$INSTALL_DIR"
   fi

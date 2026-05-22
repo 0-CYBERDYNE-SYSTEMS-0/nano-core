@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OpenClaw vs FFT_nano — Architecture Comparison</title>
+<title>OpenClaw vs nano-core — Architecture Comparison</title>
 <style>
   :root {
     --bg: #0d1117;
@@ -157,7 +157,7 @@
   <div class="separator"></div>
   <div class="btn-group" id="modeGroup">
     <button data-mode="openclaw">OpenClaw</button>
-    <button data-mode="fft_nano">FFT_nano</button>
+    <button data-mode="nano-core">nano-core</button>
     <button data-mode="overlay" class="active">Overlay</button>
   </div>
   <div class="separator"></div>
@@ -174,7 +174,7 @@
   </label>
   <div class="legend">
     <span><span class="legend-dot" style="background:var(--oc-blue)"></span>OpenClaw</span>
-    <span><span class="legend-dot" style="background:var(--fft-green)"></span>FFT_nano</span>
+    <span><span class="legend-dot" style="background:var(--fft-green)"></span>nano-core</span>
     <span><span class="legend-dot" style="background:var(--shared-border)"></span>Shared</span>
     <span><span class="legend-dot" style="background:var(--diverge)"></span>Divergence</span>
   </div>
@@ -219,16 +219,16 @@
     'multi-agent':   { label: 'Multi-Agent Router', sub: 'Per-peer/guild/channel', system: 'openclaw', ocDetail: 'Agent bindings: per-peer, per-guild, per-channel routing with isolated workspaces per agent', source: '' },
     'tool-approval': { label: 'Tool Approval', sub: 'Interactive approval UI', system: 'openclaw', ocDetail: 'Interactive approval workflow through gateway, user confirms/denies tool executions', source: '' },
 
-    'group-registry':      { label: 'Group Registry', sub: 'registered_groups.json', system: 'fft_nano', fftDetail: 'registered_groups.json + SQLite chat lookup. Groups auto-register on first trigger', source: 'src/index.ts' },
-    'pi-runner':           { label: 'PI Runner', sub: 'Subprocess spawn', system: 'fft_nano', fftDetail: 'Direct child_process.spawn() \u2014 builds args array, manages lifecycle, parses JSON stdout events', source: 'src/pi-runner.ts' },
-    'ipc-files':           { label: 'IPC File Layer', sub: 'Atomic JSON writes', system: 'fft_nano', fftDetail: 'data/ipc/{group}/messages/ \u2014 writeIpcFile() with atomic rename pattern (write .tmp, rename to final)', source: 'src/pi-runner.ts:129' },
-    'ipc-watcher':         { label: 'IPC Watcher', sub: 'Poll + read + delete', system: 'fft_nano', fftDetail: 'Polling loop (IPC_POLL_INTERVAL) reads sorted IPC files, processes them, deletes after handling', source: 'src/index.ts' },
-    'draft-ipc':           { label: 'Draft IPC System', sub: 'Dual-path drafts', system: 'fft_nano', fftDetail: 'Dual-path: native sendMessageDraft (invisible typing indicator) vs send+edit fallback (visible message)', source: 'src/telegram-draft-ipc.ts' },
-    'verbose-mode':        { label: 'Verbose Mode', sub: 'off/new/all/verbose', system: 'fft_nano', fftDetail: 'Four modes: off (silent), new (unique tools only), all (every call), verbose (full args+results). Cycled via /verbose', source: 'src/verbose-mode.ts' },
-    'draft-disable':       { label: 'Draft Disable Registry', sub: 'TTL-based tracking', system: 'fft_nano', fftDetail: 'TelegramDraftDisableRegistry: tracks chats where sendMessageDraft fails, auto-disables with TTL expiry', source: 'src/telegram-draft-ipc.ts' },
-    'completion-resolver': { label: 'Completion Resolver', sub: 'State resolution', system: 'fft_nano', fftDetail: 'resolveTelegramStreamCompletionState() \u2014 checks: streamed? externally completed? draft/message mode? Decides: new msg, edit, or delete+resend', source: 'src/telegram-draft-ipc.ts:55' },
-    'sandbox':             { label: 'Sandbox Wrapper', sub: 'bwrap/docker/none', system: 'fft_nano', fftDetail: 'wrapWithSandbox() \u2014 optional isolation: bubblewrap, docker, or none. Wraps the PI subprocess command', source: 'src/sandbox.ts' },
-    'heartbeat':           { label: 'Heartbeat Loop', sub: 'Active-hours health checks', system: 'fft_nano', fftDetail: 'Periodic health checks gated by active hours (parseHeartbeatActiveHours). Suppresses duplicates', source: 'src/heartbeat-policy.ts' },
+    'group-registry':      { label: 'Group Registry', sub: 'registered_groups.json', system: 'nano-core', fftDetail: 'registered_groups.json + SQLite chat lookup. Groups auto-register on first trigger', source: 'src/index.ts' },
+    'pi-runner':           { label: 'PI Runner', sub: 'Subprocess spawn', system: 'nano-core', fftDetail: 'Direct child_process.spawn() \u2014 builds args array, manages lifecycle, parses JSON stdout events', source: 'src/pi-runner.ts' },
+    'ipc-files':           { label: 'IPC File Layer', sub: 'Atomic JSON writes', system: 'nano-core', fftDetail: 'data/ipc/{group}/messages/ \u2014 writeIpcFile() with atomic rename pattern (write .tmp, rename to final)', source: 'src/pi-runner.ts:129' },
+    'ipc-watcher':         { label: 'IPC Watcher', sub: 'Poll + read + delete', system: 'nano-core', fftDetail: 'Polling loop (IPC_POLL_INTERVAL) reads sorted IPC files, processes them, deletes after handling', source: 'src/index.ts' },
+    'draft-ipc':           { label: 'Draft IPC System', sub: 'Dual-path drafts', system: 'nano-core', fftDetail: 'Dual-path: native sendMessageDraft (invisible typing indicator) vs send+edit fallback (visible message)', source: 'src/telegram-draft-ipc.ts' },
+    'verbose-mode':        { label: 'Verbose Mode', sub: 'off/new/all/verbose', system: 'nano-core', fftDetail: 'Four modes: off (silent), new (unique tools only), all (every call), verbose (full args+results). Cycled via /verbose', source: 'src/verbose-mode.ts' },
+    'draft-disable':       { label: 'Draft Disable Registry', sub: 'TTL-based tracking', system: 'nano-core', fftDetail: 'TelegramDraftDisableRegistry: tracks chats where sendMessageDraft fails, auto-disables with TTL expiry', source: 'src/telegram-draft-ipc.ts' },
+    'completion-resolver': { label: 'Completion Resolver', sub: 'State resolution', system: 'nano-core', fftDetail: 'resolveTelegramStreamCompletionState() \u2014 checks: streamed? externally completed? draft/message mode? Decides: new msg, edit, or delete+resend', source: 'src/telegram-draft-ipc.ts:55' },
+    'sandbox':             { label: 'Sandbox Wrapper', sub: 'bwrap/docker/none', system: 'nano-core', fftDetail: 'wrapWithSandbox() \u2014 optional isolation: bubblewrap, docker, or none. Wraps the PI subprocess command', source: 'src/sandbox.ts' },
+    'heartbeat':           { label: 'Heartbeat Loop', sub: 'Active-hours health checks', system: 'nano-core', fftDetail: 'Periodic health checks gated by active hours (parseHeartbeatActiveHours). Suppresses duplicates', source: 'src/heartbeat-policy.ts' },
   };
 
   const LAYOUT = {
@@ -287,23 +287,23 @@
     ['tool-approval', 'gateway', 'openclaw'],
     ['gateway', 'plugin-sdk', 'openclaw'],
     ['bot-client', 'msg-store', 'openclaw'],
-    ['bot-client', 'group-registry', 'fft_nano'],
-    ['group-registry', 'msg-store', 'fft_nano'],
-    ['msg-store', 'pi-runner', 'fft_nano'],
-    ['pi-runner', 'sandbox', 'fft_nano'],
-    ['sandbox', 'agent-exec', 'fft_nano'],
-    ['agent-exec', 'pi-runner', 'fft_nano'],
-    ['pi-runner', 'ipc-files', 'fft_nano'],
-    ['ipc-files', 'ipc-watcher', 'fft_nano'],
-    ['ipc-watcher', 'draft-ipc', 'fft_nano'],
-    ['ipc-watcher', 'completion-resolver', 'fft_nano'],
-    ['draft-ipc', 'draft-disable', 'fft_nano'],
-    ['draft-ipc', 'bot-client', 'fft_nano'],
-    ['pi-runner', 'verbose-mode', 'fft_nano'],
-    ['verbose-mode', 'bot-client', 'fft_nano'],
-    ['pi-runner', 'completion-resolver', 'fft_nano'],
-    ['completion-resolver', 'final-delivery', 'fft_nano'],
-    ['heartbeat', 'pi-runner', 'fft_nano'],
+    ['bot-client', 'group-registry', 'nano-core'],
+    ['group-registry', 'msg-store', 'nano-core'],
+    ['msg-store', 'pi-runner', 'nano-core'],
+    ['pi-runner', 'sandbox', 'nano-core'],
+    ['sandbox', 'agent-exec', 'nano-core'],
+    ['agent-exec', 'pi-runner', 'nano-core'],
+    ['pi-runner', 'ipc-files', 'nano-core'],
+    ['ipc-files', 'ipc-watcher', 'nano-core'],
+    ['ipc-watcher', 'draft-ipc', 'nano-core'],
+    ['ipc-watcher', 'completion-resolver', 'nano-core'],
+    ['draft-ipc', 'draft-disable', 'nano-core'],
+    ['draft-ipc', 'bot-client', 'nano-core'],
+    ['pi-runner', 'verbose-mode', 'nano-core'],
+    ['verbose-mode', 'bot-client', 'nano-core'],
+    ['pi-runner', 'completion-resolver', 'nano-core'],
+    ['completion-resolver', 'final-delivery', 'nano-core'],
+    ['heartbeat', 'pi-runner', 'nano-core'],
   ];
 
   const ANNOTATIONS = [
@@ -370,16 +370,16 @@
     if (!node) return false;
     const preset = PRESETS[currentPreset];
     if (preset && !preset.includes(id)) return false;
-    if (currentMode === 'openclaw' && node.system === 'fft_nano') return false;
-    if (currentMode === 'fft_nano' && node.system === 'openclaw') return false;
+    if (currentMode === 'openclaw' && node.system === 'nano-core') return false;
+    if (currentMode === 'nano-core' && node.system === 'openclaw') return false;
     return true;
   }
 
   function isEdgeVisible(edge) {
     const [from, to, system] = edge;
     if (!isNodeVisible(from) || !isNodeVisible(to)) return false;
-    if (currentMode === 'openclaw' && system === 'fft_nano') return false;
-    if (currentMode === 'fft_nano' && system === 'openclaw') return false;
+    if (currentMode === 'openclaw' && system === 'nano-core') return false;
+    if (currentMode === 'nano-core' && system === 'openclaw') return false;
     return true;
   }
 
@@ -392,21 +392,21 @@
         : { fill: 'rgba(63,185,80,0.1)', stroke: '#2ea043', text: '#e6edf3' };
     }
     if (node.system === 'openclaw') return { fill: 'rgba(56,139,253,0.12)', stroke: '#388bfd', text: '#e6edf3' };
-    if (node.system === 'fft_nano') return { fill: 'rgba(63,185,80,0.12)', stroke: '#2ea043', text: '#e6edf3' };
+    if (node.system === 'nano-core') return { fill: 'rgba(63,185,80,0.12)', stroke: '#2ea043', text: '#e6edf3' };
     return { fill: 'rgba(139,148,158,0.08)', stroke: '#8b949e', text: '#e6edf3' };
   }
 
   function edgeColors(system) {
     if (currentMode !== 'overlay') return { stroke: '#484f58', dash: '' };
     if (system === 'openclaw') return { stroke: '#388bfd', dash: '6,3' };
-    if (system === 'fft_nano') return { stroke: '#2ea043', dash: '6,3' };
+    if (system === 'nano-core') return { stroke: '#2ea043', dash: '6,3' };
     return { stroke: '#484f58', dash: '' };
   }
 
   function systemTag(node) {
     if (currentMode !== 'overlay') return '';
     if (node.system === 'openclaw') return ' [OC]';
-    if (node.system === 'fft_nano') return ' [FFT]';
+    if (node.system === 'nano-core') return ' [FFT]';
     return '';
   }
 
@@ -486,7 +486,7 @@
       var x2 = to.x + to.w / 2, y2 = to.y;
       var ec = edgeColors(system);
       var markerId = currentMode !== 'overlay' ? 'arrow-shared' :
-        system === 'openclaw' ? 'arrow-oc' : system === 'fft_nano' ? 'arrow-fft' : 'arrow-shared';
+        system === 'openclaw' ? 'arrow-oc' : system === 'nano-core' ? 'arrow-fft' : 'arrow-shared';
 
       var dx = Math.abs(x2 - x1), dy = y2 - y1;
       var d;
@@ -633,13 +633,13 @@
       cols.appendChild(colOc);
 
       var colFft = createEl('div', 'compare-col col-fft');
-      colFft.appendChild(createEl('h3', null, 'FFT_nano'));
+      colFft.appendChild(createEl('h3', null, 'nano-core'));
       colFft.appendChild(document.createTextNode(node.fftDetail || 'N/A'));
       cols.appendChild(colFft);
 
       detailContent.appendChild(cols);
     } else {
-      var detail = currentMode === 'fft_nano' ? (node.fftDetail || node.ocDetail || 'N/A')
+      var detail = currentMode === 'nano-core' ? (node.fftDetail || node.ocDetail || 'N/A')
         : currentMode === 'openclaw' ? (node.ocDetail || node.fftDetail || 'N/A')
         : (node.system === 'openclaw' ? node.ocDetail : node.fftDetail) || 'N/A';
       var sc = createEl('div', 'single-col', detail);
@@ -667,7 +667,7 @@
         var t = getNode(c.target);
         if (!t) return;
         var sysLabel = c.system === 'both' ? '' : c.system === 'openclaw' ? ' (OC)' : ' (FFT)';
-        var col = c.system === 'openclaw' ? 'var(--oc-blue)' : c.system === 'fft_nano' ? 'var(--fft-green)' : 'var(--text-muted)';
+        var col = c.system === 'openclaw' ? 'var(--oc-blue)' : c.system === 'nano-core' ? 'var(--fft-green)' : 'var(--text-muted)';
         var item = createEl('div', 'conn-item');
         var dirSpan = createEl('span', 'conn-dir', c.dir);
         dirSpan.style.color = col;
@@ -714,7 +714,7 @@
     document.querySelectorAll('#modeGroup button').forEach(function(b) {
       b.className = '';
       if (b.dataset.mode === currentMode) {
-        b.className = currentMode === 'openclaw' ? 'active-oc' : currentMode === 'fft_nano' ? 'active-fft' : 'active';
+        b.className = currentMode === 'openclaw' ? 'active-oc' : currentMode === 'nano-core' ? 'active-fft' : 'active';
       }
     });
     render();

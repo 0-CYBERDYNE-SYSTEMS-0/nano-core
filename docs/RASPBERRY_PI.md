@@ -1,6 +1,6 @@
 # Raspberry Pi Deployment (First-Class)
 
-This guide is the Raspberry Pi-specific addendum for `FFT_nano`.
+This guide is the Raspberry Pi-specific addendum for `nano-core`.
 Canonical install/run command reference lives in `README.md` ("Quickstart (Primary UX Path)").
 
 Target platform:
@@ -59,8 +59,8 @@ docker info
 ## 5. Clone and run guided onboarding
 
 ```bash
-git clone https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano.git
-cd FFT_nano
+git clone https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git
+cd nano-core
 ./scripts/onboard-all.sh --runtime docker
 ```
 
@@ -156,7 +156,7 @@ This handles companion dashboard fetch, HA startup, and onboarding flow.
 ## 11. Update procedure
 
 ```bash
-cd ~/FFT_nano
+cd ~/nano-core
 git pull --ff-only
 ./scripts/setup.sh --runtime docker
 ./scripts/service.sh restart

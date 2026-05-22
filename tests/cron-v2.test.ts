@@ -202,7 +202,7 @@ test('runScheduledTaskV2 triggers wake_mode=now and announce delivery', async ()
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
     added_at: new Date().toISOString(),
   };
 
@@ -280,7 +280,7 @@ test('runScheduledTaskV2 preserves typed subagent jobs from older task rows', as
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
     added_at: new Date().toISOString(),
   };
 
@@ -333,7 +333,7 @@ test('runScheduledTaskV2 passes explicit schedule_json.tz as effectiveTimezone (
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
     added_at: new Date().toISOString(),
   };
 
@@ -371,7 +371,7 @@ test('runScheduledTaskV2 falls back to host TIMEZONE when schedule_json has no t
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
     added_at: new Date().toISOString(),
   };
 
@@ -409,7 +409,7 @@ test('runScheduledTaskV2 with invalid tz falls back to validated host TIMEZONE (
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
     added_at: new Date().toISOString(),
   };
 
@@ -448,7 +448,7 @@ test('runScheduledTaskV2 suppresses failed evaluator details from delivered outp
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
     added_at: new Date().toISOString(),
   };
 
@@ -507,7 +507,7 @@ test('runScheduledTaskV2 with invalid schedule_json.tz still completes task succ
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
     added_at: new Date().toISOString(),
   };
 
@@ -554,7 +554,7 @@ test('runScheduledTaskV2 with invalid schedule_json.tz produces valid machine ti
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
     added_at: new Date().toISOString(),
   };
 
@@ -601,7 +601,7 @@ test('runScheduledTaskV2 with invalid process.env.TZ still executes tasks (VAL-C
     const group: RegisteredGroup = {
       name: 'main',
       folder: 'main',
-      trigger: '@FarmFriend',
+      trigger: '@nano-core',
       added_at: new Date().toISOString(),
     };
 

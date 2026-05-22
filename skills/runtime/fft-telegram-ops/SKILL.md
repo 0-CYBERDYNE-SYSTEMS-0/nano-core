@@ -1,6 +1,6 @@
 ---
 name: fft-telegram-ops
-description: Operate FFT_nano Telegram workflows including main chat claiming, command safety boundaries, admin panel usage, media intake behavior, and Telegram-first deployment patterns.
+description: Operate nano-core Telegram workflows including main chat claiming, command safety boundaries, admin panel usage, media intake behavior, and Telegram-first deployment patterns.
 ---
 
 # FFT Telegram Ops
@@ -9,7 +9,7 @@ Use this skill for Telegram onboarding, operations, and safe admin command handl
 
 ## When to use this skill
 
-- Use when setting up or repairing Telegram bot routing in FFT_nano.
+- Use when setting up or repairing Telegram bot routing in nano-core.
 - Use when claiming/maintaining main chat and admin command boundaries.
 - Use when verifying Telegram media intake and command policy behavior.
 
@@ -65,7 +65,7 @@ Main/admin chat only:
 ## Messaging Behavior
 
 - Main chat responds to all messages.
-- Non-main chats require trigger prefix `@<ASSISTANT_NAME>` (default `@FarmFriend`).
+- Non-main chats require trigger prefix `@<ASSISTANT_NAME>` (default `@nano-core`).
 - Coder delegation is rejected in non-main chats.
 
 ## Media Intake
@@ -80,4 +80,4 @@ Main/admin chat only:
 
 - Run `/status` in Telegram to confirm runtime and channel state.
 - Use `/panel` in main chat for task/group/coder quick actions.
-- If polling conflicts occur, stop duplicate FFT_nano instances.
+- If polling conflicts occur, stop duplicate nano-core instances.

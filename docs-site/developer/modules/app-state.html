@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>app-state.ts | FFT_nano Docs</title>
-  <meta name="description" content="FFT_nano module reference: app-state.ts">
+  <title>app-state.ts | nano-core Docs</title>
+  <meta name="description" content="nano-core module reference: app-state.ts">
   <meta name="theme-color" content="#0a0a0a">
   <link rel="icon" href="../../favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -73,7 +73,7 @@
 <body>
   <div class="docs-container">
     <nav class="sidebar">
-      <div class="logo">FFT_nano</div>
+      <div class="logo">nano-core</div>
       <div class="logo-sub">Developer Documentation</div>
       <div class="nav-section">
         <div class="nav-section-title">Navigation</div>
@@ -139,7 +139,7 @@ interface ActiveCoderRun {
   bootRunInFlight: boolean
   // + shutdown hooks, TUI server, web server references
 }</code></pre><h2 id="maps-and-instances">Maps and Instances</h2><table><thead><tr><th>Export</th><th>Type</th><th>Purpose</th></tr></thead><tbody><tr><td><code>activeChatRuns</code><td>Map<string, ActiveChatRun></td><td>Keyed by chatJid — one active run per chat</td></tr><tr><td><code>activeChatRunsById</code><td>Map<string, ActiveChatRun></td><td>Keyed by requestId — fast abort lookup</td></tr><tr><td><code>activeCoderRuns</code><td>Map<string, ActiveCoderRun></td><td>Keyed by requestId — coding workers</td></tr><tr><td><code>telegramPreviewRegistry</code><td>TelegramPreviewRegistry</td><td>Streaming preview state per run</td></tr><tr><td><code>hostEventBus</code><td>HostEventBus</td><td>Local EventEmitter for pi runtime events</td></tr><tr><td><code>telegramToolProgressRuns</code><td>Map<string, TelegramToolProgressState></td><td>Tool progress per run</td></tr><tr><td><code>heartbeatLastSent</code><td>Map<string, {text, sentAt}></td><td>Per-chatJid last heartbeat</td></tr><tr><td><code>tuiMessageQueue</code><td>Map<string, Array<{text,runId,deliver}>></td><td>TUI pending delivery queue</td></tr><tr><td><code>telegramSettingsPanelActions</code><td>Map<string, {chatJid,action,expiresAt}></td><td>Pending settings callbacks</td></tr><tr><td><code>compactionMemoryFlushMarkers</code><td>Map<string, number></td><td>Compaction checkpoint timestamps</td></tr></tbody></table><h2 id="constants">Constants</h2><pre><code class="language-typescript">TUI_SENDER_ID: &#x27;__fft_tui__&#x27;
-TUI_SENDER_NAME: &#x27;FFT_nano TUI&#x27;
+TUI_SENDER_NAME: &#x27;nano-core TUI&#x27;
 SERVICE_STARTED_AT: string   // ISO timestamp at module load
 APP_VERSION: string          // from package.json
 TELEGRAM_SETTINGS_PANEL_PREFIX: &#x27;cfg:&#x27;

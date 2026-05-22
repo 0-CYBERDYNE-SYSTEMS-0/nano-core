@@ -1,6 +1,6 @@
 # Onboarding
 
-`FFT_nano` includes a single command onboarding flow that runs:
+`nano-core` includes a single command onboarding flow that runs:
 backup -> setup -> browser-first onboarding handoff -> daemon step -> doctor.
 
 If provider credentials or `TELEGRAM_BOT_TOKEN` are still missing after setup, `./scripts/onboard-all.sh`
@@ -58,7 +58,7 @@ Interactive mode prompts for flow/mode/provider/channel/hatch and identity value
 For incomplete first-run installs, the guided wrapper automatically prefers the web hatch and opens FFT Control Center.
 
 Installer environment overrides:
-- `FFT_NANO_INSTALL_DIR=/path/to/install`: install somewhere other than `~/FFT_nano`
+- `FFT_NANO_INSTALL_DIR=/path/to/install`: install somewhere other than `~/nano-core`
 - `FFT_NANO_REF=v1.7.2`: install a specific release tag
 - `FFT_NANO_REF=main`: install current public `main`
 - `FFT_NANO_FORCE=1`: replace a non-empty install directory
@@ -124,8 +124,8 @@ Runtime gate env toggles:
 6. During enforced bootstrap, normal tasks are redirected into onboarding interview flow and `/coder` commands are blocked.
 7. When onboarding is complete, agent should emit `ONBOARDING_COMPLETE`; host finalizes state and removes the token from user-visible output.
 8. Soft rollout default: legacy pending workspaces are not retroactively gated unless `FFT_NANO_WORKSPACE_ENFORCE_BOOTSTRAP_GATE_EXISTING=1`.
-9. Records bootstrap seeding in `.fft_nano/workspace-state.json`.
-10. Records wizard run metadata in `.fft_nano/wizard-state.json`.
+9. Records bootstrap seeding in `.nano-core/workspace-state.json`.
+10. Records wizard run metadata in `.nano-core/wizard-state.json`.
 11. Updates the selected env file (`--env-path`) for provider/channel/remote URL settings.
 12. Telegram `/main` first-claim shortcut: if no main chat exists yet and `TELEGRAM_ADMIN_SECRET` is unset, a direct Telegram DM can claim main with `/main`; set `TELEGRAM_ADMIN_SECRET` afterward and restart.
 

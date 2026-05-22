@@ -38,7 +38,7 @@ function makeGroup(folder: string): RegisteredGroup {
   return {
     name: `Group ${folder}`,
     folder,
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
     added_at: new Date().toISOString(),
   };
 }

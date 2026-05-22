@@ -53,7 +53,7 @@ test('runContainerAgent handles an already aborted signal without throwing', asy
   const group: RegisteredGroup = {
     name: 'Test Group',
     folder: groupFolder,
-    trigger: '@FarmFriend',
+    trigger: '@nano-core',
     added_at: '2026-03-31T00:00:00.000Z',
   };
 
@@ -64,7 +64,7 @@ test('runContainerAgent handles an already aborted signal without throwing', asy
       groupFolder: group.folder,
       chatJid: 'telegram:test',
       isMain: false,
-      assistantName: 'FarmFriend',
+      assistantName: 'nano-core',
       requestId: 'req-aborted-before-start',
       piExecutableOverride: '/bin/false',
     },
@@ -127,7 +127,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@FarmFriend',
+      trigger: '@nano-core',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -144,7 +144,7 @@ test(
         groupFolder,
         chatJid: 'telegram:test',
         isMain: false,
-        assistantName: 'FarmFriend',
+        assistantName: 'nano-core',
         requestId: 'req-stale-1',
         workspaceDirOverride: workspaceDir,
         piExecutableOverride: fakePiPath,
@@ -238,7 +238,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@FarmFriend',
+      trigger: '@nano-core',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -247,7 +247,7 @@ test(
       groupFolder,
       chatJid: 'telegram:test',
       isMain: false,
-      assistantName: 'FarmFriend',
+      assistantName: 'nano-core',
       requestId: 'req-fresh-1',
       noContinue: true,
       workspaceDirOverride: workspaceDir,
@@ -302,7 +302,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@FarmFriend',
+      trigger: '@nano-core',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -314,7 +314,7 @@ test(
         groupFolder,
         chatJid: 'telegram:test',
         isMain: false,
-        assistantName: 'FarmFriend',
+        assistantName: 'nano-core',
         requestId: 'req-fresh-stall',
         noContinue: true,
         workspaceDirOverride: workspaceDir,
@@ -445,7 +445,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@FarmFriend',
+      trigger: '@nano-core',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -454,7 +454,7 @@ test(
       groupFolder,
       chatJid: 'telegram:test',
       isMain: false,
-      assistantName: 'FarmFriend',
+      assistantName: 'nano-core',
       requestId: 'req-slow-tool-1',
       noContinue: true,
       workspaceDirOverride: workspaceDir,
@@ -506,7 +506,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@FarmFriend',
+      trigger: '@nano-core',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -515,7 +515,7 @@ test(
       groupFolder,
       chatJid: 'telegram:test',
       isMain: true,
-      assistantName: 'FarmFriend',
+      assistantName: 'nano-core',
       requestId,
       noContinue: true,
       workspaceDirOverride: workspaceDir,
@@ -576,7 +576,7 @@ setTimeout(() => process.exit(0), 10);
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@FarmFriend',
+      trigger: '@nano-core',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -585,7 +585,7 @@ setTimeout(() => process.exit(0), 10);
       groupFolder,
       chatJid: 'telegram:test',
       isMain: true,
-      assistantName: 'FarmFriend',
+      assistantName: 'nano-core',
       requestId: `req-stream-${Date.now().toString(36)}`,
       noContinue: true,
       workspaceDirOverride: workspaceDir,
@@ -655,7 +655,7 @@ setTimeout(() => process.exit(0), 10);
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@FarmFriend',
+      trigger: '@nano-core',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -664,7 +664,7 @@ setTimeout(() => process.exit(0), 10);
       groupFolder,
       chatJid: 'telegram:test',
       isMain: true,
-      assistantName: 'FarmFriend',
+      assistantName: 'nano-core',
       requestId,
       noContinue: true,
       codingHint: 'force_delegate_execute',
@@ -778,7 +778,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@FarmFriend',
+      trigger: '@nano-core',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -787,7 +787,7 @@ test(
       groupFolder,
       chatJid: 'telegram:test',
       isMain: false,
-      assistantName: 'FarmFriend',
+      assistantName: 'nano-core',
       requestId: 'req-long-tool-1',
       noContinue: true,
       workspaceDirOverride: workspaceDir,
@@ -831,7 +831,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@FarmFriend',
+      trigger: '@nano-core',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -844,7 +844,7 @@ test(
         groupFolder,
         chatJid: 'telegram:test',
         isMain: false,
-        assistantName: 'FarmFriend',
+        assistantName: 'nano-core',
         requestId: 'req-tool-end-hang-1',
         noContinue: true,
         workspaceDirOverride: workspaceDir,
@@ -1000,7 +1000,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@FarmFriend',
+      trigger: '@nano-core',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -1011,7 +1011,7 @@ test(
         groupFolder,
         chatJid: 'telegram:test',
         isMain: false,
-        assistantName: 'FarmFriend',
+        assistantName: 'nano-core',
         requestId: 'req-rpc-ui-1',
         noContinue: true,
         workspaceDirOverride: workspaceDir,

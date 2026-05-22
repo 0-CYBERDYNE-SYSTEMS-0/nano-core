@@ -1,14 +1,14 @@
-# FFT_nano Documentation
+# nano-core Documentation
 
-`FFT_nano` is a single Node.js host process that routes Telegram/WhatsApp messages, stores state in SQLite, and runs the agent with runtime selection (`docker` default via `auto`, optional `host` with explicit opt-in).
+`nano-core` is a single Node.js host process that routes Telegram/WhatsApp messages, stores state in SQLite, and runs the agent with runtime selection (`docker` default via `auto`, optional `host` with explicit opt-in).
 
 Canonical operator flow and command details live in `README.md`.
 
 ## Quickstart (Canonical)
 
 ```bash
-git clone https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano.git
-cd FFT_nano
+git clone https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git
+cd nano-core
 ./scripts/onboard-all.sh
 ```
 

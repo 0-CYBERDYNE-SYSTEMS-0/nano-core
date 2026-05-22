@@ -1,6 +1,6 @@
 # Release Process
 
-This is the canonical release flow for `FFT_nano`.
+This is the canonical release flow for `nano-core`.
 
 `main` is the public release branch.
 `dev` is the pre-release integration branch.
@@ -60,7 +60,7 @@ git push origin main
 4. Create and push the annotated tag:
 
 ```bash
-git tag -a vX.Y.Z -m "FFT_nano vX.Y.Z"
+git tag -a vX.Y.Z -m "nano-core vX.Y.Z"
 git push origin vX.Y.Z
 ```
 

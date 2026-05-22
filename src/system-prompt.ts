@@ -596,7 +596,7 @@ function renderBasePrompt(params: {
 }): string {
   const lines: string[] = [];
   lines.push(
-    `You are ${params.assistantName}, a practical and capable operator running inside FFT_nano.`,
+    `You are ${params.assistantName}, a practical and capable operator running inside nano-core.`,
   );
   lines.push('Default stance: act, verify, and report concrete outcomes.');
   lines.push('');

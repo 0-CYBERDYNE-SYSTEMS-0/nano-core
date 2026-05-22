@@ -152,7 +152,7 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 - Main-chat coding requests now prefer approval/suggestion flows with resolved workspace targets instead of blind execution.
 - Runtime prompt assembly now handles canonical memory, daily staging notes, and stronger non-main durable-memory fallbacks.
-- Profile/runtime docs, onboarding references, and skill layout were updated for the current OpenClaw/FarmFriend host model.
+- Profile/runtime docs, onboarding references, and skill layout were updated for the current OpenClaw/nano-core host model.
 
 ### Fixed
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FFT_nano Architecture Playground</title>
+<title>nano-core Architecture Playground</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; overflow: hidden; height: 100vh; display: flex; flex-direction: column; }
@@ -601,7 +601,7 @@ function updatePrompt() {
   var visibleNodes = nodes.filter(function(n) { return visibleNodeIds.indexOf(n.id) >= 0 && state.layers[n.layer]; });
 
   var parts = [];
-  parts.push('FFT_nano Architecture \u2014 ' + preset.label + ' view');
+  parts.push('nano-core Architecture \u2014 ' + preset.label + ' view');
   parts.push('');
 
   if (preset.nodes) {

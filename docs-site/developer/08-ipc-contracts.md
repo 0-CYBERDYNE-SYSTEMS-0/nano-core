@@ -69,7 +69,7 @@ Authorization:
   "jid": "telegram:123456",
   "name": "Team Chat",
   "folder": "telegram-123456",
-  "trigger": "@FarmFriend"
+  "trigger": "@nano-core"
 }
 ```
 

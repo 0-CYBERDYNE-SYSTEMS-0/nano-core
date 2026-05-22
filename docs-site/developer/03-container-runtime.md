@@ -67,4 +67,4 @@ If worktree creation fails, the run fails closed and does not fall back to mutat
 
 ## Host Runtime Note
 
-`host` runtime means FFT_nano runs `pi` directly on the host without Docker isolation. It is explicitly opt-in and is less isolated than Docker mode.
+`host` runtime means nano-core runs `pi` directly on the host without Docker isolation. It is explicitly opt-in and is less isolated than Docker mode.

@@ -19,7 +19,7 @@ function makeRegisteredGroups(groups: Array<{ jid: string; folder: string }>): R
     out[g.jid] = {
       name: g.folder,
       folder: g.folder,
-      trigger: '@FarmFriend',
+      trigger: '@nano-core',
       added_at: new Date().toISOString(),
     };
   }

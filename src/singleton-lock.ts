@@ -48,10 +48,10 @@ export function acquireSingletonLock(lockPath: string): void {
       if (pidIsAlive(existingPid)) {
         logger.error(
           { lockPath, existingPid, existing },
-          'Another FFT_nano instance is already running',
+          'Another nano-core instance is already running',
         );
         console.error(
-          `FATAL: Another FFT_nano instance is already running (pid=${existingPid}).\n` +
+          `FATAL: Another nano-core instance is already running (pid=${existingPid}).\n` +
             `Stop the other instance (launchd or dev) before starting a new one.\n` +
             `Lock file: ${lockPath}\n`,
         );

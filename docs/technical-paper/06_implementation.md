@@ -2,11 +2,11 @@
 
 ![Deployment Architecture](../diagrams/06_deployment_architecture.png)
 
-*Figure 1: FFT_nano Deployment Architecture*
+*Figure 1: nano-core Deployment Architecture*
 
 ## Overview
 
-This section covers the practical aspects of deploying, configuring, and operating FFT_nano in production environments. It includes installation procedures, configuration management, monitoring, and maintenance best practices.
+This section covers the practical aspects of deploying, configuring, and operating nano-core in production environments. It includes installation procedures, configuration management, monitoring, and maintenance best practices.
 
 ## Installation
 
@@ -103,8 +103,8 @@ services:
     image: postgres:15
     container_name: fft-nano-db
     environment:
-      POSTGRES_DB: fft_nano
-      POSTGRES_USER: fft_nano
+      POSTGRES_DB: nano-core
+      POSTGRES_USER: nano-core
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -218,7 +218,7 @@ HOMEASSISTANT_URL=http://home-assistant.local:8123
 HOMEASSISTANT_TOKEN=your-long-lived-access-token
 
 # PostgreSQL (optional)
-POSTGRES_CONNECTION_STRING=postgresql://user:pass@localhost/fft_nano
+POSTGRES_CONNECTION_STRING=postgresql://user:pass@localhost/nano-core
 ```
 
 ### Config File
@@ -287,7 +287,7 @@ memory:
 ```bash
 # .env
 PRODUCTION_MODE=false
-DATABASE_URL=sqlite:///~/.hermes/fft_nano.db
+DATABASE_URL=sqlite:///~/.hermes/nano-core.db
 ```
 
 ### 2. High Availability Deployment
@@ -343,8 +343,8 @@ services:
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_DB: fft_nano
-      POSTGRES_USER: fft_nano
+      POSTGRES_DB: nano-core
+      POSTGRES_USER: nano-core
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -557,7 +557,7 @@ DATE=$(date +%Y%m%d_%H%M%S)
 mkdir -p "$BACKUP_DIR/$DATE"
 
 # Backup database (PostgreSQL)
-pg_dump -h localhost -U fft_nano fft_nano > "$BACKUP_DIR/$DATE/db.sql"
+pg_dump -h localhost -U nano-core nano-core > "$BACKUP_DIR/$DATE/db.sql"
 
 # Backup user data
 tar -czf "$BACKUP_DIR/$DATE/user_data.tar.gz" ~/.hermes/data/

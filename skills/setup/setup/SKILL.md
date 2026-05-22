@@ -1,9 +1,9 @@
 ---
 name: setup
-description: Run initial FFT_nano setup. Use when user wants to install dependencies, authenticate WhatsApp, register their main channel, or start the background services. Triggers on "setup", "install", "configure fft_nano", or first-time setup requests.
+description: Run initial nano-core setup. Use when user wants to install dependencies, authenticate WhatsApp, register their main channel, or start the background services. Triggers on "setup", "install", "configure nano-core", or first-time setup requests.
 ---
 
-# FFT_nano Setup
+# nano-core Setup
 
 Run all commands automatically. Only pause when user action is required (scanning QR codes).
 
@@ -31,7 +31,7 @@ fi
 ### Preferred Path: Docker Runtime
 
 Tell the user:
-> FFT_nano now defaults to Docker for isolated execution. I'll configure that as the primary runtime.
+> nano-core now defaults to Docker for isolated execution. I'll configure that as the primary runtime.
 
 If Docker is missing or stopped, guide installation:
 
@@ -120,7 +120,7 @@ KEY=$(grep "^ANTHROPIC_API_KEY=" .env | cut -d= -f2)
 
 ```bash
 ./container/build.sh
-echo '{}' | docker run -i --entrypoint /bin/echo fft_nano-agent:latest "Container OK"
+echo '{}' | docker run -i --entrypoint /bin/echo nano-core-agent:latest "Container OK"
 ```
 
 ### Host mode (advanced)
@@ -177,7 +177,7 @@ Before registering your main channel, you need to understand an important securi
 > - Can see messages from ALL other registered groups
 > - Can manage and delete tasks across all groups
 > - Can write to global memory that all groups can read
-> - Has read-write access to the entire FFT_nano project
+> - Has read-write access to the entire nano-core project
 >
 > **Recommendation:** Use your personal "Message Yourself" chat or a solo WhatsApp group as your main channel. This ensures only you have admin control.
 >
@@ -190,7 +190,7 @@ Before registering your main channel, you need to understand an important securi
 
 If they choose option 3, ask a follow-up:
 
-> You've chosen a group with other people. This means everyone in that group will have admin privileges over FFT_nano.
+> You've chosen a group with other people. This means everyone in that group will have admin privileges over nano-core.
 >
 > Are you sure you want to proceed? The other members will be able to:
 > - Read messages from your other registered chats
@@ -248,7 +248,7 @@ mkdir -p groups/main/logs
 ## 9. Configure External Directory Access (Mount Allowlist)
 
 Ask the user:
-> Do you want the agent to be able to access any directories **outside** the FFT_nano project?
+> Do you want the agent to be able to access any directories **outside** the nano-core project?
 >
 > Examples: Git repositories, project folders, documents you want Claude to work on.
 >
@@ -257,8 +257,8 @@ Ask the user:
 If **no**, create an empty allowlist to make this explicit:
 
 ```bash
-mkdir -p ~/.config/fft_nano
-cat > ~/.config/fft_nano/mount-allowlist.json << 'EOF'
+mkdir -p ~/.config/nano-core
+cat > ~/.config/nano-core/mount-allowlist.json << 'EOF'
 {
   "allowedRoots": [],
   "blockedPatterns": [],
@@ -301,13 +301,13 @@ Ask the user:
 Create the allowlist file based on their answers:
 
 ```bash
-mkdir -p ~/.config/fft_nano
+mkdir -p ~/.config/nano-core
 ```
 
 Then write the JSON file. Example for a user who wants `~/projects` (read-write) and `~/docs` (read-only) with non-main read-only:
 
 ```bash
-cat > ~/.config/fft_nano/mount-allowlist.json << 'EOF'
+cat > ~/.config/nano-core/mount-allowlist.json << 'EOF'
 {
   "allowedRoots": [
     {
@@ -330,7 +330,7 @@ EOF
 Verify the file:
 
 ```bash
-cat ~/.config/fft_nano/mount-allowlist.json
+cat ~/.config/nano-core/mount-allowlist.json
 ```
 
 Tell the user:
@@ -341,7 +341,7 @@ Tell the user:
 > **Security notes:**
 > - Sensitive paths (`.ssh`, `.gnupg`, `.aws`, credentials) are always blocked
 > - This config file is stored outside the project, so agents cannot modify it
-> - Changes require restarting the FFT_nano service
+> - Changes require restarting the nano-core service
 >
 > To grant a group access to a directory, add it to their config in `data/registered_groups.json`:
 > ```json
@@ -361,13 +361,13 @@ NODE_PATH=$(which node)
 PROJECT_PATH=$(pwd)
 HOME_PATH=$HOME
 
-cat > ~/Library/LaunchAgents/com.fft_nano.plist << EOF
+cat > ~/Library/LaunchAgents/com.nano-core.plist << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.fft_nano</string>
+    <string>com.nano-core</string>
     <key>ProgramArguments</key>
     <array>
         <string>${NODE_PATH}</string>
@@ -387,9 +387,9 @@ cat > ~/Library/LaunchAgents/com.fft_nano.plist << EOF
         <string>${HOME_PATH}</string>
     </dict>
     <key>StandardOutPath</key>
-    <string>${PROJECT_PATH}/logs/fft_nano.log</string>
+    <string>${PROJECT_PATH}/logs/nano-core.log</string>
     <key>StandardErrorPath</key>
-    <string>${PROJECT_PATH}/logs/fft_nano.error.log</string>
+    <string>${PROJECT_PATH}/logs/nano-core.error.log</string>
 </dict>
 </plist>
 EOF
@@ -404,12 +404,12 @@ Build and start the service:
 ```bash
 npm run build
 mkdir -p logs
-launchctl load ~/Library/LaunchAgents/com.fft_nano.plist
+launchctl load ~/Library/LaunchAgents/com.nano-core.plist
 ```
 
 Verify it's running:
 ```bash
-launchctl list | grep fft_nano
+launchctl list | grep nano-core
 ```
 
 ## 11. Test
@@ -419,14 +419,14 @@ Tell the user (using the assistant name they configured):
 
 Check the logs:
 ```bash
-tail -f logs/fft_nano.log
+tail -f logs/nano-core.log
 ```
 
 The user should receive a response in WhatsApp.
 
 ## Troubleshooting
 
-**Service not starting**: Check `logs/fft_nano.error.log`
+**Service not starting**: Check `logs/nano-core.error.log`
 
 **Agent runtime fails with "Claude Code process exited with code 1"**:
 - Ensure runtime is available:
@@ -437,14 +437,14 @@ The user should receive a response in WhatsApp.
 **No response to messages**:
 - Verify the trigger pattern matches (e.g., `@AssistantName` at start of message)
 - Check that the chat JID is in `data/registered_groups.json`
-- Check `logs/fft_nano.log` for errors
+- Check `logs/nano-core.log` for errors
 
 **WhatsApp disconnected**:
 - The service will show a macOS notification
 - Run `npm run auth` to re-authenticate
-- Restart the service: `launchctl kickstart -k gui/$(id -u)/com.fft_nano`
+- Restart the service: `launchctl kickstart -k gui/$(id -u)/com.nano-core`
 
 **Unload service**:
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.fft_nano.plist
+launchctl unload ~/Library/LaunchAgents/com.nano-core.plist
 ```

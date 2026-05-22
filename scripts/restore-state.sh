@@ -49,7 +49,7 @@ done
 [[ -n "$ARCHIVE_PATH" ]] || { echo "ERROR: --archive is required" >&2; exit 2; }
 [[ -f "$ARCHIVE_PATH" ]] || { echo "ERROR: archive not found: $ARCHIVE_PATH" >&2; exit 1; }
 
-echo "FFT_nano state restore"
+echo "nano-core state restore"
 echo "  archive: $ARCHIVE_PATH"
 echo "  repo:    $ROOT_DIR"
 echo "  ws:      $WORKSPACE_TARGET"

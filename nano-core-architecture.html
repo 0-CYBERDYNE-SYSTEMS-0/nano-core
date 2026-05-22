@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FFT_nano Architecture — Post-Refactor</title>
+<title>nano-core Architecture — Post-Refactor</title>
 <style>
   :root {
     --bg: #0d1117; --surface: #161b22; --surface2: #1c2128; --border: #30363d;
@@ -87,7 +87,7 @@
 <body>
 
 <div id="topbar">
-  <h1>FFT_nano Architecture</h1>
+  <h1>nano-core Architecture</h1>
   <span class="refactor-tag tag-refactored">Post-Refactor</span>
   <div class="sep"></div>
   <span class="section-label">View</span>
@@ -708,7 +708,7 @@ function updatePrompt() {
   var parts = [];
   var preset = PRESETS[state.preset];
 
-  parts.push('FFT_nano architecture (post-refactor, branch: refactor/architecture-simplification).');
+  parts.push('nano-core architecture (post-refactor, branch: refactor/architecture-simplification).');
 
   if (state.preset !== 'full') {
     parts.push('Currently viewing: ' + preset.label + '.');

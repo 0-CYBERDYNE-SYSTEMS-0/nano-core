@@ -34,8 +34,8 @@ export const TRIGGER_PATTERN: RegExp;
 ## Important Defaults
 
 - `ASSISTANT_NAME` default is profile-aware:
-  - `fft_nano` in `core`
-  - `FarmFriend` in `farm`
+  - `nano-core` in `core`
+  - `nano-core` in `farm`
 - `MAIN_WORKSPACE_DIR`: `~/nano` (expandable via `FFT_NANO_MAIN_WORKSPACE_DIR`)
 - `CONTAINER_IMAGE`: `fft-nano-agent:latest`
 - `CONTAINER_TIMEOUT`: `21600000` (6h)

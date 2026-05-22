@@ -1,9 +1,9 @@
-![FFT_nano Logo](logo.png)
+![nano-core Logo](logo.png)
 
-# FFT_nano
+# nano-core
 
-[![Release](https://img.shields.io/github/v/release/0-CYBERDYNE-SYSTEMS-0/FFT_nano)](https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano/releases)
-[![Release Readiness](https://img.shields.io/github/actions/workflow/status/0-CYBERDYNE-SYSTEMS-0/FFT_nano/release-readiness.yml?branch=main&label=release%20readiness)](https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano/actions/workflows/release-readiness.yml)
+[![Release](https://img.shields.io/github/v/release/0-CYBERDYNE-SYSTEMS-0/nano-core)](https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core/releases)
+[![Release Readiness](https://img.shields.io/github/actions/workflow/status/0-CYBERDYNE-SYSTEMS-0/nano-core/release-readiness.yml?branch=main&label=release%20readiness)](https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core/actions/workflows/release-readiness.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 An autonomous AI coworker that runs on your farm's hardware. It learns your operation, texts you updates, writes code to automate your equipment, and gets smarter every season. No subscriptions. No cloud dependency. MIT licensed.
@@ -32,7 +32,7 @@ Built by a farmer with 24 years of field experience. Three years of real operati
 - `npm install` is not the primary install path yet
 - See `docs/RELEASE.md` for current release process
 
-**Links:** [Releases](https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano/releases) | [Security](.github/SECURITY.md) | [Contributing](CONTRIBUTING.md) | [Docs](docs/)
+**Links:** [Releases](https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core/releases) | [Security](.github/SECURITY.md) | [Contributing](CONTRIBUTING.md) | [Docs](docs/)
 - Support: `SUPPORT.md`
 - Changelog: `CHANGELOG.md`
 
@@ -51,8 +51,8 @@ The installer downloads the latest stable release, installs missing basics where
 Developer/manual install:
 
 ```bash
-git clone https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano.git
-cd FFT_nano
+git clone https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git
+cd nano-core
 ./scripts/onboard-all.sh
 ```
 
@@ -67,7 +67,7 @@ The guided flow performs:
   - Docker runtime: build agent image with the repo-pinned `pi` coding agent package
   - Host runtime: use the repo-local `node_modules/.bin/pi` before any global `pi`
 - `.env` scaffold from `.env.example` (if missing)
-- mount allowlist scaffold at `~/.config/fft_nano/mount-allowlist.json` (if missing)
+- mount allowlist scaffold at `~/.config/nano-core/mount-allowlist.json` (if missing)
 - onboarding wizard (`risk gate`, `quickstart|advanced`, `local|remote`, provider/channel/hatch)
 - host service step (`install/start` by default, with `--no-install-daemon` support)
 - workspace onboarding/bootstrap seed (`NANO.md`, `SOUL.md`, `TODOS.md`, `HEARTBEAT.md`, `MEMORY.md`; preserves `BOOTSTRAP.md` for first-run ritual and `BOOT.md` when enabled)
@@ -207,7 +207,7 @@ Important: `fft tui` is an attach client. The host process must already be runni
 The pinned launcher created by setup targets the installed checkout from any directory. Use `--repo` to target another checkout:
 
 ```bash
-fft --repo /absolute/path/to/FFT_nano tui
+fft --repo /absolute/path/to/nano-core tui
 ```
 
 If you prefer the linked CLI form, use:
@@ -428,7 +428,7 @@ docker info
 
 ## Raspberry Pi Startup (Raspberry Pi OS 64-bit)
 
-FFT_nano runs on Pi as a Linux Docker deployment.
+nano-core runs on Pi as a Linux Docker deployment.
 
 Canonical Pi guide (full runbook):
 - `docs/RASPBERRY_PI.md`
@@ -446,8 +446,8 @@ sudo usermod -aG docker "$USER"
 # log out/in (or reboot), then:
 sudo systemctl enable --now docker
 docker info
-git clone https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano.git
-cd FFT_nano
+git clone https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git
+cd nano-core
 ./scripts/onboard-all.sh --runtime docker
 ./scripts/service.sh status
 ./scripts/service.sh logs
@@ -490,7 +490,7 @@ Pre-demo health check (PASS/FAIL):
 npm run farm:doctor
 ```
 
-Checks include Docker daemon, HA reachability/auth, `com.fft_nano` runtime status, and fresh `data/farm-state/current.json` with `haConnected=true`.
+Checks include Docker daemon, HA reachability/auth, `com.nano-core` runtime status, and fresh `data/farm-state/current.json` with `haConnected=true`.
 
 Details: `docs/FARM_ONBOARDING.md`
 
@@ -586,7 +586,7 @@ Merge rules:
 - Main/admin runs: project runtime skills + `~/nano/skills/`
 - Non-main runs: project runtime skills only
 - If names collide, later source wins (`~/nano/skills/` overrides project on main)
-- Only skills previously managed by FFT_nano are pruned on sync; manually installed skills are preserved.
+- Only skills previously managed by nano-core are pruned on sync; manually installed skills are preserved.
 
 Detailed skill spec: `docs/PI_SKILLS.md`
 
@@ -605,7 +605,7 @@ Useful env vars:
 
 Useful paths:
 
-- Host logs: `logs/fft_nano.log`, `logs/fft_nano.error.log`
+- Host logs: `logs/nano-core.log`, `logs/nano-core.error.log`
 - Group container logs: `groups/<group>/logs/`
 - Group registry: `data/registered_groups.json`
 - Router state: `data/router_state.json`
@@ -687,6 +687,6 @@ No. Use `skills/setup` and `skills/runtime` in this repo.
 - Optional host runtime exists as an explicit unsafe opt-in (`CONTAINER_RUNTIME=host` + allow flags).
 - Mounts define visibility boundaries.
 - Additional mounts are validated against external allowlist at:
-  - `~/.config/fft_nano/mount-allowlist.json`
+  - `~/.config/nano-core/mount-allowlist.json`
 
 See `.github/SECURITY.md` and `docs-site/developer/11-security-model.md` for details.

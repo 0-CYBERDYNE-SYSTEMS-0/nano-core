@@ -2,11 +2,11 @@
 
 ![Security Architecture](../diagrams/05_security_architecture.png)
 
-*Figure 1: FFT_nano Security Architecture Overview*
+*Figure 1: nano-core Security Architecture Overview*
 
 ## Overview
 
-Security is paramount when deploying autonomous AI agents in production environments. FFT_nano implements a comprehensive security model with defense-in-depth principles, ensuring safe operation while maintaining flexibility and extensibility.
+Security is paramount when deploying autonomous AI agents in production environments. nano-core implements a comprehensive security model with defense-in-depth principles, ensuring safe operation while maintaining flexibility and extensibility.
 
 ## Security Principles
 

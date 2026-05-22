@@ -28,7 +28,7 @@ test('writePromptInputLogFile writes prompt diagnostics with metadata and prompt
       noContinue: false,
       latestUserText: 'what did you just say about the news?',
       finalPrompt:
-        '[RECENT CONVERSATION]\n[2026-03-29T18:03:48.000Z] FarmFriend: headline summary\n\n[NEW INBOUND MESSAGES]\n[2026-03-29T18:05:12.000Z] TD: what did you just say about the news?',
+        '[RECENT CONVERSATION]\n[2026-03-29T18:03:48.000Z] nano-core: headline summary\n\n[NEW INBOUND MESSAGES]\n[2026-03-29T18:05:12.000Z] TD: what did you just say about the news?',
       createdAt: '2026-03-29T18:05:13.000Z',
     });
 

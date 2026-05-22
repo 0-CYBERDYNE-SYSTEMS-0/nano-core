@@ -2,7 +2,7 @@
 
 ![Complete System Topology](../diagrams/16_complete_system_topology.png)
 
-*Figure: FFT_nano Complete System Topology*
+*Figure: nano-core Complete System Topology*
 
 ## Background and Motivation
 
@@ -10,7 +10,7 @@ Agriculture is undergoing a digital transformation, driven by the need for incre
 
 The emergence of **Large Language Models (LLMs)** and **autonomous AI agents** presents a new paradigm: systems that can understand natural language, reason about complex situations, and execute actions across diverse platforms. However, most LLM applications remain constrained to chat interfaces or research prototypes, with few examples of production-grade deployments in critical infrastructure domains.
 
-**FFT_nano (Farm Food Technology nano)** addresses this gap by demonstrating how LLM-powered autonomous agents can be deployed in real-world agricultural automation scenarios. It provides a complete reference implementation, from architecture design to production deployment, showcasing best practices for building safe, extensible, and intelligent AI systems.
+**nano-core (Farm Food Technology nano)** addresses this gap by demonstrating how LLM-powered autonomous agents can be deployed in real-world agricultural automation scenarios. It provides a complete reference implementation, from architecture design to production deployment, showcasing best practices for building safe, extensible, and intelligent AI systems.
 
 ## Problem Statement
 
@@ -61,7 +61,7 @@ Automated actions in production environments carry risks:
 
 ## Solution Overview
 
-FFT_nano addresses these challenges through a **multi-layered autonomous AI agent architecture** built on Hermes Agent platform:
+nano-core addresses these challenges through a **multi-layered autonomous AI agent architecture** built on Hermes Agent platform:
 
 ### Core Principles
 
@@ -97,7 +97,7 @@ FFT_nano addresses these challenges through a **multi-layered autonomous AI agen
 
 ## Key Contributions
 
-FFT_nano makes several contributions to the field of autonomous AI agents and agricultural automation:
+nano-core makes several contributions to the field of autonomous AI agents and agricultural automation:
 
 ### 1. Production-Grade AI Agent Architecture
 - Demonstrates complete deployment pipeline from development to production
@@ -154,13 +154,13 @@ This technical whitepaper is organized as follows:
 This document is intended for:
 - **System Architects**: Understanding of design patterns and trade-offs
 - **Developers**: Implementing similar agent-based systems
-- **Farm Operators**: Evaluating FFT_nano for deployment
+- **Farm Operators**: Evaluating nano-core for deployment
 - **Researchers**: Exploring AI agent applications in agriculture
 - **Security Professionals**: Reviewing safety and compliance measures
 
 ## Related Work
 
-FFT_nano builds upon and extends several areas of research and practice:
+nano-core builds upon and extends several areas of research and practice:
 
 - **Autonomous AI Agents**: Building on work from DeepMind, OpenAI, and Anthropic on agent-based LLM systems
 - **IoT Integration**: Leveraging patterns from industrial IoT platforms and edge computing

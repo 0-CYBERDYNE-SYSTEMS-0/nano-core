@@ -2,11 +2,11 @@
 
 ![Use Case Overview](../diagrams/07_use_case_overview.png)
 
-*Figure 1: FFT_nano Use Case Taxonomy*
+*Figure 1: nano-core Use Case Taxonomy*
 
 ## Overview
 
-FFT_nano demonstrates its value through practical agricultural automation scenarios. This section presents real-world use cases showcasing how autonomous AI agents transform farm operations, from daily monitoring to complex decision support.
+nano-core demonstrates its value through practical agricultural automation scenarios. This section presents real-world use cases showcasing how autonomous AI agents transform farm operations, from daily monitoring to complex decision support.
 
 ## Use Case 1: Daily Farm Monitoring
 
@@ -37,7 +37,7 @@ echo "=== Alerts ==="
 tail -n 50 /var/log/alerts.log
 ```
 
-### FFT_nano Approach
+### nano-core Approach
 
 **User Query (Telegram):**
 ```
@@ -88,7 +88,7 @@ The agent automatically:
 
 ### Benefits
 
-| Metric | Traditional | FFT_nano |
+| Metric | Traditional | nano-core |
 |--------|-------------|----------|
 | Time to check | 5-10 minutes | 30 seconds |
 | User expertise needed | High (scripting) | Low (natural language) |
@@ -114,7 +114,7 @@ if [ $(moisture_zone_a) -lt 60 ]; then
 fi
 ```
 
-### FFT_nano Approach
+### nano-core Approach
 
 **User Query (Telegram):**
 ```
@@ -218,7 +218,7 @@ fi
 - Delayed notification (only runs on schedule)
 - No automatic remediation
 
-### FFT_nano Approach
+### nano-core Approach
 
 **Proactive Monitoring (Scheduled):**
 
@@ -323,7 +323,7 @@ async def detect_anomalies(data):
 
 ### Benefits
 
-| Aspect | Traditional Monitoring | FFT_nano |
+| Aspect | Traditional Monitoring | nano-core |
 |--------|----------------------|----------|
 | Detection type | Threshold only | Multi-pattern |
 | Context | None | Full context |
@@ -345,7 +345,7 @@ grep "harvest" logs/* | wc -l
 grep "yield" database.db | awk '{sum+=$2} END {print sum/NR}'
 ```
 
-### FFT_nano Approach
+### nano-core Approach
 
 **User Query (Telegram):**
 ```
@@ -446,7 +446,7 @@ A farmer encounters a problem and wants to learn from others who faced similar i
 - Call extension service
 - Trial and error
 
-### FFT_nano Approach
+### nano-core Approach
 
 **User Query (Telegram):**
 ```
@@ -551,7 +551,7 @@ grep "pest" logs/* > monthly_pest_management.txt
 # ... hours of manual work
 ```
 
-### FFT_nano Approach
+### nano-core Approach
 
 **User Query (Telegram):**
 ```
@@ -628,14 +628,14 @@ async def generate_compliance_report(month, year):
 
 ### Case Study: Green Valley Farm
 
-**Before FFT_nano:**
+**Before nano-core:**
 - Daily monitoring time: 2 hours
 - Irrigation water waste: 25%
 - Crop yield variance: 30% between zones
 - Anomaly detection time: 4-8 hours
 - Regulatory compliance: Manual, error-prone
 
-**After FFT_nano (6 months):**
+**After nano-core (6 months):**
 - Daily monitoring time: 5 minutes (96% reduction)
 - Irrigation water waste: 8% (68% improvement)
 - Crop yield variance: 12% (60% improvement)

@@ -1,6 +1,6 @@
 # Security Policy
 
-FFT_nano prioritizes secure-by-default operation (container isolation, minimal mount exposure, and explicit credential handling).
+nano-core prioritizes secure-by-default operation (container isolation, minimal mount exposure, and explicit credential handling).
 
 ## Reporting a Vulnerability
 

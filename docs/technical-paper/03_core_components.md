@@ -6,7 +6,7 @@
 
 ## Overview
 
-This section provides an in-depth analysis of FFT_nano's core subsystems: the **Agent Core**, **Tool Registry**, **Messaging Gateway**, and **Skills System**. Each component is examined with implementation details, design decisions, and code examples.
+This section provides an in-depth analysis of nano-core's core subsystems: the **Agent Core**, **Tool Registry**, **Messaging Gateway**, and **Skills System**. Each component is examined with implementation details, design decisions, and code examples.
 
 ## 1. Agent Core
 

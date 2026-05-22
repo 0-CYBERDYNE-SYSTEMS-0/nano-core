@@ -148,8 +148,8 @@ test('createTelegramBot uploads video, audio, voice, and animation via Telegram 
   try {
     const bot = createTelegramBot({
       token: 'token',
-      assistantName: 'FarmFriend',
-      triggerPattern: /@FarmFriend/i,
+      assistantName: 'nano-core',
+      triggerPattern: /@nano-core/i,
     });
 
     await bot.sendVideo('telegram:1', Buffer.from('video'), 'clip.mp4', 'Video');

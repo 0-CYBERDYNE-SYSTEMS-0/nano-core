@@ -2,7 +2,7 @@
 
 ## Source Code Changes
 
-FFT_nano is a product-focused fork. Contributions should:
+nano-core is a product-focused fork. Contributions should:
 
 - Preserve the security model (container isolation + minimal mounts)
 - Stay understandable (prefer direct code over framework layers)

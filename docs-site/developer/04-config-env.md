@@ -7,8 +7,8 @@ Primary source of truth:
 ## Core Runtime Defaults (`src/config.ts`)
 
 - `ASSISTANT_NAME` default:
-  - `fft_nano` in `core` profile
-  - `FarmFriend` in `farm` profile
+  - `nano-core` in `core` profile
+  - `nano-core` in `farm` profile
 - `POLL_INTERVAL`: `2000` ms
 - `SCHEDULER_POLL_INTERVAL`: `60000` ms
 - `MAIN_GROUP_FOLDER`: `main`

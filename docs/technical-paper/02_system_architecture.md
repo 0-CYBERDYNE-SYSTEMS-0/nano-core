@@ -2,11 +2,11 @@
 
 ![Architecture Overview](../diagrams/01_architecture_overview.png)
 
-*Figure 1: FFT_nano High-Level Architecture Overview*
+*Figure 1: nano-core High-Level Architecture Overview*
 
 ## Overview
 
-FFT_nano implements a **layered architecture** designed for modularity, extensibility, and production reliability. The system is organized into four primary layers:
+nano-core implements a **layered architecture** designed for modularity, extensibility, and production reliability. The system is organized into four primary layers:
 
 1. **Presentation Layer** - User interfaces and communication channels
 2. **Agent Layer** - Core intelligence and orchestration

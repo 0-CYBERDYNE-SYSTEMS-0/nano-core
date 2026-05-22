@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Security Model | FFT_nano Docs</title>
-  <meta name="description" content="FFT_nano documentation page: Security Model">
+  <title>Security Model | nano-core Docs</title>
+  <meta name="description" content="nano-core documentation page: Security Model">
   <meta name="theme-color" content="#0a0a0a">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -91,7 +91,7 @@
   <button class="hamburger" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
   <div class="docs-container">
     <nav class="sidebar">
-      <div class="logo">FFT_nano</div>
+      <div class="logo">nano-core</div>
       <div class="logo-sub">Developer Documentation</div>
       <div class="nav-section">
         <div class="nav-section-title">Navigation</div>
@@ -123,7 +123,7 @@
 <li>IPC routing and authorization</li>
 </ul>
 <h2 id="2-single-instance-lock">2. Single-Instance Lock</h2>
-<p><code>acquireSingletonLock(data/fft_nano.lock)</code> prevents multiple host processes from concurrent polling.</p>
+<p><code>acquireSingletonLock(data/nano-core.lock)</code> prevents multiple host processes from concurrent polling.</p>
 <p>Behavior:</p>
 <ul>
 <li>stale lock cleanup if pid dead</li>
@@ -132,7 +132,7 @@
 <h2 id="3-mount-allowlist-external-tamper-resistant">3. Mount Allowlist (External, Tamper-Resistant)</h2>
 <p>Allowlist file path:</p>
 <ul>
-<li><code>~/.config/fft_nano/mount-allowlist.json</code></li>
+<li><code>~/.config/nano-core/mount-allowlist.json</code></li>
 </ul>
 <p>Why external:</p>
 <ul>

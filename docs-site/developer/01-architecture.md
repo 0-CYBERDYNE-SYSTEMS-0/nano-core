@@ -2,7 +2,7 @@
 
 ## System Shape
 
-`fft_nano` is a single host Node.js runtime that:
+`nano-core` is a single host Node.js runtime that:
 1. Receives inbound messages from Telegram and/or WhatsApp.
 2. Persists chat/task data in SQLite.
 3. Builds prompt context and starts a containerized agent run.
@@ -66,7 +66,7 @@ Non-main groups:
 
 From `main()` in `src/index.ts`:
 1. Register shutdown handlers.
-2. Acquire singleton lock (`data/fft_nano.lock`).
+2. Acquire singleton lock (`data/nano-core.lock`).
 3. Ensure container runtime availability.
 4. Initialize DB.
 5. Load persisted runtime state.

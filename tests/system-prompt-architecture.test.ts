@@ -62,7 +62,7 @@ test('buildSystemPrompt injects trusted metadata, overlay, durable canon, and re
     ],
     [
       '/workspace/group/canonical/projects.md',
-      '# projects\n\nFFT_nano owns chat-host runtime orchestration.\n',
+      '# projects\n\nnano-core owns chat-host runtime orchestration.\n',
     ],
     ['/workspace/group/HEARTBEAT.md', '# HEARTBEAT\n'],
     ['/workspace/group/BOOTSTRAP.md', '# BOOTSTRAP\n'],

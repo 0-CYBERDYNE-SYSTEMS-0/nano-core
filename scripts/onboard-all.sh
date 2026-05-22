@@ -538,7 +538,7 @@ render_completion_handoff() {
   print_numbered_list "Optional next:" "${optional_next[@]}"
 }
 
-say "FFT_nano onboard (single command)"
+say "nano-core onboard (single command)"
 say "Root: $ROOT_DIR"
 say "Workspace: $WORKSPACE_DIR"
 say ""

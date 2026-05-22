@@ -2,11 +2,11 @@
 
 ![Performance Metrics Dashboard](../diagrams/08_performance_metrics.png)
 
-*Figure 1: FFT_nano Performance Metrics Dashboard*
+*Figure 1: nano-core Performance Metrics Dashboard*
 
 ## Overview
 
-This section presents a comprehensive analysis of FFT_nano's performance characteristics, including latency measurements, throughput benchmarks, resource utilization, and cost analysis. All measurements are based on real-world deployment data from 6 months of production operation.
+This section presents a comprehensive analysis of nano-core's performance characteristics, including latency measurements, throughput benchmarks, resource utilization, and cost analysis. All measurements are based on real-world deployment data from 6 months of production operation.
 
 ## Measurement Methodology
 

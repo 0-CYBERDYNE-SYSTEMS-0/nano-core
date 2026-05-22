@@ -50,7 +50,7 @@ test('translateLegacyMessageToHostEvent returns delivery event for authorized le
       'telegram:1': {
         name: 'Group A',
         folder: 'group-a',
-        trigger: '@FarmFriend',
+        trigger: '@nano-core',
         added_at: '2026-03-21T00:00:00.000Z',
       },
     },
@@ -83,7 +83,7 @@ test('translateLegacyMessageToHostEvent ignores legacy draft files', () => {
       'telegram:1': {
         name: 'Group A',
         folder: 'group-a',
-        trigger: '@FarmFriend',
+        trigger: '@nano-core',
         added_at: '2026-03-21T00:00:00.000Z',
       },
     },
@@ -113,7 +113,7 @@ test('translateLegacyMessageToHostEvent returns run_progress event for authorize
       'telegram:1': {
         name: 'Group A',
         folder: 'group-a',
-        trigger: '@FarmFriend',
+        trigger: '@nano-core',
         added_at: '2026-03-21T00:00:00.000Z',
       },
     },
@@ -137,7 +137,7 @@ test('translateLegacyMessageToHostEvent rejects invalid run_progress payloads', 
     'telegram:1': {
       name: 'Group A',
       folder: 'group-a',
-      trigger: '@FarmFriend',
+      trigger: '@nano-core',
       added_at: '2026-03-21T00:00:00.000Z',
     },
   };
@@ -183,7 +183,7 @@ test('translateLegacyMessageToHostEvent blocks non-main cross-group run_progress
       'telegram:1': {
         name: 'Group A',
         folder: 'group-a',
-        trigger: '@FarmFriend',
+        trigger: '@nano-core',
         added_at: '2026-03-21T00:00:00.000Z',
       },
     },
@@ -217,7 +217,7 @@ test('translateLegacyMessageToHostEvent rejects raw evaluator verdict JSON messa
       'telegram:1': {
         name: 'Group A',
         folder: 'group-a',
-        trigger: '@FarmFriend',
+        trigger: '@nano-core',
         added_at: '2026-03-21T00:00:00.000Z',
       },
     },
@@ -264,7 +264,7 @@ test('translateLegacyMessageToHostEvent rejects evaluator verdict variants', () 
         'telegram:1': {
           name: 'Group A',
           folder: 'group-a',
-          trigger: '@FarmFriend',
+          trigger: '@nano-core',
           added_at: '2026-03-21T00:00:00.000Z',
         },
       },
@@ -298,7 +298,7 @@ test('dispatchLegacyMessageEnvelope awaits async delivery handlers', async () =>
       'telegram:1': {
         name: 'Group A',
         folder: 'group-a',
-        trigger: '@FarmFriend',
+        trigger: '@nano-core',
         added_at: '2026-03-21T00:00:00.000Z',
       },
     },
@@ -337,7 +337,7 @@ test('dispatchLegacyMessageEnvelope propagates delivery failures', async () => {
         'telegram:1': {
           name: 'Group A',
           folder: 'group-a',
-          trigger: '@FarmFriend',
+          trigger: '@nano-core',
           added_at: '2026-03-21T00:00:00.000Z',
         },
       },

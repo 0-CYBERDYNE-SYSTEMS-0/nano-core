@@ -1,7 +1,7 @@
-# Hermes-Style `/goal` + `/subgoal` for FFT_nano (Main/Admin) with Integration E2E
+# Hermes-Style `/goal` + `/subgoal` for nano-core (Main/Admin) with Integration E2E
 
 ## Summary
-- Add a persistent standing-goal loop to FFT_nano, modeled on Hermes behavior: `/goal` manages a long-running objective, `/subgoal` adds criteria, and the host auto-continues direct assistant turns until done/paused/cleared.
+- Add a persistent standing-goal loop to nano-core, modeled on Hermes behavior: `/goal` manages a long-running objective, `/subgoal` adds criteria, and the host auto-continues direct assistant turns until done/paused/cleared.
 - Scope locked from your choices:
   1. Hermes-parity core (`/goal` + `/subgoal` + auto loop).
   2. LLM-based judge (read-only judge turn, JSON verdict).

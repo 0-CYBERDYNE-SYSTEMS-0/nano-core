@@ -1,14 +1,14 @@
-# FFT_nano Enterprise Technical Paper
+# nano-core Enterprise Technical Paper
 
 **Version:** 1.0.0  
 **Date:** March 4, 2026  
-**Authors:** FFT_nano Development Team
+**Authors:** nano-core Development Team
 
 ---
 
 ## Abstract
 
-FFT_nano (Farm Food Technology nano) is a production-grade autonomous AI agent platform designed for agricultural automation. This technical whitepaper presents a comprehensive analysis of FFT_nano's architecture, implementation, and real-world deployment. We demonstrate how LLM-powered agents can transform farm operations through natural language interfaces, automated decision-making, and multi-system integration. The paper includes detailed performance metrics, security considerations, and practical use cases showing measurable impact: 96% reduction in daily monitoring time, 68% improvement in irrigation efficiency, and 830% return on investment.
+nano-core (Farm Food Technology nano) is a production-grade autonomous AI agent platform designed for agricultural automation. This technical whitepaper presents a comprehensive analysis of nano-core's architecture, implementation, and real-world deployment. We demonstrate how LLM-powered agents can transform farm operations through natural language interfaces, automated decision-making, and multi-system integration. The paper includes detailed performance metrics, security considerations, and practical use cases showing measurable impact: 96% reduction in daily monitoring time, 68% improvement in irrigation efficiency, and 830% return on investment.
 
 ## Table of Contents
 
@@ -196,13 +196,13 @@ The paper includes 16 architecture diagrams:
 
 ## Citation
 
-If you use FFT_nano in your research or work, please cite:
+If you use nano-core in your research or work, please cite:
 
 ```bibtex
-@techreport{fft_nano_2026,
-  title={FFT_nano: A Production-Grade Autonomous AI Agent Platform for Agricultural Automation},
-  author={FFT_nano Development Team},
-  institution={FFT_nano Project},
+@techreport{nano-core_2026,
+  title={nano-core: A Production-Grade Autonomous AI Agent Platform for Agricultural Automation},
+  author={nano-core Development Team},
+  institution={nano-core Project},
   year={2026},
   url={https://github.com/your-org/fft-nano}
 }
@@ -220,7 +220,7 @@ If you use FFT_nano in your research or work, please cite:
 ### Community
 - GitHub Issues: https://github.com/your-org/fft-nano/issues
 - Discord: https://discord.gg/fft-nano
-- Twitter: @FFT_nano
+- Twitter: @nano-core
 
 ### Support
 - Email: support@fft-nano.org
@@ -231,7 +231,7 @@ If you use FFT_nano in your research or work, please cite:
 
 ## License
 
-FFT_nano is released under the MIT License. See [Appendix F](10_appendices.md#f-license-and-attribution) for details.
+nano-core is released under the MIT License. See [Appendix F](10_appendices.md#f-license-and-attribution) for details.
 
 Third-party licenses are listed in [Appendix F](10_appendices.md#f2-third-party-licenses).
 
@@ -247,7 +247,7 @@ Third-party licenses are listed in [Appendix F](10_appendices.md#f2-third-party-
 
 ## Acknowledgments
 
-FFT_nano builds upon the work of many open source projects and researchers. We would like to thank:
+nano-core builds upon the work of many open source projects and researchers. We would like to thank:
 
 - Anthropic for the Claude AI models
 - The OpenAI team for GPT models

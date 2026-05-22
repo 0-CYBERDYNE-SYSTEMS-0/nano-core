@@ -515,7 +515,7 @@ function buildWorkerPrompt(
 ): string {
   const lines = [
     '[REAL CODING WORKER RUN]',
-    'You are the dedicated coding worker for FFT_nano.',
+    'You are the dedicated coding worker for nano-core.',
     'This is a host-managed worker run. Do the engineering work directly; do not claim delegation.',
     '',
     '## Worker Contract',

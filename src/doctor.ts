@@ -72,7 +72,7 @@ function summarizeStatus(checks: CheckResult[]): CheckLevel {
 
 function formatReportText(report: DoctorReport): string {
   const lines = [
-    `FFT_nano doctor: ${report.status.toUpperCase()}`,
+    `nano-core doctor: ${report.status.toUpperCase()}`,
     `generated_at: ${report.generatedAt}`,
     `parity_config: ${report.configPath}`,
     '',

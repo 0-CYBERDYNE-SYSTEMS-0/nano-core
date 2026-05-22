@@ -1,9 +1,9 @@
 ---
 name: debug
-description: Debug FFT_nano agent runtime issues (Docker default, host opt-in). Use when agent execution fails, runtime checks fail, or onboarding/startup is blocked.
+description: Debug nano-core agent runtime issues (Docker default, host opt-in). Use when agent execution fails, runtime checks fail, or onboarding/startup is blocked.
 ---
 
-# FFT_nano Runtime Debugging
+# nano-core Runtime Debugging
 
 This guide covers host-side diagnosis for current runtime modes:
 - Docker (default)
@@ -15,7 +15,7 @@ This guide covers host-side diagnosis for current runtime modes:
 Host process (src/index.ts)
   -> runtime selection (src/container-runtime.ts)
   -> agent execution (src/container-runner.ts)
-     - Docker mode: docker run fft_nano-agent:latest
+     - Docker mode: docker run nano-core-agent:latest
      - Host mode: node container/agent-runner/dist/index.js
 ```
 
@@ -23,8 +23,8 @@ Host process (src/index.ts)
 
 | Log | Location | Purpose |
 |---|---|---|
-| App log | `logs/fft_nano.log` | Router, scheduler, runtime orchestration |
-| App error log | `logs/fft_nano.error.log` | Host process failures |
+| App log | `logs/nano-core.log` | Router, scheduler, runtime orchestration |
+| App error log | `logs/nano-core.error.log` | Host process failures |
 | Runtime run log | `groups/<folder>/logs/runtime-*.log` | Per-run stdout/stderr, mounts, env diagnostics |
 
 ## Quick Health Checks
@@ -111,7 +111,7 @@ Ensure runtime logs show expected mounted session directory and no permission er
 ### Docker mode smoke
 
 ```bash
-echo '{}' | docker run -i --entrypoint /bin/echo fft_nano-agent:latest "Container OK"
+echo '{}' | docker run -i --entrypoint /bin/echo nano-core-agent:latest "Container OK"
 ```
 
 ### Host mode smoke
@@ -124,10 +124,10 @@ CONTAINER_RUNTIME=host FFT_NANO_ALLOW_HOST_RUNTIME=1 FFT_NANO_DRY_RUN=1 npm run 
 ## Service-level Checks (launchd)
 
 ```bash
-launchctl list | grep fft_nano || true
-launchctl kickstart -k gui/$(id -u)/com.fft_nano
+launchctl list | grep nano-core || true
+launchctl kickstart -k gui/$(id -u)/com.nano-core
 sleep 2
-tail -80 logs/fft_nano.log
+tail -80 logs/nano-core.log
 ```
 
 ## One-Pass Diagnostics Script
@@ -150,7 +150,7 @@ ls -t groups/*/logs/runtime-*.log 2>/dev/null | head -3 || echo "no runtime logs
 ## Escalation Data to Capture
 
 If issue persists, capture and share:
-1. `logs/fft_nano.log` tail (last 120 lines)
+1. `logs/nano-core.log` tail (last 120 lines)
 2. Latest `groups/<folder>/logs/runtime-*.log`
 3. Output of `docker info` (or host mode env flags)
 4. Current `.env` runtime keys (redact secrets)

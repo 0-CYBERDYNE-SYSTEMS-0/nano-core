@@ -1,8 +1,8 @@
-# FFT_nano Main Workspace
+# nano-core Main Workspace
 
 Legacy note:
 - `AGENTS.md` is the old OpenClaw-style name for the workspace operating contract.
-- In `fft_nano`, that role now belongs to `NANO.md`.
+- In `nano-core`, that role now belongs to `NANO.md`.
 - Keep `SOUL.md` for identity/tone and `MEMORY.md` for durable memory.
 
 Session start order:

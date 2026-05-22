@@ -92,7 +92,7 @@ if [[ -z "${TELEGRAM_BOT_TOKEN:-}" ]] && [[ "$(uname -s)" == "Darwin" ]] && comm
   if [[ -z "${ACCOUNT}" ]]; then
     ACCOUNT="$(whoami 2>/dev/null || true)"
   fi
-  TELEGRAM_BOT_TOKEN="$(security find-generic-password -a "${ACCOUNT}" -s "FFT_nano:TELEGRAM_BOT_TOKEN" -w 2>/dev/null || true)"
+  TELEGRAM_BOT_TOKEN="$(security find-generic-password -a "${ACCOUNT}" -s "nano-core:TELEGRAM_BOT_TOKEN" -w 2>/dev/null || true)"
   export TELEGRAM_BOT_TOKEN
 fi
 
@@ -126,7 +126,7 @@ web_port="${FFT_NANO_WEB_PORT:-28990}"
 profile="${FFT_PROFILE:-core}"
 feature_farm="${FEATURE_FARM:-auto}"
 
-echo "FFT_nano start (mode=$mode, profile=$profile, feature_farm=$feature_farm, runtime=$runtime, whatsapp=$wa, telegram=$([[ -n "$telegram" ]] && echo enabled || echo disabled), tui_enabled=$tui_enabled, tui_host=$tui_host, tui_port=$tui_port, web_enabled=$web_enabled, web_access=$web_access, web_host=$web_host, web_port=$web_port)"
+echo "nano-core start (mode=$mode, profile=$profile, feature_farm=$feature_farm, runtime=$runtime, whatsapp=$wa, telegram=$([[ -n "$telegram" ]] && echo enabled || echo disabled), tui_enabled=$tui_enabled, tui_host=$tui_host, tui_port=$tui_port, web_enabled=$web_enabled, web_access=$web_access, web_host=$web_host, web_port=$web_port)"
 
 if [[ "$mode" == "dev" ]]; then
   echo "Note: dev mode is for debugging only; normal runtime should use start mode (or omit mode)." >&2

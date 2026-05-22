@@ -6,7 +6,7 @@
 
 ## Overview
 
-FFT_nano's power comes from its ability to integrate with diverse external systems through a unified tool interface. This section details the supported integrations, implementation patterns, and best practices for adding new integrations.
+nano-core's power comes from its ability to integrate with diverse external systems through a unified tool interface. This section details the supported integrations, implementation patterns, and best practices for adding new integrations.
 
 ## Integration Categories
 

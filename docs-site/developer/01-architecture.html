@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Architecture | FFT_nano Docs</title>
-  <meta name="description" content="FFT_nano documentation page: Architecture">
+  <title>Architecture | nano-core Docs</title>
+  <meta name="description" content="nano-core documentation page: Architecture">
   <meta name="theme-color" content="#0a0a0a">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -91,7 +91,7 @@
   <button class="hamburger" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
   <div class="docs-container">
     <nav class="sidebar">
-      <div class="logo">FFT_nano</div>
+      <div class="logo">nano-core</div>
       <div class="logo-sub">Developer Documentation</div>
       <div class="nav-section">
         <div class="nav-section-title">Navigation</div>
@@ -114,7 +114,7 @@
         <article class="article">
           <h1 id="architecture">Architecture</h1>
 <h2 id="system-shape">System Shape</h2>
-<p><code>fft_nano</code> is a single host Node.js runtime that:</p>
+<p><code>nano-core</code> is a single host Node.js runtime that:</p>
 <ol>
 <li>Receives inbound messages from Telegram and/or WhatsApp.</li>
 <li>Persists chat/task data in SQLite.</li>
@@ -177,7 +177,7 @@
 <p>From <code>main()</code> in <code>src/index.ts</code>:</p>
 <ol>
 <li>Register shutdown handlers.</li>
-<li>Acquire singleton lock (<code>data/fft_nano.lock</code>).</li>
+<li>Acquire singleton lock (<code>data/nano-core.lock</code>).</li>
 <li>Ensure container runtime availability.</li>
 <li>Initialize DB.</li>
 <li>Load persisted runtime state.</li>

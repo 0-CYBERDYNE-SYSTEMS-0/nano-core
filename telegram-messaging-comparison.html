@@ -114,7 +114,7 @@
   </label>
   <div class="legend">
     <span><span class="ldot" style="background:var(--hermes)"></span>Hermes</span>
-    <span><span class="ldot" style="background:var(--fft)"></span>FFT_nano</span>
+    <span><span class="ldot" style="background:var(--fft)"></span>nano-core</span>
     <span><span class="ldot" style="background:var(--oc)"></span>OpenClaw</span>
     <span><span class="ldot" style="background:var(--shared)"></span>Shared</span>
     <span><span class="ldot" style="background:var(--warn)"></span>Issue</span>
@@ -526,7 +526,7 @@ function selectNode(id) {
 
   var badges = document.getElementById('d-badges');
   clear(badges);
-  var sysLabel = n.sys==='hermes'?'Hermes':n.sys==='fft'?'FFT_nano':n.sys==='openclaw'?'OpenClaw':'Shared';
+  var sysLabel = n.sys==='hermes'?'Hermes':n.sys==='fft'?'nano-core':n.sys==='openclaw'?'OpenClaw':'Shared';
   var b = document.createElement('span');
   b.className = 'd-badge';
   b.style.background = sysFill(n.sys);
@@ -571,7 +571,7 @@ function selectNode(id) {
     cmpDiv.appendChild(h3);
     var row = document.createElement('div');
     row.className = 'cmp-row';
-    [['h','Hermes','cmp-hermes'],['f','FFT_nano','cmp-fft'],['o','OpenClaw','cmp-oc']].forEach(function(s){
+    [['h','Hermes','cmp-hermes'],['f','nano-core','cmp-fft'],['o','OpenClaw','cmp-oc']].forEach(function(s){
       if (!n.compare[s[0]]) return;
       var cell = document.createElement('div');
       cell.className = 'cmp-cell ' + s[2];
@@ -653,14 +653,14 @@ function deleteCmt(id,i) {
 
 function updatePrompt() {
   var parts = [];
-  parts.push('Telegram messaging pipeline comparison: FFT_nano vs OpenClaw vs Hermes Agent.');
+  parts.push('Telegram messaging pipeline comparison: nano-core vs OpenClaw vs Hermes Agent.');
   if (state.mode !== 'overlay') parts.push('Viewing: ' + state.mode + ' only.');
   if (state.preset !== 'full') parts.push('Focus: ' + PRESETS[state.preset].label + '.');
   var issues = [];
   nodes.forEach(function(n){
     if (n.issues && isNodeVisible(n)) n.issues.forEach(function(issue){ issues.push('- ' + n.label + ': ' + issue); });
   });
-  if (issues.length) { parts.push('\nFFT_nano issues identified:'); parts.push(issues.join('\n')); }
+  if (issues.length) { parts.push('\nnano-core issues identified:'); parts.push(issues.join('\n')); }
   var cmtKeys = Object.keys(state.comments);
   if (cmtKeys.length) {
     parts.push('\nFeedback:');
@@ -675,7 +675,7 @@ function updatePrompt() {
 
 function initControls() {
   var sysBtns = document.getElementById('sys-btns');
-  [['overlay','Overlay','a-overlay'],['hermes','Hermes','a-hermes'],['fft','FFT_nano','a-fft'],['openclaw','OpenClaw','a-oc']].forEach(function(s){
+  [['overlay','Overlay','a-overlay'],['hermes','Hermes','a-hermes'],['fft','nano-core','a-fft'],['openclaw','OpenClaw','a-oc']].forEach(function(s){
     var btn = document.createElement('button');
     btn.className = 'tb' + (state.mode===s[0]?' '+s[2]:'');
     btn.textContent = s[1];

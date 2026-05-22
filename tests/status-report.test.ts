@@ -106,7 +106,7 @@ test('status report renders pulse first and alerts on timeout incidents', () => 
   });
 
   const text = formatStatusReport({
-    assistantName: 'FarmFriend',
+    assistantName: 'nano-core',
     version: '1.2.3 main@abc1234',
     runtime: 'docker',
     serviceStartedAt: '2026-04-12T10:00:00.000Z',
@@ -147,7 +147,7 @@ test('status report renders pulse first and alerts on timeout incidents', () => 
     },
   });
 
-  assert.match(text, /^FarmFriend pulse: ALERT/m);
+  assert.match(text, /^nano-core pulse: ALERT/m);
   assert.match(text, /- version: 1.2.3 main@abc1234/);
   assert.match(text, /- agent_running: working/);
   assert.match(text, /- active_runs: agent=1 coder=1 subagent=0/);
@@ -173,7 +173,7 @@ test('status report marks warn when active run progress is stale beyond threshol
   });
 
   const text = formatStatusReport({
-    assistantName: 'FarmFriend',
+    assistantName: 'nano-core',
     version: '1.2.3 main@abc1234',
     runtime: 'docker',
     serviceStartedAt: '2026-04-12T11:00:00.000Z',
@@ -202,7 +202,7 @@ test('status report marks warn when active run progress is stale beyond threshol
     agentRunning: true,
   });
 
-  assert.match(text, /^FarmFriend pulse: WARN/m);
+  assert.match(text, /^nano-core pulse: WARN/m);
   assert.match(text, /warnings: stuck_runs=1/);
 });
 
@@ -213,7 +213,7 @@ test('status report includes knowledge section when knowledge telemetry is provi
   });
 
   const text = formatStatusReport({
-    assistantName: 'FarmFriend',
+    assistantName: 'nano-core',
     version: '1.2.3 main@abc1234',
     runtime: 'docker',
     serviceStartedAt: '2026-04-12T11:00:00.000Z',
@@ -276,7 +276,7 @@ test('status report redacts evaluator verdict details from user-visible incident
   });
 
   const text = formatStatusReport({
-    assistantName: 'FarmFriend',
+    assistantName: 'nano-core',
     version: '1.2.3 main@abc1234',
     runtime: 'docker',
     serviceStartedAt: '2026-04-12T11:00:00.000Z',

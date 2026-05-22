@@ -2,11 +2,11 @@
 
 ![Roadmap Timeline](../diagrams/09_roadmap_timeline.png)
 
-*Figure 1: FFT_nano Development Roadmap (2024-2026)*
+*Figure 1: nano-core Development Roadmap (2024-2026)*
 
 ## Overview
 
-FFT_nano is an evolving platform with a clear vision for the future. This section outlines planned enhancements, research directions, and strategic initiatives that will shape the next generation of agricultural AI automation.
+nano-core is an evolving platform with a clear vision for the future. This section outlines planned enhancements, research directions, and strategic initiatives that will shape the next generation of agricultural AI automation.
 
 ## Short-Term Roadmap (Q2 2024)
 

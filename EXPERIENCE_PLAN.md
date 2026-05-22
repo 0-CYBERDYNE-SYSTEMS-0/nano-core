@@ -1,15 +1,15 @@
-# FFT_nano HTML Experience — PLANNING DOCUMENT
+# nano-core HTML Experience — PLANNING DOCUMENT
 **Project:** fft-nano-experience
-**Location:** `~/fft_nano/fft-experience/`
+**Location:** `~/nano-core/fft-experience/`
 **Type:** Single-file HTML technical showcase / whitepaper experience
-**Author:** hermes (for scrim wiggins / FFT_nano)
+**Author:** hermes (for scrim wiggins / nano-core)
 
 ---
 
-## 1. RECONNAISSANCE SUMMARY — FFT_nano Architecture
+## 1. RECONNAISSANCE SUMMARY — nano-core Architecture
 
-### What FFT_nano Is
-FFT_nano is a single-process Node.js host that runs an LLM agent (via `pi` / Pi coding agent) inside an isolated Docker container and routes chat I/O through Telegram and/or WhatsApp. It is the nerve center of the FarmFriend Terminal ecosystem — a farming operations platform with deep Home Assistant integration.
+### What nano-core Is
+nano-core is a single-process Node.js host that runs an LLM agent (via `pi` / Pi coding agent) inside an isolated Docker container and routes chat I/O through Telegram and/or WhatsApp. It is the nerve center of the nano-core Terminal ecosystem — a farming operations platform with deep Home Assistant integration.
 
 ### Core Data Flow
 ```
@@ -37,7 +37,7 @@ Response back to originating chat
 
 **2. Container Runtime (src/container-runtime.ts, container/runtime/)**
 - Docker-default isolation with optional host runtime
-- Additional mount security via `~/.config/fft_nano/mount-allowlist.json`
+- Additional mount security via `~/.config/nano-core/mount-allowlist.json`
 - Per-group Pi home at `data/pi/<group>/.pi/` → mounted to `/home/node/.pi`
 - Container spawn and mount wiring, env passthrough, timeout management
 
@@ -90,7 +90,7 @@ Response back to originating chat
 ## 2. DESIGN VISION — "THE NANOSPHERE"
 
 ### Concept
-An immersive, single-file HTML experience that presents FFT_nano's architecture as a **living, breathing digital organism** — the NanoSphere. Every panel, animation, and data visualization is rooted in the actual FFT_nano codebase. This is not a marketing page. It is a **technical manifesto** — an overwhelming, high-density, maximum-stimulus experience that communicates the depth, elegance, and power of FFT_nano's architecture while being genuinely useful as documentation.
+An immersive, single-file HTML experience that presents nano-core's architecture as a **living, breathing digital organism** — the NanoSphere. Every panel, animation, and data visualization is rooted in the actual nano-core codebase. This is not a marketing page. It is a **technical manifesto** — an overwhelming, high-density, maximum-stimulus experience that communicates the depth, elegance, and power of nano-core's architecture while being genuinely useful as documentation.
 
 ### Design Language
 - **Theme:** Deep-space terminal noir. Black/navy void backgrounds, electric neon accents (FFT green `#39FF14`, signal cyan `#00F5FF`, warning amber `#FFB800`, alert red `#FF3366`). Inspired by oscilloscope displays, bioluminescent organisms, and cyberpunk HUDs.
@@ -120,7 +120,7 @@ An immersive, single-file HTML experience that presents FFT_nano's architecture 
 ## 3. INFORMATION ARCHITECTURE — SECTION BY SECTION
 
 ### S1: HERO / NANOSPHERE ORRERY
-Full-viewport. Animated 3D-like particle system where particles flow between nodes representing each architectural component (Telegram node, Docker node, Pi node, SQLite node, Farm node). Nodes pulse with live data (message count, session count). Particle trails follow the actual FFT_nano data flow path. FFT_nano logo rendered as animated SVG with glitch effects.
+Full-viewport. Animated 3D-like particle system where particles flow between nodes representing each architectural component (Telegram node, Docker node, Pi node, SQLite node, Farm node). Nodes pulse with live data (message count, session count). Particle trails follow the actual nano-core data flow path. nano-core logo rendered as animated SVG with glitch effects.
 
 ### S2: SYSTEM ARCHITECTURE — THE LIVING DIAGRAM
 Animated Excalidraw-style system diagram showing the complete Telegram→Host→Container→Pi→Response data flow. Each box is an architectural component from `src/`. Hover reveals the actual file path, line count, and a 2-line description. Lines animate with flowing particles to show data direction. Layer toggle: "show all files" vs "show modules only".
@@ -137,7 +137,7 @@ Live-updating panel grid:
 Data is generated from mock state (architecture-accurate), animated with number-flip transitions.
 
 ### S4: THE DATA FLOW — STEP BY STEP
-Vertical timeline/scroll-driven animation. As user scrolls, each stage of the FFT_nano pipeline activates:
+Vertical timeline/scroll-driven animation. As user scrolls, each stage of the nano-core pipeline activates:
 1. **Telegram Inbound** — Message hits router, parsed, stored in SQLite
 2. **Route Resolution** — Main vs group, trigger detection, policy enforcement
 3. **Container Spawn** — Docker image pulled, mounts wired, env passthrough
@@ -147,20 +147,20 @@ Vertical timeline/scroll-driven animation. As user scrolls, each stage of the FF
 Each stage has an animated SVG diagram and links to the actual source file.
 
 ### S5: SKILLS CONSTELLATION
-Interactive node graph showing FFT_nano's skill tree. Root nodes: Setup Skills / Runtime Skills. Branches expand to show actual skill names (from `skills/runtime/`, `skills/setup/`, `~/nano/skills/`). Hover shows skill description from SKILL.md. Nodes glow when hovered. Connection lines show skill dependency/override relationships.
+Interactive node graph showing nano-core's skill tree. Root nodes: Setup Skills / Runtime Skills. Branches expand to show actual skill names (from `skills/runtime/`, `skills/setup/`, `~/nano/skills/`). Hover shows skill description from SKILL.md. Nodes glow when hovered. Connection lines show skill dependency/override relationships.
 
 ### S6: MEMORY PROTOCOL VISUALIZER
 Animated diagram of how MEMORY.md, SOUL.md, memory search, and session context flow together. Shows actual file paths. Interactive — clicking a memory region highlights its role in context assembly. Includes mock search demo with BM25-style scoring visualization.
 
 ### S7: FARM TOPOLOGY — HA INTEGRATION
-If farm profile detected or as showcase: 3D-ish wireframe visualization of farm entities (sensors, irrigation, climate). Each entity pulses. Connecting lines show HA→FFT_nano communication. Real-time-style display showing entity states. This section is the most visually spectacular — it connects FFT_nano's real-world purpose (farm automation) to its digital architecture.
+If farm profile detected or as showcase: 3D-ish wireframe visualization of farm entities (sensors, irrigation, climate). Each entity pulses. Connecting lines show HA→nano-core communication. Real-time-style display showing entity states. This section is the most visually spectacular — it connects nano-core's real-world purpose (farm automation) to its digital architecture.
 
 ### S8: CRON SCHEDULER TIMELINE
 Visual timeline of scheduled tasks (from `src/cron/`). Tasks shown as bars on a 24-hour radial clock. Color-coded by type (cron=green, interval=cyan, once=amber). Hover shows task details. Animated "current time" needle. Live task queue visualization.
 
 ### S9: NANOBANANA GALLERY — CAPABILITY SHOWCASE
-Image generation panel using nanobabana (nano-banana-pro skill) generating custom FFT_nano-themed imagery:
-- "FFT_nano agent consciousness visualization — bioluminescent neural network in FFT green"
+Image generation panel using nanobabana (nano-banana-pro skill) generating custom nano-core-themed imagery:
+- "nano-core agent consciousness visualization — bioluminescent neural network in FFT green"
 - "Farm friend terminal architecture diagram — holographic HUD style"
 - "Pi coding agent debug stream — terminal aesthetic with particle effects"
 Images displayed with glitch-in animation. Each image caption includes the exact prompt used.
@@ -184,7 +184,7 @@ Full Excalidraw-drawn diagrams embedded as interactive SVGs:
 Diagrams are animated: elements fade in on scroll, connections draw themselves.
 
 ### S12: TECHNICAL FOOTPRINT
-Data visualization showing FFT_nano's codebase stats:
+Data visualization showing nano-core's codebase stats:
 - Files by module (bar chart)
 - Lines of code per module (horizontal bar)
 - File type distribution (donut chart)
@@ -232,7 +232,7 @@ fft-experience/
 
 Generate 4 images for the experience using the `nano-banana-pro` skill:
 
-1. **Hero Visual**: "FFT_nano logo concept — bioluminescent neural network node in deep space, electric green and cyan on black void, cyberpunk HUD aesthetic, high detail, dramatic lighting"
+1. **Hero Visual**: "nano-core logo concept — bioluminescent neural network node in deep space, electric green and cyan on black void, cyberpunk HUD aesthetic, high detail, dramatic lighting"
 2. **Farm Topology**: "Futuristic farm operation center — holographic wireframe irrigation system, sensor network nodes, cyan and amber on dark background, technical schematic aesthetic"
 3. **Architecture Diagram**: "Abstract visualization of a multi-container software architecture — Telegram cloud connected to Docker containers, Pi agent brain in center, memory streams flowing like aurora, dark sci-fi aesthetic"
 4. **Skills Constellation**: "Abstract star constellation — nodes connected by glowing threads of light, FFT green and cyan on deep navy, representing a distributed skills graph, magical realism style"
@@ -242,7 +242,7 @@ Generate 4 images for the experience using the `nano-banana-pro` skill:
 ## 6. TODO LIST
 
 ### Phase 0: Setup & Reconnaissance (DONE)
-- [x] Investigate ~/fft_nano repo structure
+- [x] Investigate ~/nano-core repo structure
 - [x] Read README.md, AGENTS.md, src/types.ts
 - [x] Map src/ file tree and module responsibilities
 - [x] Understand container runtime, skills, memory, farm, cron, web/TUI layers
@@ -261,7 +261,7 @@ Generate 4 images for the experience using the `nano-banana-pro` skill:
 - [ ] Implement scroll navigation + Intersection Observer
 
 ### Phase 3: Animated Components
-- [ ] Build S1 Hero — WebGL particle system with FFT_nano nodes
+- [ ] Build S1 Hero — WebGL particle system with nano-core nodes
 - [ ] Build S3 Metrics — Canvas gauges with number-flip animation
 - [ ] Build S4 Data Flow — Scroll-driven timeline with SVG paths
 - [ ] Build S5 Skills Constellation — Canvas node graph with hover

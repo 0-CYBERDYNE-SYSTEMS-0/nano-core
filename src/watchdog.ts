@@ -361,8 +361,8 @@ export function createWatchdog(
       run.abortController.abort(
         new Error(
           staleByMax
-            ? 'Aborted by FFT_nano watchdog: max chat run age exceeded'
-            : 'Aborted by FFT_nano watchdog: chat run made no progress',
+            ? 'Aborted by nano-core watchdog: max chat run age exceeded'
+            : 'Aborted by nano-core watchdog: chat run made no progress',
         ),
       );
       await emitIncident({
@@ -416,8 +416,8 @@ export function createWatchdog(
       run.abortController?.abort(
         new Error(
           staleByMax
-            ? 'Aborted by FFT_nano watchdog: max coder run age exceeded'
-            : 'Aborted by FFT_nano watchdog: coder run made no progress',
+            ? 'Aborted by nano-core watchdog: max coder run age exceeded'
+            : 'Aborted by nano-core watchdog: coder run made no progress',
         ),
       );
       await emitIncident({

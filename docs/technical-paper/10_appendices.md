@@ -332,7 +332,7 @@ WEATHER_API_KEY=your-weather-api-key
 HOMEASSISTANT_URL=http://home-assistant.local:8123
 HOMEASSISTANT_TOKEN=your-long-lived-access-token
 
-POSTGRES_CONNECTION_STRING=postgresql://user:pass@localhost/fft_nano
+POSTGRES_CONNECTION_STRING=postgresql://user:pass@localhost/nano-core
 ```
 
 ### C.2 Config File
@@ -378,7 +378,7 @@ memory:
 # Logging Configuration
 logging:
   level: info  # debug, info, warning, error
-  file: ~/.hermes/fft_nano.log
+  file: ~/.hermes/nano-core.log
   rotation: daily
   retention: 30d
 
@@ -416,8 +416,8 @@ services:
     image: postgres:15
     container_name: fft-nano-db
     environment:
-      POSTGRES_DB: fft_nano
-      POSTGRES_USER: fft_nano
+      POSTGRES_DB: nano-core
+      POSTGRES_USER: nano-core
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -620,12 +620,12 @@ pytest tests/
 
 ### F.1 License
 
-FFT_nano is released under the MIT License:
+nano-core is released under the MIT License:
 
 ```
 MIT License
 
-Copyright (c) 2024 FFT_nano Contributors
+Copyright (c) 2024 nano-core Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -648,7 +648,7 @@ SOFTWARE.
 
 ### F.2 Third-Party Licenses
 
-FFT_nano uses the following third-party software:
+nano-core uses the following third-party software:
 
 | Library | License | Purpose |
 |---------|---------|---------|
@@ -684,6 +684,6 @@ FFT_nano uses the following third-party software:
 
 **Document Version: 1.0.0**  
 **Last Updated: March 4, 2026**  
-**Document Maintainer:** FFT_nano Development Team
+**Document Maintainer:** nano-core Development Team
 
 For questions or feedback, please contact: docs@fft-nano.org

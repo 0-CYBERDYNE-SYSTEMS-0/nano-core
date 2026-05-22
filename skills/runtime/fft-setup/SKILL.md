@@ -1,11 +1,11 @@
 ---
 name: fft-setup
-description: Setup and bootstrap FFT_nano on macOS or Linux, including container runtime checks, dependency install/build, env wiring for Pi provider credentials, and first-run startup validation.
+description: Setup and bootstrap nano-core on macOS or Linux, including container runtime checks, dependency install/build, env wiring for Pi provider credentials, and first-run startup validation.
 ---
 
 # FFT Setup
 
-Use this skill when the task is to install, bootstrap, or verify FFT_nano runtime setup.
+Use this skill when the task is to install, bootstrap, or verify nano-core runtime setup.
 
 ## When to use this skill
 
@@ -91,11 +91,4 @@ ZAI_API_KEY=replace-me
 - Telegram mode: `/status` responds.
 - Main chat behavior is correct:
   - main chat responds to normal messages
-  - non-main chat requires `@FarmFriend` (or configured `@<ASSISTANT_NAME>`)
-
-## Farm Mode Handoff
-
-For farm bridge onboarding, use the dedicated dual-mode bootstrap:
-
-- Demo (simulated telemetry + showcase): `./scripts/farm-bootstrap.sh --mode demo`
-- Production (real devices + mapping + validation): `./scripts/farm-bootstrap.sh --mode production`
+  - non-main chat requires `@nano-core` (or configured `@<ASSISTANT_NAME>`)

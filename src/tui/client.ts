@@ -490,7 +490,7 @@ export async function runTuiClient(opts: CliOptions): Promise<void> {
       ? `local (${socketPath})`
       : opts.url || DEFAULT_GATEWAY_URL;
     header.setText(
-      theme.header(`FFT_nano TUI · ${modeLabel} · session ${sessionKey}`),
+      theme.header(`nano-core TUI · ${modeLabel} · session ${sessionKey}`),
     );
   };
 
@@ -990,7 +990,7 @@ export async function runTuiClient(opts: CliOptions): Promise<void> {
     await loadHistory(120);
   }
 
-  chatLog.addSystem('Connected to FFT_nano gateway. Type /help for commands.');
+  chatLog.addSystem('Connected to nano-core gateway. Type /help for commands.');
   if (startupSession.infoMessage) {
     chatLog.addSystem(startupSession.infoMessage);
   }

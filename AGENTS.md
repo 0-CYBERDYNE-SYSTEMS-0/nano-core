@@ -1,4 +1,4 @@
-# FFT_nano / NanoClaw Agent Notes
+# nano-core / NanoClaw Agent Notes
 
 This repo is a single Node.js host process that:
 - Receives chat messages (Telegram and/or WhatsApp)
@@ -35,8 +35,8 @@ export TELEGRAM_BOT_TOKEN="..."
 
 Main channel behavior:
 - `main` responds to all messages.
-- Non-main chats only respond if the message starts with the trigger word (default `@FarmFriend`).
-  - The trigger word is `@<ASSISTANT_NAME>` where `ASSISTANT_NAME` defaults to `FarmFriend` (see `src/config.ts`).
+- Non-main chats only respond if the message starts with the trigger word (default `@nano-core`).
+  - The trigger word is `@<ASSISTANT_NAME>` where `ASSISTANT_NAME` defaults to `nano-core` (see `src/config.ts`).
 
 Ways to make your Telegram DM the `main` channel:
 - Set `TELEGRAM_MAIN_CHAT_ID` (numeric chat id) and restart.
@@ -63,7 +63,7 @@ Notes:
 
 ## Coding Agent (/coder)
 
-- In the main/admin chat you can use: `@FarmFriend /coder <task>`.
+- In the main/admin chat you can use: `@nano-core /coder <task>`.
 - `/coding <task>` is an alias for `/coder <task>`.
 - `/coder-plan <task>` and `/coder_plan <task>` run the coding worker in read-only planning mode.
 - Main/admin natural-language coding requests stay in the main assistant unless the operator explicitly approves coder escalation.
@@ -91,7 +91,7 @@ organized in two layers:
 ### Skill directory layout
 
 ```
-fft_nano-dev/
+nano-core-dev/
   skills/
     setup/          ← operator-facing guides (one-time setup tasks)
     runtime/        ← repo-tracked agent skills (fft-coder-ops, agent-browser, etc.)
@@ -103,7 +103,7 @@ fft_nano-dev/
 ### The two layers
 
 **`skills/runtime/`** — repo-tracked, version-controlled, part of the install package.
-These are FFT_nano's standard agent skills. Any operator or agent can see and use them.
+These are nano-core's standard agent skills. Any operator or agent can see and use them.
 They are the source of record for distributed deploys.
 
 **`~/nano/skills/`** — your personal skills layer. Lives inside the agent's workspace,
@@ -113,7 +113,7 @@ your personal tools, domain-specific skills).
 
 ### How skill mirroring works
 
-On each run, FFT_nano merges both layers and syncs them into the agent's home:
+On each run, nano-core merges both layers and syncs them into the agent's home:
 
 ```
 skills/runtime/  +  ~/nano/skills/
@@ -127,7 +127,7 @@ container: /home/node/.pi/skills/
   On name collision, `~/nano/skills/` wins (it is sourced last).
 - **Non-main group runs:** only repo skills are synced. Personal skills are intentionally
   not available to group members — access is workspace-scoped, not global.
-- **Sync safety:** FFT_nano uses a manifest file (`.fft_nano_managed_skills.json`) to
+- **Sync safety:** nano-core uses a manifest file (`.nano-core_managed_skills.json`) to
   track which skills it manages. Only repo-tracked skills are managed — personal skills
   in `~/nano/skills/` are never overwritten or removed by sync. You can safely add,
   modify, or delete personal skills without affecting the repo layer.
@@ -172,16 +172,16 @@ This repo has two different ways to run the host, and they are not interchangeab
   - Debug-only path; use this when actively developing and you want source-level changes without rebuilding.
 - `./scripts/service.sh ...`
   - Manages the long-running OS service.
-  - On macOS this is a user LaunchAgent with label `com.fft_nano`.
+  - On macOS this is a user LaunchAgent with label `com.nano-core`.
   - On Linux this is a systemd unit named `fft-nano` by default.
 
 Important operational rule:
 - If the machine is already running the launchd/systemd service, do not also start a second foreground host with `start.sh` or `npm run start`.
-- The host acquires a singleton lock at `data/fft_nano.lock`.
+- The host acquires a singleton lock at `data/nano-core.lock`.
 - A second instance can fail on the lock, or still cause upstream channel conflicts such as Telegram polling collisions.
 
 What actually runs on macOS:
-- The installed LaunchAgent label is `com.fft_nano`.
+- The installed LaunchAgent label is `com.nano-core`.
 - The service keeps the main host alive and restarts it if it exits.
 - The web UI and TUI gateway are served by that same host process.
   - TUI websocket default: `127.0.0.1:28989`
@@ -197,14 +197,14 @@ npm run build
 Equivalent direct macOS restart:
 
 ```bash
-launchctl kickstart -k gui/$(id -u)/com.fft_nano
+launchctl kickstart -k gui/$(id -u)/com.nano-core
 ```
 
 Recommended verification after restart:
 
 ```bash
-launchctl list | grep com.fft_nano
-cat data/fft_nano.lock
+launchctl list | grep com.nano-core
+cat data/nano-core.lock
 lsof -nP -iTCP:28989 -sTCP:LISTEN
 lsof -nP -iTCP:28990 -sTCP:LISTEN
 ```
@@ -227,7 +227,7 @@ Why this matters:
 Common failure modes:
 - Missing provider key: `pi` reports "No models available" (no API key passed through).
 - Wrong `PI_API`/`PI_MODEL`: `pi` reports "Model '<provider>'/'<model>' not found".
-- Multiple instances: Telegram polling can error with "Conflict: terminated by other getUpdates request". FFT_nano now uses a lock file (`data/fft_nano.lock`) to prevent two instances from running at once.
+- Multiple instances: Telegram polling can error with "Conflict: terminated by other getUpdates request". nano-core now uses a lock file (`data/nano-core.lock`) to prevent two instances from running at once.
 - Docker daemon unavailable: run `docker info` and start Docker Desktop/daemon if needed.
 
 ---
@@ -258,7 +258,7 @@ Do not start unrelated feature work directly in the root checkout.
 
 This is the canonical operator workflow and is intentional:
 
-1. Implement and test in the dev checkout/worktree (for example `fft_nano-dev`).
+1. Implement and test in the dev checkout/worktree (for example `nano-core-dev`).
 2. Open PR and merge to `origin/main`.
 3. Fast-forward the local runtime/release checkout on `main`.
 4. Build/restart service from that local `main` checkout.
@@ -274,16 +274,16 @@ Use one reusable general-purpose dev worktree for unrelated feature work:
 
 ```bash
 # Create the reusable dev worktree from main
-git worktree add ../fft_nano-dev -b feat/current-work main
+git worktree add ../nano-core-dev -b feat/current-work main
 
 # Do feature work there
-cd ../fft_nano-dev
+cd ../nano-core-dev
 
 # When done, merge or park the branch, then remove the worktree
 git checkout main
 git merge --ff-only feat/current-work
 
-git worktree remove ../fft_nano-dev
+git worktree remove ../nano-core-dev
 git branch -d feat/current-work
 ```
 

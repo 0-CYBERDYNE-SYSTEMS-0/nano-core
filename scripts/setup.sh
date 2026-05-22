@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# One-time setup helper for FFT_nano.
+# One-time setup helper for nano-core.
 # - Installs Node deps
 # - Builds TypeScript
 # - Builds the agent container image
@@ -404,8 +404,8 @@ install_cli_launcher() {
 
   mkdir -p "$(dirname "$profile")"
   touch "$profile"
-  if grep -Fq "# >>> FFT_nano CLI >>>" "$profile"; then
-    say "PATH profile already contains FFT_nano CLI block: $profile"
+  if grep -Fq "# >>> nano-core CLI >>>" "$profile"; then
+    say "PATH profile already contains nano-core CLI block: $profile"
     return
   fi
 
@@ -416,14 +416,14 @@ install_cli_launcher() {
 
   {
     printf '\n'
-    printf '# >>> FFT_nano CLI >>>\n'
+    printf '# >>> nano-core CLI >>>\n'
     printf 'export PATH="%s:$PATH"\n' "$path_entry"
-    printf '# <<< FFT_nano CLI <<<\n'
+    printf '# <<< nano-core CLI <<<\n'
   } >>"$profile"
   say "Added ${bin_dir} to PATH in $profile (open a new shell, or run: export PATH=\"${bin_dir}:\$PATH\")."
 }
 
-say "FFT_nano setup (root: $ROOT_DIR)"
+say "nano-core setup (root: $ROOT_DIR)"
 parse_args "$@"
 
 need_cmd node

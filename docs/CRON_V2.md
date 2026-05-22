@@ -1,6 +1,6 @@
 # Cron V2 Compatibility Layer
 
-`FFT_nano` supports both legacy scheduler payloads and the new cron v2-style task fields.
+`nano-core` supports both legacy scheduler payloads and the new cron v2-style task fields.
 
 ## Mode Switch
 

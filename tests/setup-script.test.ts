@@ -232,7 +232,7 @@ test('setup.sh installs pinned fft launcher and shell PATH block when auto-link 
   assert.match(launcher, /"\$@"/);
 
   const zshrc = readFileSync(path.join(homeDir, '.zshrc'), 'utf8');
-  assert.match(zshrc, /# >>> FFT_nano CLI >>>/);
+  assert.match(zshrc, /# >>> nano-core CLI >>>/);
   assert.match(zshrc, /export PATH="\$HOME\/\.local\/bin:\$PATH"/);
 
   const npmCalls = readFileSync(npmLog, 'utf8').trim().split('\n');
