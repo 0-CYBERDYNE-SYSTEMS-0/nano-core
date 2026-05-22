@@ -87,21 +87,6 @@ export interface TaskRunLog {
   error: string | null;
 }
 
-export interface FarmActionRequest {
-  type: 'farm_action';
-  action: string;
-  params: Record<string, unknown>;
-  requestId: string;
-}
-
-export interface FarmActionResult {
-  requestId: string;
-  status: 'success' | 'error';
-  result?: unknown;
-  error?: string;
-  executedAt: string;
-}
-
 export interface CanvasLayout {
   columns: number;
   gap: number;
@@ -306,7 +291,7 @@ export interface MemoryActionResult {
 export type FileDeliveryKind = 'photo' | 'document' | 'video' | 'audio';
 
 export interface FileDeliveryRequest {
-  type: 'farm_action';
+  type: 'file_delivery';
   action: 'deliver_file';
   requestId: string;
   params: {

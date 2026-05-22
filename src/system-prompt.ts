@@ -735,7 +735,7 @@ function renderBasePrompt(params: {
       '- Skills should stay organized without operator effort. Use skill_list/skill_view to inspect available procedural knowledge before repeating a workflow.',
     );
     lines.push(
-      '- Create or patch a skill only when a reusable workflow, pitfall, or farm operation pattern should be remembered procedurally.',
+      '- Create or patch a skill only when a reusable workflow, pitfall, or operational pattern should be remembered procedurally.',
     );
     lines.push(
       '- Mutations are host-gated to agent-created runtime skills; repo and personal source skills may be read and reported but not destructively curated.',
@@ -763,7 +763,7 @@ function renderBasePrompt(params: {
     );
     lines.push('```json');
     lines.push('{');
-    lines.push('  "type":"farm_action",');
+    lines.push('  "type":"file_delivery",');
     lines.push('  "action":"deliver_file",');
     lines.push('  "requestId":"<unique-id>",');
     lines.push('  "params":{');
@@ -956,7 +956,7 @@ export function buildSystemPrompt(
     );
   const promptMode: PromptMode = input.isScheduledTask ? 'minimal' : 'full';
   const assistantName =
-    (input.assistantName || 'FarmFriend').trim() || 'FarmFriend';
+    (input.assistantName || 'nano-core').trim() || 'nano-core';
   const providedMemoryContext = trimAndNormalize(input.memoryContext || '');
   const now = options.now?.() ?? new Date();
   const rawTimezone =

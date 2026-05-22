@@ -5,7 +5,6 @@ import { pathToFileURL } from 'url';
 
 import {
   DATA_DIR,
-  FEATURE_FARM,
   FFT_PROFILE,
   MAIN_WORKSPACE_DIR,
   PARITY_CONFIG,
@@ -420,19 +419,11 @@ function checkStateDirs(): CheckResult {
 }
 
 function checkRuntimeProfile(): CheckResult {
-  if (FFT_PROFILE === 'farm' && !FEATURE_FARM) {
-    return {
-      id: 'runtime.profile',
-      level: 'warn',
-      summary: 'Profile is farm but farm feature paths are disabled',
-      detail: `source=${PROFILE_DETECTION.source} reason=${PROFILE_DETECTION.reason}`,
-    };
-  }
   return {
     id: 'runtime.profile',
     level: 'pass',
     summary: 'Runtime profile resolved',
-    detail: `profile=${FFT_PROFILE} feature_farm=${FEATURE_FARM} source=${PROFILE_DETECTION.source}`,
+    detail: `profile=${FFT_PROFILE} source=${PROFILE_DETECTION.source}`,
   };
 }
 

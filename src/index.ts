@@ -13,8 +13,6 @@ import makeWASocket, {
 import {
   ASSISTANT_NAME,
   DATA_DIR,
-  FEATURE_FARM,
-  FARM_STATE_ENABLED,
   FFT_NANO_CODER_GATE_MODE,
   FFT_NANO_ONBOARDING_MODE,
   FFT_NANO_TUI_AUTH_TOKEN,
@@ -79,7 +77,6 @@ import {
 } from './db.js';
 import { startSchedulerLoop } from './task-scheduler.js';
 import {
-  FarmActionRequest,
   MemoryActionRequest,
   NewMessage,
   RegisteredGroup,
@@ -167,12 +164,7 @@ import {
   type CodingWorkerRequest,
 } from './coding-orchestrator.js';
 import { resolveCoderProjectTarget } from './coder-project-resolver.js';
-import { executeFarmAction } from './farm-action-gateway.js';
 import { processFileDeliveryRequest } from './file-delivery.js';
-import {
-  startFarmStateCollector,
-  stopFarmStateCollector,
-} from './farm-state-collector.js';
 import { executeMemoryAction } from './memory-action-gateway.js';
 import {
   applySkillManagerTransitions,
@@ -5019,8 +5011,6 @@ const appRuntime = createAppRuntime({
     heartbeatActiveHours: HEARTBEAT_ACTIVE_HOURS,
     dataDir: DATA_DIR,
     fftProfile: FFT_PROFILE,
-    featureFarm: FEATURE_FARM,
-    farmStateEnabled: FARM_STATE_ENABLED,
     profileDetection: PROFILE_DETECTION,
     whatsappEnabled: WHATSAPP_ENABLED,
     onboardingMode: FFT_NANO_ONBOARDING_MODE,
@@ -5073,8 +5063,6 @@ const appRuntime = createAppRuntime({
   startWebControlCenterService,
   stopTuiGatewayService,
   stopWebControlCenterService,
-  startFarmStateCollector,
-  stopFarmStateCollector,
   startHeartbeatLoop,
   maybeRunBootMdOnce,
   getContainerRuntime,
@@ -5180,7 +5168,7 @@ function runQuietSkillAgent(params: {
     'This run is internal maintenance. Do not send chat messages unless explicitly asked.',
     'Use skill_action IPC for all skill reads and writes.',
     'Do not inspect or edit skill files directly. Use action_results as the durable source of truth.',
-    'Keep skills organized for non-technical farm operators: clear names, valid frontmatter, class-level reusable workflows, and lean active catalog.',
+    'Keep skills organized for non-technical operators: clear names, valid frontmatter, class-level reusable workflows, and lean active catalog.',
     'You may only mutate host-allowed agent-created runtime skills. For source-owned skills, report issues instead of trying to modify them.',
   ].join('\n');
   const maintenanceChatJid = `maintenance:${params.group.folder}`;
@@ -5249,7 +5237,7 @@ function maybeRunSkillSelfImprovement(params: {
     requestId: `${params.requestId || 'run'}:skill-self-improve`,
     prompt: [
       'Review the completed conversation for reusable procedural knowledge.',
-      'Use skill_list first. Create or patch a skill only if this run taught a reusable workflow, pitfall, command pattern, farm operating procedure, or troubleshooting recipe.',
+      'Use skill_list first. Create or patch a skill only if this run taught a reusable workflow, pitfall, command pattern, operating procedure, or troubleshooting recipe.',
       'Prefer broad class-level skills with labeled sections over many narrow one-off skills.',
       'Do not duplicate existing skills. Keep frontmatter valid and descriptions practical.',
       '',
@@ -5305,7 +5293,7 @@ function maybeRunSkillManager(params: {
     prompt: [
       'Run a bounded skill manager review.',
       'Use skill_status and skill_view to inspect the active library.',
-      'Goal: keep farm/operator skills lean, organized, and valid. Clean frontmatter issues for agent-created skills by patching them. Report source-owned frontmatter issues in your final summary.',
+      'Goal: keep operator skills lean, organized, and valid. Clean frontmatter issues for agent-created skills by patching them. Report source-owned frontmatter issues in your final summary.',
       'Consolidate near-duplicate agent-created skills into class-level umbrella skills when useful. Archive only agent-created skills that are stale, duplicate, or fully absorbed.',
       'Do not mutate source-owned project or personal skills.',
     ].join('\n'),
@@ -6046,7 +6034,6 @@ function createWebControlCenterAdapters(): WebControlCenterAdapters {
     }),
     getProfileStatus: () => ({
       profile: FFT_PROFILE,
-      featureFarm: FEATURE_FARM,
       profileDetection: PROFILE_DETECTION,
     }),
     getBuildInfo: () => ({
@@ -6873,27 +6860,17 @@ async function processHostEvent(event: HostEvent): Promise<void> {
       return;
     case 'action_requested': {
       const result =
-        event.request.type === 'farm_action'
-          ? FEATURE_FARM
-            ? await executeFarmAction(event.request, event.isMain)
-            : {
-                requestId: event.request.requestId,
-                status: 'error' as const,
-                error:
-                  'farm_action is disabled in core profile (set FFT_PROFILE=farm or FEATURE_FARM=1)',
-                executedAt: new Date().toISOString(),
-              }
-          : event.request.type === 'skill_action'
-            ? await executeSkillAction(event.request, {
-                sourceGroup: event.sourceGroup,
-                isMain: event.isMain,
-                registeredGroups: state.registeredGroups,
-              })
-            : await executeMemoryAction(event.request, {
-                sourceGroup: event.sourceGroup,
-                isMain: event.isMain,
-                registeredGroups: state.registeredGroups,
-              });
+        event.request.type === 'skill_action'
+          ? await executeSkillAction(event.request, {
+              sourceGroup: event.sourceGroup,
+              isMain: event.isMain,
+              registeredGroups: state.registeredGroups,
+            })
+          : await executeMemoryAction(event.request, {
+              sourceGroup: event.sourceGroup,
+              isMain: event.isMain,
+              registeredGroups: state.registeredGroups,
+            });
       fs.writeFileSync(
         event.resultPath,
         JSON.stringify(
@@ -7186,7 +7163,7 @@ function startIpcWatcher(): void {
         );
       }
 
-      // Process farm actions from this group's IPC directory
+      // Process domain actions from this group's IPC directory
       try {
         const actionsDir = path.join(ipcBaseDir, sourceGroup, 'actions');
         if (fs.existsSync(actionsDir)) {
@@ -7198,7 +7175,6 @@ function startIpcWatcher(): void {
             const filePath = path.join(actionsDir, file);
             try {
               const request = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as
-                | FarmActionRequest
                 | MemoryActionRequest
                 | SkillActionRequest;
 
@@ -7210,7 +7186,6 @@ function startIpcWatcher(): void {
               fs.mkdirSync(resultDir, { recursive: true });
 
               if (
-                request.type === 'farm_action' ||
                 request.type === 'memory_action' ||
                 request.type === 'skill_action'
               ) {
@@ -7244,7 +7219,7 @@ function startIpcWatcher(): void {
             } catch (err) {
               logger.error(
                 { file, sourceGroup, err },
-                'Error processing IPC farm action',
+                'Error processing IPC action',
               );
               const errorDir = path.join(ipcBaseDir, 'errors');
               fs.mkdirSync(errorDir, { recursive: true });
@@ -7280,7 +7255,7 @@ function startIpcWatcher(): void {
             try {
               const request = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
               if (
-                request.type === 'farm_action' &&
+                request.type === 'file_delivery' &&
                 request.action === 'deliver_file'
               ) {
                 const groupJid = Object.keys(state.registeredGroups).find(
@@ -7368,7 +7343,7 @@ function startIpcWatcher(): void {
               } else {
                 logger.warn(
                   { sourceGroup, file },
-                  'Ignoring IPC file delivery: expected farm_action deliver_file',
+                  'Ignoring IPC file delivery: expected file_delivery deliver_file',
                 );
               }
             } catch (err) {
@@ -7903,10 +7878,10 @@ function ensureContainerSystemRunning(): void {
   appRuntime.ensureContainerSystemRunning();
 }
 
-function stopFarmServicesForShutdown(signal: string): void {
+function stopDomainServicesForShutdown(signal: string): void {
   stopUpdateNotificationLoop();
   stopHeartbeatLoop();
-  appRuntime.stopFarmServicesForShutdown(signal);
+  appRuntime.stopDomainServicesForShutdown(signal);
 }
 
 async function shutdownAndExit(
@@ -7928,9 +7903,9 @@ async function main(): Promise<void> {
 }
 
 main().catch(async (err) => {
-  stopFarmServicesForShutdown('startup_error');
+  stopDomainServicesForShutdown('startup_error');
   await stopWebControlCenterService();
   await stopTuiGatewayService();
-  logger.error({ err }, 'Failed to start FFT_nano');
+  logger.error({ err }, 'Failed to start nano-core');
   process.exit(1);
 });

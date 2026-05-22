@@ -3,8 +3,7 @@ import path from 'path';
 import { PARITY_CONFIG, PARITY_CONFIG_PATH } from './parity-config.js';
 import { FEATURE_FARM, FFT_PROFILE, PROFILE_DETECTION } from './profile.js';
 
-const DEFAULT_ASSISTANT_NAME =
-  FFT_PROFILE === 'farm' ? 'FarmFriend' : 'fft_nano';
+const DEFAULT_ASSISTANT_NAME = 'nano-core';
 
 export const ASSISTANT_NAME =
   process.env.ASSISTANT_NAME || DEFAULT_ASSISTANT_NAME;
@@ -42,43 +41,6 @@ export const MAIN_GROUP_FOLDER = 'main';
 export const MAIN_WORKSPACE_DIR = path.resolve(
   expandHomePath(process.env.FFT_NANO_MAIN_WORKSPACE_DIR || '~/nano'),
 );
-export const FARM_STATE_ENABLED =
-  FEATURE_FARM &&
-  envFlag(process.env.FARM_STATE_ENABLED, FFT_PROFILE === 'farm');
-export const FARM_MODE = (process.env.FARM_MODE || 'demo').trim().toLowerCase();
-export const FARM_STATE_DIR = path.resolve(DATA_DIR, 'farm-state');
-export const FARM_PROFILE_PATH = path.resolve(
-  expandHomePath(
-    process.env.FARM_PROFILE_PATH || path.join(DATA_DIR, 'farm-profile.json'),
-  ),
-);
-export const FARM_STATE_FAST_MS = envInt(
-  process.env.FARM_STATE_FAST_MS,
-  15000,
-  5000,
-  60000,
-);
-export const FARM_STATE_MEDIUM_MS = envInt(
-  process.env.FARM_STATE_MEDIUM_MS,
-  120000,
-  30000,
-  600000,
-);
-export const FARM_STATE_SLOW_MS = envInt(
-  process.env.FARM_STATE_SLOW_MS,
-  900000,
-  300000,
-  3600000,
-);
-export const HA_URL = process.env.HA_URL || 'http://localhost:8123';
-export const HA_URL_CANDIDATES = parseHaUrlCandidates(
-  HA_URL,
-  process.env.HA_URL_CANDIDATES,
-);
-export const HA_TOKEN = process.env.HA_TOKEN || '';
-export const FFT_DASHBOARD_REPO_PATH =
-  process.env.FFT_DASHBOARD_REPO_PATH || '';
-
 export const CONTAINER_IMAGE =
   process.env.CONTAINER_IMAGE || 'fft-nano-agent:latest';
 const DEFAULT_CONTAINER_TIMEOUT_MS = 6 * 60 * 60 * 1000; // 6 hours
@@ -140,25 +102,6 @@ function resolveTuiHost(accessMode: WebAccessMode): string {
   if (explicit) return explicit;
   if (accessMode === 'localhost') return '127.0.0.1';
   return '0.0.0.0';
-}
-
-function normalizeUrlCandidate(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  return trimmed.replace(/\/$/, '');
-}
-
-function parseHaUrlCandidates(primaryUrl: string, rawList?: string): string[] {
-  const fallbacks = ['http://localhost:8123', 'http://192.168.64.1:8123'];
-  const explicit =
-    rawList
-      ?.split(',')
-      .map((entry) => normalizeUrlCandidate(entry))
-      .filter((entry): entry is string => Boolean(entry)) || [];
-  const ordered = [primaryUrl, ...explicit, ...fallbacks]
-    .map((entry) => normalizeUrlCandidate(entry))
-    .filter((entry): entry is string => Boolean(entry));
-  return Array.from(new Set(ordered));
 }
 
 export const MEMORY_RETRIEVAL_GATE_ENABLED = envFlag(
@@ -235,7 +178,7 @@ const parsedAliases = aliasEnv
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
-const defaultAliases = FFT_PROFILE === 'farm' ? ['F-15'] : [];
+const defaultAliases: string[] = [];
 
 export const ASSISTANT_TRIGGER_ALIASES = Array.from(
   new Set([ASSISTANT_NAME, ...defaultAliases, ...parsedAliases]),

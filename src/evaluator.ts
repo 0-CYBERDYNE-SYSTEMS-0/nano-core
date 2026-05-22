@@ -194,7 +194,7 @@ function getRubric(runType: RunType, changedFiles?: string[]): string {
     case 'heartbeat':
       return [
         '1. Did the agent complete the tasks specified in its instructions?',
-        '2. Were all monitoring checks, farm status checks, or operational tasks performed?',
+        '2. Were all monitoring checks, status checks, or operational tasks performed?',
         '3. Did the agent take any required actions, or only produce narrative?',
         '4. Are there any urgent issues the agent should have flagged but did not?',
         '5. Is the output substantive (not just a placeholder "I checked everything is fine")?',

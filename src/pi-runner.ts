@@ -471,8 +471,6 @@ export function collectRuntimeSecrets(
     'MODAL_API_KEY',
     'NVIDIA_API_KEY',
     'FFT_NANO_DRY_RUN',
-    'HA_URL',
-    'HA_TOKEN',
     'FFT_NANO_PROMPT_FILE_MAX_CHARS',
     'FFT_NANO_PROMPT_TOTAL_MAX_CHARS',
   ] as const;

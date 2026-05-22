@@ -15,7 +15,6 @@ interface RuntimeStatusPayload {
 
 interface ProfileStatusPayload {
   profile: string;
-  featureFarm: boolean;
   profileDetection: {
     source: string;
     reason: string;
