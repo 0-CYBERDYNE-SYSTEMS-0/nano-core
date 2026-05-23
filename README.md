@@ -643,7 +643,11 @@ Versioning and official release flow are documented in `docs/RELEASE.md`.
 - Official distribution is **GitHub Releases** (source archives + checksums).
 - npm publish is intentionally deferred until this repo ships a dedicated end-user CLI packaging path.
 
-## Architecture (Short)
+## Architecture
+
+![nano-core architecture](assets/architecture.svg)
+
+[Edit diagram](https://excalidraw.com/#json=0rOfumv4kb5ez_gK2ech9,ElC66pp_di48sBQlyj3lnA) — source at `assets/architecture.excalidraw`
 
 ```text
 Telegram/WhatsApp -> SQLite -> host router/scheduler -> containerized Pi runtime -> chat response
