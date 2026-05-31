@@ -1,0 +1,111 @@
+{
+  "allowedPaths": [
+    ".env.example",
+    ".gitignore",
+    ".gitleaks.toml",
+    ".npmignore",
+    ".prettierrc",
+    "bin/",
+    "config/",
+    "container/",
+    "package-lock.json",
+    "package.json",
+    "scripts/",
+    "skills/runtime/",
+    "src/",
+    "tests/",
+    "tsconfig.json",
+    "web/control-center/"
+  ],
+  "blockedPaths": [
+    ".git/",
+    ".github/",
+    ".claude/",
+    "backups/",
+    "data/",
+    "dist/",
+    "docs/technical-paper/",
+    "groups/",
+    "logs/",
+    "node_modules/",
+    "skills/runtime/farm*",
+    "skills/runtime/agriculture*",
+    "store/",
+    "tmp/",
+    "tmp-ipc/"
+  ],
+  "blockedPathPatterns": [
+    "(^|/)farm[^/]*",
+    "(^|/)agriculture[^/]*",
+    "(^|/)irrigation[^/]*",
+    "(^|/)livestock[^/]*",
+    "(^|/)crop[^/]*",
+    "(^|/)soil[^/]*",
+    "(^|/)harvest[^/]*",
+    "(^|/)tractor[^/]*"
+  ],
+  "skipForbiddenFiles": true,
+  "textReplacements": [
+    {
+      "from": "https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano.git",
+      "to": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git"
+    },
+    {
+      "from": "https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano",
+      "to": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core"
+    },
+    {
+      "from": "https://farm-friend.com/fft-nano/",
+      "to": "https://farm-friend.com/nano-core/"
+    },
+    {
+      "from": "https://farm-friend.com/fft-nano",
+      "to": "https://farm-friend.com/nano-core"
+    }
+  ],
+  "packageJson": {
+    "name": "nano-core",
+    "description": "nano-core: industry-agnostic AI coworker runtime. Receives messages, runs an agent subprocess, persists state. No subscriptions. MIT licensed.",
+    "repositoryUrl": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git",
+    "bugsUrl": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core/issues",
+    "homepage": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core#readme",
+    "bin": {
+      "nano": "./bin/nano.js",
+      "nano-core": "./bin/nano.js"
+    },
+    "removeScriptPatterns": [
+      "^farm:"
+    ],
+    "keywords": [
+      "autonomous-agents",
+      "ai-agents",
+      "llm",
+      "llm-agents",
+      "nodejs",
+      "typescript",
+      "telegram-bot",
+      "whatsapp-bot",
+      "raspberry-pi",
+      "open-source",
+      "automation",
+      "persistent-memory",
+      "local-first-ai"
+    ]
+  },
+  "forbiddenTerms": [
+    "\\bfarm(?:er|ers|ing|land|work|works|house|houses)?\\b",
+    "\\bag(?:riculture|ricultural|tech)\\b",
+    "\\birrigation\\b",
+    "\\blivestock\\b",
+    "\\bcrop(?:s|ping)?\\b",
+    "\\bsoil\\b",
+    "\\bharvest\\b",
+    "\\btractor(?:s)?\\b"
+  ],
+  "forbiddenTermExemptions": [
+    "config/nano-core-sync.json",
+    "scripts/sync-nano-core.mjs",
+    "tests/nano-core-sync.test.ts",
+    "SYNC_SOURCE.md"
+  ]
+}
