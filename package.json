@@ -1,6 +1,6 @@
 {
   "name": "nano-core",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "nano-core: industry-agnostic AI coworker runtime. Receives messages, runs an agent subprocess, persists state. No subscriptions. MIT licensed.",
   "keywords": [
     "autonomous-agents",
@@ -38,7 +38,7 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "test": "node --import tsx --test $(find tests -type f -name '*.test.ts' | tr '\\n' ' ')",
-    "nano": "node ./bin/nano.js",
+    "fft": "node ./bin/fft.js",
     "web:install": "npm --prefix web/control-center ci",
     "web:build": "npm --prefix web/control-center run build",
     "web:dev": "npm --prefix web/control-center run dev",
@@ -48,6 +48,7 @@
     "tui:client:dev": "tsx src/tui/client.ts",
     "onboard": "tsx src/onboard-cli.ts",
     "onboard:full": "bash scripts/onboard-all.sh",
+    "profile": "tsx src/profile-cli.ts",
     "backup:state": "bash scripts/backup-state.sh",
     "restore:state": "bash scripts/restore-state.sh",
     "auth": "tsx src/whatsapp-auth.ts",

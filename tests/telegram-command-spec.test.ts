@@ -40,6 +40,15 @@ test('Telegram command normalization accepts aliases and bot-suffixed forms', ()
   );
   assert.equal(normalizeTelegramCommandToken('/curator@TestBot'), '/curator');
   assert.equal(normalizeTelegramCommandToken('/coding@TestBot'), '/coding');
+  assert.equal(normalizeTelegramCommandToken('/run@TestBot'), '/run');
+  assert.equal(
+    normalizeTelegramCommandToken('/run-status@TestBot'),
+    '/run-status',
+  );
+  assert.equal(
+    normalizeTelegramCommandToken('/cancel_run@TestBot'),
+    '/cancel_run',
+  );
   assert.equal(normalizeTelegramCommandToken('/delivery@TestBot'), '/delivery');
   assert.equal(
     normalizeTelegramCommandToken('/text_delivery@TestBot'),
@@ -53,14 +62,16 @@ test('main chat help includes admin restart alias and non-main help does not', (
   const mainHelp = formatHelpText(true);
   const nonMainHelp = formatHelpText(false);
 
-  assert.match(mainHelp, /\/delivery \[stream\|off\|draft\]/);
-  assert.match(nonMainHelp, /\/delivery \[stream\|off\|draft\]/);
+  assert.match(mainHelp, /\/delivery \[stream\|append\|off\|draft\]/);
+  assert.match(nonMainHelp, /\/delivery \[stream\|append\|off\|draft\]/);
   assert.match(
     mainHelp,
     /\/knowledge \[status\|init\|task\|ingest\|lint\] - knowledge wiki\/librarian controls/,
   );
   assert.doesNotMatch(nonMainHelp, /\/knowledge \[/);
   assert.match(mainHelp, /\/restart - alias for \/gateway restart/);
+  assert.match(mainHelp, /\/run <task> - start a durable long normal-agent run/);
+  assert.match(mainHelp, /\/run-status <id> - show long run status/);
   assert.match(
     mainHelp,
     /\/setup \[cancel\] - runtime setup wizard for provider\/model\/key/,
@@ -70,4 +81,14 @@ test('main chat help includes admin restart alias and non-main help does not', (
     nonMainHelp,
     /Admin commands are only available in the main chat/,
   );
+});
+
+test('/reflect is a registered, normalizable, main-only command', () => {
+  assert.equal(normalizeTelegramCommandToken('/reflect'), '/reflect');
+  assert.equal(normalizeTelegramCommandToken('/reflect@TestBot'), '/reflect');
+
+  const mainHelp = formatHelpText(true);
+  const nonMainHelp = formatHelpText(false);
+  assert.match(mainHelp, /\/reflect \[dry-run\] \[focus\]/);
+  assert.doesNotMatch(nonMainHelp, /\/reflect \[dry-run\]/);
 });

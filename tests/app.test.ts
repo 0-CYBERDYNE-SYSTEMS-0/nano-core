@@ -22,8 +22,8 @@ test('startTelegram registers polling handler and routes callback queries', asyn
     constants: {
       telegramBotToken: 'token',
       telegramApiBaseUrl: undefined,
-      assistantName: 'nano-core',
-      triggerPattern: /@nano-core/i,
+      assistantName: 'FarmFriend',
+      triggerPattern: /@FarmFriend/i,
     },
     createTelegramBot: () => ({
       startPolling: (handler) => {
@@ -80,15 +80,15 @@ test('startTelegram stops message handling after setup input consumes the event'
           jid: 'telegram:1',
           name: 'Test',
           folder: 'test',
-          trigger: '@nano-core',
+          trigger: '@FarmFriend',
         },
       },
     },
     constants: {
       telegramBotToken: 'token',
       telegramApiBaseUrl: undefined,
-      assistantName: 'nano-core',
-      triggerPattern: /@nano-core/i,
+      assistantName: 'FarmFriend',
+      triggerPattern: /@FarmFriend/i,
     },
     createTelegramBot: () => ({
       startPolling: (handler) => {
@@ -148,8 +148,8 @@ test('startTelegram routes unregistered Telegram group messages to approval hand
     constants: {
       telegramBotToken: 'token',
       telegramApiBaseUrl: undefined,
-      assistantName: 'nano-core',
-      triggerPattern: /@nano-core/i,
+      assistantName: 'FarmFriend',
+      triggerPattern: /@FarmFriend/i,
     },
     createTelegramBot: () => ({
       startPolling: (handler) => {
@@ -181,7 +181,7 @@ test('startTelegram routes unregistered Telegram group messages to approval hand
     chatJid: 'telegram:-1001',
     chatName: 'Field Team',
     timestamp: '2026-05-19T12:00:00.000Z',
-    content: '@nano-core hello',
+    content: '@FarmFriend hello',
   });
 
   assert.deepEqual(approvals, ['telegram:-1001']);
@@ -202,8 +202,8 @@ test('main allows onboarding mode without configured channels', async () => {
     constants: {
       telegramBotToken: undefined,
       telegramApiBaseUrl: undefined,
-      assistantName: 'nano-core',
-      triggerPattern: /@nano-core/i,
+      assistantName: 'FarmFriend',
+      triggerPattern: /@FarmFriend/i,
       dataDir: '/tmp/fft-nano-test',
       featureFarm: false,
       farmStateEnabled: false,

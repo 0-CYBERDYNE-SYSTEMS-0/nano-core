@@ -1,11 +1,11 @@
 ---
 name: fft-debug
-description: Diagnose and resolve nano-core runtime issues across container execution, provider credentials, Telegram/WhatsApp routing, scheduler behavior, and per-group logs/state.
+description: Diagnose and resolve FFT_nano runtime issues across container execution, provider credentials, Telegram/WhatsApp routing, scheduler behavior, and per-group logs/state.
 ---
 
 # FFT Debug
 
-Use this skill for incident triage and deterministic debugging of nano-core host and container paths.
+Use this skill for incident triage and deterministic debugging of FFT_nano host and container paths.
 
 ## When to use this skill
 
@@ -28,10 +28,10 @@ Use this skill for incident triage and deterministic debugging of nano-core host
 ## Fast Triage
 
 1. Confirm single instance lock:
-   - `ls -la data/nano-core.lock`
+   - `ls -la data/fft_nano.lock`
 2. Check startup/runtime logs:
-   - `tail -n 200 logs/nano-core.log`
-   - `tail -n 200 logs/nano-core.error.log`
+   - `tail -n 200 logs/fft_nano.log`
+   - `tail -n 200 logs/fft_nano.error.log`
 3. Check per-group container logs:
    - `ls -la groups/<group>/logs`
    - `tail -n 200 groups/<group>/logs/*`

@@ -33,6 +33,10 @@ export const TELEGRAM_ADMIN_COMMANDS = [
   { command: 'coding', description: 'Alias for /coder' },
   { command: 'coder_plan', description: 'Delegate coding plan-only' },
   { command: 'subagents', description: 'List/stop/spawn subagent runs' },
+  { command: 'run', description: 'Start a durable long agent run' },
+  { command: 'runs', description: 'List recent long agent runs' },
+  { command: 'run_status', description: 'Show long run status' },
+  { command: 'cancel_run', description: 'Cancel a long agent run' },
   {
     command: 'skill_manager',
     description: 'Manage skill lifecycle (stale detection, archiving, backups)',
@@ -40,6 +44,10 @@ export const TELEGRAM_ADMIN_COMMANDS = [
   {
     command: 'librarian',
     description: 'Knowledge wiki controls (status, lint, capture, run)',
+  },
+  {
+    command: 'reflect',
+    description: 'Reflect on recent work; save only durable learning',
   },
   { command: 'tasks', description: 'List scheduled tasks' },
   { command: 'knowledge', description: 'Manage knowledge wiki/librarian' },
@@ -78,10 +86,17 @@ export type TelegramCommandName =
   | '/queue'
   | '/compact'
   | '/subagents'
+  | '/run'
+  | '/runs'
+  | '/run-status'
+  | '/run_status'
+  | '/cancel-run'
+  | '/cancel_run'
   | '/skill-manager'
   | '/skill_manager'
   | '/librarian'
   | '/curator'
+  | '/reflect'
   | '/main'
   | '/gateway'
   | '/restart'
@@ -124,10 +139,17 @@ const KNOWN_TELEGRAM_COMMANDS: Set<TelegramCommandName> = new Set([
   '/queue',
   '/compact',
   '/subagents',
+  '/run',
+  '/runs',
+  '/run-status',
+  '/run_status',
+  '/cancel-run',
+  '/cancel_run',
   '/skill-manager',
   '/skill_manager',
   '/librarian',
   '/curator',
+  '/reflect',
   '/main',
   '/gateway',
   '/restart',
@@ -169,7 +191,7 @@ export function formatHelpText(isMainGroup: boolean): string {
     '/model [provider/model|reset] - show/set chat model',
     '/think [off|minimal|low|medium|high|xhigh] - set thinking level',
     '/reasoning [off|on|stream] - set reasoning visibility mode',
-    '/delivery [stream|off|draft] - set Telegram text delivery mode',
+    '/delivery [stream|append|off|draft] - set Telegram text delivery mode',
     '/verbose [/v] [off|new|all|verbose] - cycle or set tool progress mode',
     '/new - start fresh session on next run',
     '/reset - alias for /new',
@@ -210,7 +232,12 @@ export function formatHelpText(isMainGroup: boolean): string {
     '/coding <task> - alias for /coder',
     '/coder-plan <task> - explicit delegated planning run',
     '/subagents list|stop|spawn - manage delegated subagent runs',
+    '/run <task> - start a durable long normal-agent run',
+    '/runs - list recent long normal-agent runs',
+    '/run-status <id> - show long run status',
+    '/cancel-run <id> - cancel an active long run',
     '/skill-manager status|dry-run|run|pause|resume|pin|unpin|archive|restore|backup - manage skill lifecycle',
+    '/reflect [dry-run] [focus] - reflect on recent work and save only durable learning (memory/skill); no-ops when nothing is reusable',
     '/librarian status|lint|capture|run|dry-run|log|progress - manage knowledge wiki',
     '/curator status|dry-run|run|pause|resume|pin|unpin|archive|restore|backup - [DEPRECATED: use /skill-manager]',
   ].join('\n');

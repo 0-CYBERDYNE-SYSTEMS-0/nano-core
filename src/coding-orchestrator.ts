@@ -19,6 +19,11 @@ import type {
 } from './pi-runner.js';
 import { createHostEventId, type HostEvent } from './runtime/host-events.js';
 import { getCoderLearningsForContext } from './coder-learnings.js';
+import {
+  recordEvaluatorVerdict,
+  getEvaluatorStats,
+  type EvaluatorStats,
+} from './db.js';
 import { createRunProgressReporter } from './run-progress.js';
 import { resolveGroupFolderPath } from './group-folder.js';
 
@@ -508,6 +513,26 @@ function formatFinalMessage(params: {
   return lines.filter(Boolean).join('\n\n');
 }
 
+/**
+ * Format prior evaluator outcomes into a short context block. Returns '' when
+ * there is no history, so it adds nothing visible to fresh workspaces.
+ */
+function formatEvaluatorStatsContext(stats: EvaluatorStats): string {
+  if (stats.total === 0) return '';
+  const pct = Math.round(stats.passRate * 100);
+  const lines = [
+    '## Prior Evaluator Outcomes (this workspace)',
+    `Recent coding/subagent runs passed evaluation ${stats.passes}/${stats.total} (${pct}%).`,
+  ];
+  if (stats.recentIssues.length > 0) {
+    lines.push('Recurring issues to avoid repeating:');
+    for (const issue of stats.recentIssues) {
+      lines.push(`- ${issue}`);
+    }
+  }
+  return lines.join('\n');
+}
+
 function buildWorkerPrompt(
   request: CodingWorkerRequest,
   learningsContext: string = '',
@@ -515,7 +540,7 @@ function buildWorkerPrompt(
 ): string {
   const lines = [
     '[REAL CODING WORKER RUN]',
-    'You are the dedicated coding worker for nano-core.',
+    'You are the dedicated coding worker for FFT_nano.',
     'This is a host-managed worker run. Do the engineering work directly; do not claim delegation.',
     '',
     '## Worker Contract',
@@ -971,13 +996,14 @@ export function createCodingOrchestrator(deps: CodingOrchestratorDeps): {
     deps.activeRuns.set(request.requestId, activeRun);
 
     deps.publishEvent({
-      kind: 'run_started',
+      kind: 'run_state',
       id: createHostEventId('coder'),
       createdAt: startedAt,
       source: 'coding-orchestrator',
       runId: request.requestId,
       sessionKey: request.sessionKey,
       chatJid: request.originChatJid,
+      phase: 'start',
       detail: deriveEventDetail(request.config),
     });
 
@@ -1039,10 +1065,18 @@ export function createCodingOrchestrator(deps: CodingOrchestratorDeps): {
       activeRun.state = 'running';
 
       // Fetch coder learnings from MEMORY.md to prepend to context
-      const learningsContext = await getCoderLearningsForContext(
+      const baseLearningsContext = await getCoderLearningsForContext(
         request.originGroupFolder,
         5, // maxEntries
       );
+      // Close the loop: prepend prior evaluator outcomes for this workspace so
+      // the next run is aware of how recent runs scored and what recurred.
+      const evalStatsContext = formatEvaluatorStatsContext(
+        getEvaluatorStats(request.originGroupFolder, 20),
+      );
+      const learningsContext = [evalStatsContext, baseLearningsContext]
+        .filter(Boolean)
+        .join('\n\n');
 
       const output = await deps.runContainerAgent(
         request.group,
@@ -1118,14 +1152,16 @@ export function createCodingOrchestrator(deps: CodingOrchestratorDeps): {
         activeRun.state = aborted ? 'aborted' : 'failed';
         await cleanupWorktree();
         deps.publishEvent({
-          kind: aborted ? 'run_aborted' : 'run_failed',
+          kind: 'run_state',
           id: createHostEventId('coder'),
           createdAt: new Date().toISOString(),
           source: 'coding-orchestrator',
           runId: request.requestId,
           sessionKey: request.sessionKey,
           chatJid: request.originChatJid,
-          ...(aborted ? { detail: message } : { errorMessage: message }),
+          ...(aborted
+            ? { phase: 'end' as const, detail: message }
+            : { state: 'error' as const, errorMessage: message }),
         });
         return createWorkerErrorResult(
           request,
@@ -1281,6 +1317,24 @@ export function createCodingOrchestrator(deps: CodingOrchestratorDeps): {
             feedback: lastVerdict.feedback,
             refinements,
           };
+          // Persist the verdict so the scoring feeds future runs (closes the
+          // self-improvement loop). Skipped verdicts carry no signal.
+          if (!lastVerdict.skipped) {
+            try {
+              recordEvaluatorVerdict({
+                requestId: request.requestId,
+                groupFolder: request.originGroupFolder,
+                chatJid: request.originChatJid,
+                runType: request.config.isSubagent ? 'subagent' : 'coding',
+                pass: lastVerdict.pass,
+                score: lastVerdict.score,
+                issues: lastVerdict.issues,
+                refinements,
+              });
+            } catch {
+              /* verdict persistence is best-effort */
+            }
+          }
           qaReportPath = writeCoderArtifact(
             request,
             'CODER_QA_REPORT.md',
@@ -1334,13 +1388,14 @@ export function createCodingOrchestrator(deps: CodingOrchestratorDeps): {
 
       activeRun.state = 'completed';
       deps.publishEvent({
-        kind: 'run_finished',
+        kind: 'run_state',
         id: createHostEventId('coder'),
         createdAt: finishedAt,
         source: 'coding-orchestrator',
         runId: request.requestId,
         sessionKey: request.sessionKey,
         chatJid: request.originChatJid,
+        phase: 'end',
         detail: deriveEventDetail(request.config),
       });
       return {
@@ -1356,14 +1411,16 @@ export function createCodingOrchestrator(deps: CodingOrchestratorDeps): {
       activeRun.state = aborted ? 'aborted' : 'failed';
       await cleanupWorktree();
       deps.publishEvent({
-        kind: aborted ? 'run_aborted' : 'run_failed',
+        kind: 'run_state',
         id: createHostEventId('coder'),
         createdAt: new Date().toISOString(),
         source: 'coding-orchestrator',
         runId: request.requestId,
         sessionKey: request.sessionKey,
         chatJid: request.originChatJid,
-        ...(aborted ? { detail: message } : { errorMessage: message }),
+        ...(aborted
+          ? { phase: 'end' as const, detail: message }
+          : { state: 'error' as const, errorMessage: message }),
       });
       return createWorkerErrorResult(
         request,

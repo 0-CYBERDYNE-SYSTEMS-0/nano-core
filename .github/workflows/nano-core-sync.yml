@@ -1,0 +1,99 @@
+name: nano-core sync
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: FFT_nano ref to sync
+        required: false
+        default: main
+      open_pr:
+        description: Open or update a nano-core PR
+        required: false
+        default: 'true'
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Project shared core into nano-core
+    runs-on: ubuntu-latest
+    if: github.repository == '0-CYBERDYNE-SYSTEMS-0/FFT_nano'
+    steps:
+      - name: Check out FFT_nano source
+        uses: actions/checkout@v4
+        with:
+          path: FFT_nano
+          ref: ${{ github.event.inputs.source_ref || github.sha }}
+
+      - name: Check out nano-core target
+        uses: actions/checkout@v4
+        with:
+          repository: 0-CYBERDYNE-SYSTEMS-0/nano-core
+          token: ${{ secrets.NANO_CORE_SYNC_TOKEN }}
+          path: nano-core
+          ref: main
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: FFT_nano/package-lock.json
+
+      - name: Project core files
+        run: |
+          node FFT_nano/scripts/sync-nano-core.mjs sync \
+            --source FFT_nano \
+            --target nano-core \
+            --config FFT_nano/config/nano-core-sync.json \
+            --source-sha "${GITHUB_SHA}" \
+            --workflow-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+      - name: Detect no-op
+        id: diff
+        working-directory: nano-core
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: nano-core
+        run: npm ci
+
+      - name: Validate projected core
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: nano-core
+        run: |
+          npm run check:core-surface -- --changed-only
+          npm run typecheck
+          npm test
+          npm run validate:skills
+          npm run secret-scan
+
+      - name: Open nano-core PR
+        if: steps.diff.outputs.changed == 'true' && (github.event_name != 'workflow_dispatch' || github.event.inputs.open_pr == 'true')
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.NANO_CORE_SYNC_TOKEN }}
+          path: nano-core
+          branch: sync/fft-nano-${{ github.sha }}
+          delete-branch: true
+          title: 'sync: import core changes from FFT_nano ${{ github.sha }}'
+          commit-message: 'sync: import core changes from FFT_nano ${{ github.sha }}'
+          body: |
+            Automated core projection from `FFT_nano`.
+
+            - Source repo: `0-CYBERDYNE-SYSTEMS-0/FFT_nano`
+            - Source commit: `${{ github.sha }}`
+            - Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            This PR was generated through `scripts/sync-nano-core.mjs` using the conservative allowlist in `config/nano-core-sync.json`. Farm/agriculture-specific paths are excluded and changed files pass the core-surface scan before this PR is opened.

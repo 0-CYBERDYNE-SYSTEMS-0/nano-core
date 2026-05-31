@@ -195,7 +195,7 @@ linux_install() {
   tmp_unit="$(mktemp)"
   cat >"${tmp_unit}" <<EOF
 [Unit]
-Description=nano-core
+Description=FFT_nano
 After=network-online.target docker.service
 Wants=network-online.target
 

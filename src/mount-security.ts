@@ -1,5 +1,5 @@
 /**
- * Mount Security Module for nano-core
+ * Mount Security Module for FFT_nano
  *
  * Validates additional mounts against an allowlist stored OUTSIDE the project root.
  * This prevents container agents from modifying security configuration.

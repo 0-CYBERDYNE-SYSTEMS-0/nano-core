@@ -235,6 +235,9 @@ export const state = {
   lastTelegramMenuMainChatId: null as string | null,
   lidToPhoneMap: {} as Record<string, string>,
   messageLoopRunning: false,
+  // Epoch ms of the most recent inbound user message across all channels.
+  // Drives the idle-curator gate (only runs when the host has been quiet).
+  lastInboundAt: 0,
   ipcWatcherRunning: false,
   groupSyncTimerStarted: false,
   heartbeatLoopStarted: false,
@@ -368,7 +371,7 @@ export function pruneStaleState(): {
 // ---------------------------------------------------------------------------
 
 export const TUI_SENDER_ID = '__fft_tui__';
-export const TUI_SENDER_NAME = 'nano-core TUI';
+export const TUI_SENDER_NAME = 'FFT_nano TUI';
 export const SERVICE_STARTED_AT = new Date().toISOString();
 export const APP_VERSION = process.env.npm_package_version || 'unknown';
 export const TELEGRAM_SETTINGS_PANEL_PREFIX = 'cfg:';

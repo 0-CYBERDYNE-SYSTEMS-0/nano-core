@@ -53,7 +53,7 @@ test('runContainerAgent handles an already aborted signal without throwing', asy
   const group: RegisteredGroup = {
     name: 'Test Group',
     folder: groupFolder,
-    trigger: '@nano-core',
+    trigger: '@Assistant',
     added_at: '2026-03-31T00:00:00.000Z',
   };
 
@@ -64,7 +64,7 @@ test('runContainerAgent handles an already aborted signal without throwing', asy
       groupFolder: group.folder,
       chatJid: 'telegram:test',
       isMain: false,
-      assistantName: 'nano-core',
+      assistantName: 'Assistant',
       requestId: 'req-aborted-before-start',
       piExecutableOverride: '/bin/false',
     },
@@ -102,6 +102,86 @@ setTimeout(() => process.exit(0), 10);
   return executablePath;
 }
 
+function writeTimeoutPiExecutable(dir: string): string {
+  const executablePath = path.join(dir, 'timeout-pi.js');
+  fs.writeFileSync(
+    executablePath,
+    `#!/usr/bin/env node
+process.stdout.write(JSON.stringify({ type: 'message_delta', delta: { content: [{ type: 'text', text: 'partial before timeout' }] } }) + '\\n');
+setTimeout(() => process.exit(0), 1000);
+`,
+    'utf8',
+  );
+  fs.chmodSync(executablePath, 0o755);
+  return executablePath;
+}
+
+test(
+  'runContainerAgent writes timeout capture on hard timeout',
+  { timeout: 3000, concurrency: false },
+  async (t) => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fft-pi-timeout-'));
+    const fakePiPath = writeTimeoutPiExecutable(tempDir);
+    const workspaceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'fft-workspace-'),
+    );
+    const groupFolder = `testrun_timeout_${Date.now().toString(36)}`;
+    const groupDir = path.join(process.cwd(), 'groups', groupFolder);
+    const ipcDir = path.join(process.cwd(), 'data', 'ipc', groupFolder);
+    const piDir = path.join(process.cwd(), 'data', 'pi', groupFolder);
+
+    t.after(() => {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      fs.rmSync(workspaceDir, { recursive: true, force: true });
+      fs.rmSync(groupDir, { recursive: true, force: true });
+      fs.rmSync(ipcDir, { recursive: true, force: true });
+      fs.rmSync(piDir, { recursive: true, force: true });
+    });
+
+    const group: RegisteredGroup = {
+      name: 'Test Group',
+      folder: groupFolder,
+      trigger: '@Assistant',
+      added_at: '2026-03-31T00:00:00.000Z',
+    };
+
+    const output = await runContainerAgent(group, {
+      prompt: 'timeout',
+      groupFolder,
+      chatJid: 'telegram:test',
+      isMain: false,
+      assistantName: 'Assistant',
+      requestId: 'req-timeout-capture',
+      workspaceDirOverride: workspaceDir,
+      piExecutableOverride: fakePiPath,
+      suppressPreviewStreaming: true,
+      lifecyclePolicyOverride: {
+        hardTimeoutMs: 100,
+        staleAfterMs: null,
+        toolActiveStaleMs: null,
+        waitStateStaleMs: null,
+        allowFreshSessionFallback: false,
+      },
+    });
+
+    assert.equal(output.status, 'error');
+    assert.equal(output.error, 'Pi runner timed out after 100ms');
+
+    const captureDir = path.join(workspaceDir, 'logs', 'pi-runs');
+    const captures = fs
+      .readdirSync(captureDir)
+      .filter((name) => name.includes('req-timeout-capture-timeout'));
+    assert.equal(captures.length, 1);
+    const payload = JSON.parse(
+      fs.readFileSync(path.join(captureDir, captures[0] as string), 'utf8'),
+    );
+    assert.equal(payload.reason, 'timeout');
+    assert.equal(payload.timeoutMs, 100);
+    assert.equal(typeof payload.stdout, 'string');
+    assert.equal(typeof payload.stderr, 'string');
+  },
+);
+
 test(
   'runContainerAgent retries a stale continued interactive run with a fresh session',
   { timeout: 5000, concurrency: false },
@@ -127,7 +207,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@nano-core',
+      trigger: '@Assistant',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -144,7 +224,7 @@ test(
         groupFolder,
         chatJid: 'telegram:test',
         isMain: false,
-        assistantName: 'nano-core',
+        assistantName: 'Assistant',
         requestId: 'req-stale-1',
         workspaceDirOverride: workspaceDir,
         piExecutableOverride: fakePiPath,
@@ -238,7 +318,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@nano-core',
+      trigger: '@Assistant',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -247,7 +327,7 @@ test(
       groupFolder,
       chatJid: 'telegram:test',
       isMain: false,
-      assistantName: 'nano-core',
+      assistantName: 'Assistant',
       requestId: 'req-fresh-1',
       noContinue: true,
       workspaceDirOverride: workspaceDir,
@@ -302,7 +382,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@nano-core',
+      trigger: '@Assistant',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -314,7 +394,7 @@ test(
         groupFolder,
         chatJid: 'telegram:test',
         isMain: false,
-        assistantName: 'nano-core',
+        assistantName: 'Assistant',
         requestId: 'req-fresh-stall',
         noContinue: true,
         workspaceDirOverride: workspaceDir,
@@ -362,7 +442,7 @@ setTimeout(() => {
     type: 'tool_call_start',
     toolName: 'web_search',
     toolCallId: 'call-1',
-    args: { query: 'ai for agriculture' },
+    args: { query: 'ai for software' },
   }) + '\\n');
 }, 30);
 
@@ -445,7 +525,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@nano-core',
+      trigger: '@Assistant',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -454,7 +534,7 @@ test(
       groupFolder,
       chatJid: 'telegram:test',
       isMain: false,
-      assistantName: 'nano-core',
+      assistantName: 'Assistant',
       requestId: 'req-slow-tool-1',
       noContinue: true,
       workspaceDirOverride: workspaceDir,
@@ -485,17 +565,8 @@ test(
     const piDir = path.join(process.cwd(), 'data', 'pi', groupFolder);
     const requestId = `req-draft-${Date.now().toString(36)}`;
     const seenPreviewTexts: string[] = [];
-    const unsubscribe = hostEventBus.subscribe((event) => {
-      if (
-        event.kind === 'telegram_preview_requested' &&
-        event.requestId === requestId
-      ) {
-        seenPreviewTexts.push(event.text);
-      }
-    });
 
     t.after(() => {
-      unsubscribe();
       fs.rmSync(tempDir, { recursive: true, force: true });
       fs.rmSync(workspaceDir, { recursive: true, force: true });
       fs.rmSync(groupDir, { recursive: true, force: true });
@@ -506,25 +577,36 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@nano-core',
+      trigger: '@Assistant',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
-    const output = await runContainerAgent(group, {
-      prompt: 'reply once',
-      groupFolder,
-      chatJid: 'telegram:test',
-      isMain: true,
-      assistantName: 'nano-core',
-      requestId,
-      noContinue: true,
-      workspaceDirOverride: workspaceDir,
-      piExecutableOverride: fakePiPath,
-      lifecyclePolicyOverride: {
-        staleAfterMs: 2500,
-        hardTimeoutMs: 2500,
+    const output = await runContainerAgent(
+      group,
+      {
+        prompt: 'reply once',
+        groupFolder,
+        chatJid: 'telegram:test',
+        isMain: true,
+        assistantName: 'Assistant',
+        requestId,
+        noContinue: true,
+        workspaceDirOverride: workspaceDir,
+        piExecutableOverride: fakePiPath,
+        lifecyclePolicyOverride: {
+          staleAfterMs: 2500,
+          hardTimeoutMs: 2500,
+        },
       },
-    });
+      undefined,
+      undefined,
+      undefined,
+      (event) => {
+        if (event.kind === 'delta') {
+          seenPreviewTexts.push(event.text);
+        }
+      },
+    );
 
     assert.equal(output.status, 'success');
     assert.equal(output.result, 'final answer');
@@ -576,7 +658,7 @@ setTimeout(() => process.exit(0), 10);
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@nano-core',
+      trigger: '@Assistant',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -585,7 +667,7 @@ setTimeout(() => process.exit(0), 10);
       groupFolder,
       chatJid: 'telegram:test',
       isMain: true,
-      assistantName: 'nano-core',
+      assistantName: 'Assistant',
       requestId: `req-stream-${Date.now().toString(36)}`,
       noContinue: true,
       workspaceDirOverride: workspaceDir,
@@ -655,7 +737,7 @@ setTimeout(() => process.exit(0), 10);
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@nano-core',
+      trigger: '@Assistant',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -664,7 +746,7 @@ setTimeout(() => process.exit(0), 10);
       groupFolder,
       chatJid: 'telegram:test',
       isMain: true,
-      assistantName: 'nano-core',
+      assistantName: 'Assistant',
       requestId,
       noContinue: true,
       codingHint: 'force_delegate_execute',
@@ -683,7 +765,6 @@ setTimeout(() => process.exit(0), 10);
     assert.deepEqual(deliveredTexts, []);
   },
 );
-
 
 function writeLongQuietToolPiExecutable(dir: string): string {
   const executablePath = path.join(dir, 'fake-pi-long-tool.js');
@@ -778,7 +859,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@nano-core',
+      trigger: '@Assistant',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -787,7 +868,7 @@ test(
       groupFolder,
       chatJid: 'telegram:test',
       isMain: false,
-      assistantName: 'nano-core',
+      assistantName: 'Assistant',
       requestId: 'req-long-tool-1',
       noContinue: true,
       workspaceDirOverride: workspaceDir,
@@ -831,7 +912,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@nano-core',
+      trigger: '@Assistant',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -844,7 +925,7 @@ test(
         groupFolder,
         chatJid: 'telegram:test',
         isMain: false,
-        assistantName: 'nano-core',
+        assistantName: 'Assistant',
         requestId: 'req-tool-end-hang-1',
         noContinue: true,
         workspaceDirOverride: workspaceDir,
@@ -880,8 +961,41 @@ test(
   },
 );
 
-function writeRpcPermissionGatePiExecutable(dir: string): string {
+function writeRpcPermissionGatePiExecutable(
+  dir: string,
+  requestMethod: 'confirm' | 'notify' = 'confirm',
+): string {
+  fs.mkdirSync(dir, { recursive: true });
   const executablePath = path.join(dir, 'fake-pi-rpc-permission-gate.js');
+  const request =
+    requestMethod === 'notify'
+      ? `{
+        type: 'extension_ui_request',
+        id: 'pg-1',
+        method: 'notify',
+        title: 'Status',
+        message: 'Working',
+      }`
+      : `{
+        type: 'extension_ui_request',
+        id: 'pg-1',
+        method: 'confirm',
+        title: 'Protected Path',
+        message: 'Allow this edit?',
+        timeout: 1000,
+      }`;
+  const afterRequest =
+    requestMethod === 'notify'
+      ? `process.stdout.write(JSON.stringify({
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'rpc notified' }],
+        },
+      }) + '\\n');
+      responded = true;
+      setTimeout(() => process.exit(0), 10);`
+      : '';
   fs.writeFileSync(
     executablePath,
     `#!/usr/bin/env node
@@ -936,14 +1050,8 @@ process.stdin.on('data', (chunk) => {
         command: 'prompt',
         success: true,
       }) + '\\n');
-      process.stdout.write(JSON.stringify({
-        type: 'extension_ui_request',
-        id: 'pg-1',
-        method: 'confirm',
-        title: 'Protected Path',
-        message: 'Allow this edit?',
-        timeout: 1000,
-      }) + '\\n');
+      process.stdout.write(JSON.stringify(${request}) + '\\n');
+      ${afterRequest}
       continue;
     }
     if (message.type === 'extension_ui_response' && message.id === 'pg-1') {
@@ -1000,7 +1108,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Test Group',
       folder: groupFolder,
-      trigger: '@nano-core',
+      trigger: '@Assistant',
       added_at: '2026-03-31T00:00:00.000Z',
     };
 
@@ -1011,7 +1119,7 @@ test(
         groupFolder,
         chatJid: 'telegram:test',
         isMain: false,
-        assistantName: 'nano-core',
+        assistantName: 'Assistant',
         requestId: 'req-rpc-ui-1',
         noContinue: true,
         workspaceDirOverride: workspaceDir,
@@ -1031,5 +1139,106 @@ test(
 
     assert.equal(output.status, 'success');
     assert.equal(output.result, 'rpc allowed');
+  },
+);
+
+test(
+  'runContainerAgent emits wait progress only for blocking extension UI requests',
+  { timeout: 5000, concurrency: false },
+  async (t) => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'fft-pi-rpc-ui-'));
+    const blockingPiPath = writeRpcPermissionGatePiExecutable(
+      path.join(tempDir, 'blocking'),
+      'confirm',
+    );
+    const notifyPiPath = writeRpcPermissionGatePiExecutable(
+      path.join(tempDir, 'notify'),
+      'notify',
+    );
+    const workspaceDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'fft-workspace-'),
+    );
+    const groupFolder = `testrun_${Date.now().toString(36)}`;
+    const groupDir = path.join(process.cwd(), 'groups', groupFolder);
+    const ipcDir = path.join(process.cwd(), 'data', 'ipc', groupFolder);
+    const piDir = path.join(process.cwd(), 'data', 'pi', groupFolder);
+
+    t.after(() => {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      fs.rmSync(workspaceDir, { recursive: true, force: true });
+      fs.rmSync(groupDir, { recursive: true, force: true });
+      fs.rmSync(ipcDir, { recursive: true, force: true });
+      fs.rmSync(piDir, { recursive: true, force: true });
+    });
+
+    const group: RegisteredGroup = {
+      name: 'Test Group',
+      folder: groupFolder,
+      trigger: '@Assistant',
+      added_at: '2026-03-31T00:00:00.000Z',
+    };
+    const baseInput = {
+      prompt: 'reply once',
+      groupFolder,
+      chatJid: 'telegram:test',
+      isMain: false,
+      assistantName: 'Assistant',
+      noContinue: true,
+      workspaceDirOverride: workspaceDir,
+      lifecyclePolicyOverride: {
+        staleAfterMs: 300,
+        hardTimeoutMs: 2500,
+      },
+    };
+    const blockingProgress: string[] = [];
+    const blockingOutput = await runContainerAgent(
+      group,
+      {
+        ...baseInput,
+        requestId: 'req-rpc-ui-blocking',
+        piExecutableOverride: blockingPiPath,
+      },
+      undefined,
+      undefined,
+      async (request) => {
+        assert.equal(request.method, 'confirm');
+        return { confirmed: true };
+      },
+      (event) => {
+        blockingProgress.push(event.kind);
+      },
+    );
+
+    const notifyProgress: string[] = [];
+    const notifyOutput = await runContainerAgent(
+      group,
+      {
+        ...baseInput,
+        requestId: 'req-rpc-ui-notify',
+        piExecutableOverride: notifyPiPath,
+      },
+      undefined,
+      undefined,
+      async (request) => {
+        assert.equal(request.method, 'notify');
+        return {};
+      },
+      (event) => {
+        notifyProgress.push(event.kind);
+      },
+    );
+
+    assert.equal(blockingOutput.status, 'success');
+    assert.equal(blockingOutput.result, 'rpc allowed');
+    assert.ok(
+      blockingProgress.includes('wait'),
+      'blocking extension UI should emit wait progress',
+    );
+    assert.equal(notifyOutput.status, 'success');
+    assert.equal(notifyOutput.result, 'rpc notified');
+    assert.ok(
+      !notifyProgress.includes('wait'),
+      'fire-and-forget extension UI should not emit wait progress',
+    );
   },
 );

@@ -56,7 +56,7 @@ function createBaseDeps(): TelegramCommandDeps {
       chatUsageStats: {},
     },
     constants: {
-      assistantName: 'nano-core',
+      assistantName: 'Assistant',
       mainGroupFolder: 'main',
       telegramAdminSecret: 'secret',
       telegramSettingsPanelPrefix: 'settings:',
@@ -95,13 +95,13 @@ function createBaseDeps(): TelegramCommandDeps {
           off: 'off',
           stream: 'stream',
           partial: 'stream',
-          block: 'stream',
+          block: 'append',
           draft: 'draft',
           native: 'draft',
           progress: 'stream',
           live: 'stream',
-          persistent: 'stream',
-          append: 'stream',
+          persistent: 'append',
+          append: 'append',
           final: 'off',
         }) as Record<string, string>
       )[value.trim().toLowerCase()] ?? null,
@@ -157,9 +157,9 @@ function createBaseDeps(): TelegramCommandDeps {
     },
     prepareCoderTarget: async ({ taskText }) => ({
       status: 'ready',
-      workspaceRoot: '/tmp/projects/agintel-dashboard',
+      workspaceRoot: '/tmp/projects/test-project',
       taskText,
-      projectLabel: 'agintel-dashboard',
+      projectLabel: 'test-project',
     }),
     createCoderProject: async ({ slug }) => ({
       workspaceRoot: `/tmp/projects/${slug}`,
@@ -219,6 +219,44 @@ test('handleTelegramSetupInput persists provider value and confirms to chat', as
     { chatJid: 'telegram:1', panel: { kind: 'show-setup-home' } },
   ]);
   assert.match(deps.sent[0]?.text || '', /Saved provider: minimax/);
+});
+
+test('handleTelegramCommand /run delegates to long-run command handler and acknowledges', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => true;
+  deps.handleLongRunCommand = async (chatJid, content) => {
+    assert.equal(chatJid, 'telegram:1');
+    assert.equal(content, '/run inspect the server logs');
+    await deps.sendMessage(
+      chatJid,
+      "Started long run run-test. I'll post the result here.",
+    );
+    return true;
+  };
+
+  const handlers = createTelegramCommandHandlers(deps);
+  const handled = await handlers.handleTelegramCommand({
+    chatJid: 'telegram:1',
+    chatName: 'Chat',
+    content: '/run inspect the server logs',
+  });
+
+  assert.equal(handled, true);
+  assert.match(deps.sent[0]?.text || '', /Started long run run-test/);
+  assert.deepEqual(deps.audits.at(-1), {
+    chatJid: 'telegram:1',
+    command: '/run',
+    allowed: true,
+    reason: 'long-run',
+  });
 });
 
 test('handleTelegramCallbackQuery routes admin panel actions for main chat', async () => {
@@ -304,7 +342,7 @@ test('handleTelegramCommand opens group management panel only in main chat', asy
   await handlers.handleTelegramCommand({
     id: 'm-2',
     chatJid: 'telegram:-1001',
-    chatName: 'Field Team',
+    chatName: 'Team Chat',
     sender: 'user',
     senderName: 'Worker',
     timestamp: '2026-05-19T12:01:00.000Z',
@@ -325,7 +363,7 @@ test('handleTelegramCallbackQuery starts a coder plan from approval actions', as
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@Assistant',
   };
   deps.getTelegramSettingsPanelAction = () => ({
     kind: 'coder-approve-plan',
@@ -350,7 +388,7 @@ test('handleTelegramCallbackQuery starts a coder plan from approval actions', as
   assert.equal(codingCalls[0]?.mode, 'plan');
   assert.equal(
     codingCalls[0]?.workspaceRoot,
-    '/tmp/projects/agintel-dashboard',
+    '/tmp/projects/test-project',
   );
   assert.match(deps.sent[0]?.text || '', /Starting coder plan run/);
 });
@@ -367,8 +405,8 @@ test('handleTelegramCallbackQuery offers plan fallback when execute target is no
     kind: 'coder-select-project',
     mode: 'execute',
     taskText: 'build it',
-    projectPath: '/tmp/projects/orchard-os',
-    projectLabel: 'orchard-os',
+    projectPath: '/tmp/projects/my-project',
+    projectLabel: 'my-project',
     isGitRepo: false,
   });
 
@@ -459,7 +497,7 @@ test('handleTelegramCommand blocks /coder-create-project while onboarding is pen
   const handled = await handlers.handleTelegramCommand({
     chatJid: 'telegram:main',
     chatName: 'Main',
-    content: '/coder-create-project orchard-os build the first dashboard',
+    content: '/coder-create-project my-project build the first dashboard',
   });
 
   assert.equal(handled, true);
@@ -526,7 +564,7 @@ test('handleTelegramCommand registers spawned subagent runs in both active maps'
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@Assistant',
   };
   deps.isMainChat = () => true;
   deps.activeChatRunsById = new Map();
@@ -562,7 +600,7 @@ test('handleTelegramCallbackQuery sends terminal failure message when coder run 
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@Assistant',
   };
   deps.getTelegramSettingsPanelAction = () => ({
     kind: 'coder-approve-execute',
@@ -600,7 +638,7 @@ test('handleTelegramCallbackQuery sends terminal completion message when coder r
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@Assistant',
   };
   deps.getTelegramSettingsPanelAction = () => ({
     kind: 'coder-approve-execute',
@@ -634,7 +672,7 @@ test('handleTelegramCallbackQuery reports aborted when fallback runAgent returns
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@Assistant',
   };
   deps.getTelegramSettingsPanelAction = () => ({
     kind: 'coder-approve-execute',
@@ -675,7 +713,7 @@ test('handleTelegramCommand reports aborted when subagent fallback runAgent is s
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@Assistant',
   };
   deps.isMainChat = () => true;
   deps.runCodingTask = undefined;
@@ -743,13 +781,13 @@ test('handleTelegramCommand normalizes delivery aliases to canonical persisted v
       off: 'off',
       stream: 'stream',
       partial: 'stream',
-      block: 'stream',
+      block: 'append',
       draft: 'draft',
       native: 'draft',
       progress: 'stream',
       live: 'stream',
-      persistent: 'stream',
-      append: 'stream',
+      persistent: 'append',
+      append: 'append',
       final: 'off',
     })[value];
 
@@ -786,7 +824,7 @@ test('handleTelegramCommand accepts the native Telegram draft delivery mode', as
   assert.match(deps.sent[0]?.text || '', /Delivery mode set to draft/i);
 });
 
-test('handleTelegramCommand maps append delivery mode to durable stream', async () => {
+test('handleTelegramCommand maps append delivery mode to durable blocks', async () => {
   const updates: Array<Record<string, any>> = [];
   const deps = createBaseDeps() as TelegramCommandDeps & {
     sent: Array<{ chatJid: string; text: string }>;
@@ -803,8 +841,8 @@ test('handleTelegramCommand maps append delivery mode to durable stream', async 
   });
 
   assert.equal(handled, true);
-  assert.deepEqual(updates, [{ telegramDeliveryMode: 'stream' }]);
-  assert.match(deps.sent[0]?.text || '', /Delivery mode set to stream/i);
+  assert.deepEqual(updates, [{ telegramDeliveryMode: 'append' }]);
+  assert.match(deps.sent[0]?.text || '', /Delivery mode set to append/i);
 });
 
 test('handleTelegramCommand reports canonical delivery modes in help text', async () => {
@@ -1026,13 +1064,13 @@ test('handleTelegramCommand /knowledge routes to host knowledge handler in main 
   const handled = await handlers.handleTelegramCommand({
     chatJid: 'telegram:main',
     chatName: 'Main',
-    content: '/knowledge ingest check irrigation pressure',
+    content: '/knowledge ingest check server status',
   });
 
   assert.equal(handled, true);
   assert.equal(
     deps.sent[0]?.text,
-    'knowledge:ingest:check irrigation pressure:telegram:main',
+    'knowledge:ingest:check server status:telegram:main',
   );
   assert.deepEqual(deps.audits[0], {
     chatJid: 'telegram:main',
@@ -1067,7 +1105,7 @@ test('handleTelegramCommand routes menu-safe skill manager and librarian command
   const librarianHandled = await handlers.handleTelegramCommand({
     chatJid: 'telegram:main',
     chatName: 'Main',
-    content: '/librarian capture check pump filter',
+    content: '/librarian capture check system filter',
   });
 
   assert.equal(skillHandled, true);
@@ -1075,7 +1113,7 @@ test('handleTelegramCommand routes menu-safe skill manager and librarian command
   assert.equal(deps.sent[0]?.text, 'skill-manager:status::telegram:main');
   assert.equal(
     deps.sent[1]?.text,
-    'librarian:capture:check pump filter:telegram:main',
+    'librarian:capture:check system filter:telegram:main',
   );
   assert.deepEqual(deps.audits.slice(0, 2), [
     {

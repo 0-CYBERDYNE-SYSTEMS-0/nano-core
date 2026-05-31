@@ -60,6 +60,41 @@ export function isAllowedDeliveryPath(
   );
 }
 
+export function normalizeFileDeliveryRequest(
+  raw: unknown,
+): FileDeliveryRequest {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('File delivery request must be an object');
+  }
+
+  const request = raw as Record<string, any>;
+  const isCanonical =
+    request.type === 'file_delivery' && request.action === 'deliver_file';
+  if (!isCanonical) {
+    throw new Error(
+      'File delivery request must be file_delivery deliver_file',
+    );
+  }
+  if (typeof request.requestId !== 'string' || !request.requestId.trim()) {
+    throw new Error('File delivery request missing requestId');
+  }
+  if (!request.params || typeof request.params !== 'object') {
+    throw new Error('File delivery request missing params');
+  }
+
+  return {
+    type: 'file_delivery',
+    action: 'deliver_file',
+    requestId: request.requestId,
+    params: {
+      filePath: request.params.filePath,
+      caption: request.params.caption,
+      kind: request.params.kind,
+      chatJid: request.params.chatJid,
+    },
+  };
+}
+
 export interface FileDeliveryDeps {
   telegramBot?: {
     sendPhoto: (

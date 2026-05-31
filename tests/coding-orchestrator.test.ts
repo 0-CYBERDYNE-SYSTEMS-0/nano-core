@@ -36,13 +36,13 @@ function makeRequest(
     timeoutSeconds: 300,
     allowFanout: false,
     sessionContext: '[2026-03-22T00:00:00.000Z] User: Build the feature',
-    assistantName: 'nano-core',
+    assistantName: 'FarmFriend',
     sessionKey: 'test-group',
     group: {
       jid: 'telegram:test-group',
       name: 'Test Group',
       folder: 'test-group',
-      trigger: '@nano-core',
+      trigger: '@FarmFriend',
     },
     ...overrides,
   };

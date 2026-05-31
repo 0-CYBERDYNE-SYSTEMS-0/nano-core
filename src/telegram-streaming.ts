@@ -1,4 +1,4 @@
-import { normalizeTelegramDraftText, type TelegramBot } from './telegram.js';
+import { normalizeTelegramPreviewText, type TelegramBot } from './telegram.js';
 import { logger } from './logger.js';
 
 export interface TelegramMessagePreviewState {
@@ -52,10 +52,12 @@ export function resolveTelegramStreamCompletionState(params: {
 }
 
 const RUN_STATUS_PREVIEW_PREFIXES = [
+  'Agent status:',
   'Coder status:',
   'Skill manager status:',
   'Librarian status:',
   'Run status:',
+  'Working on your reply',
 ];
 
 export function isTelegramRunStatusPreviewText(text: string): boolean {
@@ -133,14 +135,15 @@ class BaseTelegramStreamRegistry {
 
   appendToolTrail(runKey: string, entry: string): void {
     const trail = this.toolTrails.get(runKey) || [];
+    if (trail[trail.length - 1] === entry) return;
     trail.push(entry);
-    this.toolTrails.set(runKey, trail);
+    this.toolTrails.set(runKey, trail.slice(-8));
   }
 
   getToolTrailFooter(runKey: string): string | undefined {
     const trail = this.toolTrails.get(runKey);
     if (!trail || trail.length === 0) return undefined;
-    return trail.join(' → ');
+    return `Tools: ${trail.join(' → ')}`;
   }
 
   clearToolTrail(runKey: string): void {
@@ -288,7 +291,7 @@ export async function updateTelegramPreview(params: {
 
   try {
     const now = Date.now();
-    const baseText = normalizeTelegramDraftText(params.text);
+    const baseText = normalizeTelegramPreviewText(params.text);
     const nextText = params.toolTrailFooter
       ? `${baseText}\n\n${params.toolTrailFooter}`
       : baseText;
@@ -385,7 +388,7 @@ export async function updateTelegramDraftPreview(params: {
 
   try {
     const now = Date.now();
-    const baseText = normalizeTelegramDraftText(params.text);
+    const baseText = normalizeTelegramPreviewText(params.text);
     const nextText = params.toolTrailFooter
       ? `${baseText}\n\n${params.toolTrailFooter}`
       : baseText;

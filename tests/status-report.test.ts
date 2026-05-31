@@ -106,7 +106,7 @@ test('status report renders pulse first and alerts on timeout incidents', () => 
   });
 
   const text = formatStatusReport({
-    assistantName: 'nano-core',
+    assistantName: 'FarmFriend',
     version: '1.2.3 main@abc1234',
     runtime: 'docker',
     serviceStartedAt: '2026-04-12T10:00:00.000Z',
@@ -147,7 +147,7 @@ test('status report renders pulse first and alerts on timeout incidents', () => 
     },
   });
 
-  assert.match(text, /^nano-core pulse: ALERT/m);
+  assert.match(text, /^FarmFriend pulse: ALERT/m);
   assert.match(text, /- version: 1.2.3 main@abc1234/);
   assert.match(text, /- agent_running: working/);
   assert.match(text, /- active_runs: agent=1 coder=1 subagent=0/);
@@ -173,7 +173,7 @@ test('status report marks warn when active run progress is stale beyond threshol
   });
 
   const text = formatStatusReport({
-    assistantName: 'nano-core',
+    assistantName: 'FarmFriend',
     version: '1.2.3 main@abc1234',
     runtime: 'docker',
     serviceStartedAt: '2026-04-12T11:00:00.000Z',
@@ -202,8 +202,55 @@ test('status report marks warn when active run progress is stale beyond threshol
     agentRunning: true,
   });
 
-  assert.match(text, /^nano-core pulse: WARN/m);
+  assert.match(text, /^FarmFriend pulse: WARN/m);
   assert.match(text, /warnings: stuck_runs=1/);
+});
+
+test('status report includes active durable long runs in agent count and details', () => {
+  const telemetry = createStatusTelemetry({
+    incidentWindowMs: 30 * 60 * 1000,
+    maxIncidents: 3,
+  });
+
+  const text = formatStatusReport({
+    assistantName: 'FarmFriend',
+    version: '1.2.3 main@abc1234',
+    runtime: 'docker',
+    serviceStartedAt: '2026-04-12T11:00:00.000Z',
+    incidentWindowLabel: '30m',
+    stuckWarningSeconds: 120,
+    nowMs: Date.parse('2026-04-12T12:00:00.000Z'),
+    telegramEnabled: true,
+    whatsappEnabled: true,
+    whatsappConnected: true,
+    registeredGroupCount: 1,
+    mainGroupName: 'main',
+    tasks: { active: 0, paused: 0, completed: 0 },
+    activeChatRuns: [],
+    activeLongRuns: [
+      {
+        id: 'run-long-1',
+        chatJid: 'telegram:1',
+        status: 'running',
+        createdAt: Date.parse('2026-04-12T11:50:00.000Z'),
+        startedAt: Date.parse('2026-04-12T11:51:00.000Z'),
+        lastProgressAt: Date.parse('2026-04-12T11:59:30.000Z'),
+        phase: 'tool_running',
+        detail: 'bash',
+      },
+    ],
+    activeCoderRuns: [],
+    telemetry: telemetry.getSnapshot(Date.parse('2026-04-12T12:00:00.000Z')),
+    agentRunning: true,
+  });
+
+  assert.match(text, /- agent_running: working/);
+  assert.match(text, /- active_runs: agent=1 coder=0 subagent=0/);
+  assert.match(text, /Active long runs:/);
+  assert.match(
+    text,
+    /id=run-long-1 status=running phase=tool_running\(bash\) age=540s last_progress=30s ago chat=telegram:1/,
+  );
 });
 
 test('status report includes knowledge section when knowledge telemetry is provided', () => {
@@ -213,7 +260,7 @@ test('status report includes knowledge section when knowledge telemetry is provi
   });
 
   const text = formatStatusReport({
-    assistantName: 'nano-core',
+    assistantName: 'FarmFriend',
     version: '1.2.3 main@abc1234',
     runtime: 'docker',
     serviceStartedAt: '2026-04-12T11:00:00.000Z',
@@ -276,7 +323,7 @@ test('status report redacts evaluator verdict details from user-visible incident
   });
 
   const text = formatStatusReport({
-    assistantName: 'nano-core',
+    assistantName: 'FarmFriend',
     version: '1.2.3 main@abc1234',
     runtime: 'docker',
     serviceStartedAt: '2026-04-12T11:00:00.000Z',
