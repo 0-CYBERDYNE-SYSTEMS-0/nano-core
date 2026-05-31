@@ -7,10 +7,68 @@ and this project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.ht
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-31
+
+### Added
+
+- Durable agent recovery follow-through: recoverable long-running runs now record
+  durable workspaces, resume after host restart with a bounded retry cap, and feed
+  evaluator verdict history into later coding/subagent runs.
+- At-least-once cron result delivery through a deduplicated delivery outbox, with
+  startup and periodic retry flushing.
+- Optional semantic memory re-ranking through local Ollama embeddings while
+  preserving lexical search as the default and fallback path.
+- Runtime skill version snapshots and `skill_rollback` support for reversible
+  agent-owned skill updates.
+- Signal-triggered self-improvement reviews, structured self-improvement event
+  logs, idle skill curator scheduling, and a main/admin `/reflect` command.
+
+### Changed
+
+- Telegram text delivery now supports durable `append` blocks, native `draft`
+  previews, `stream`, and `off`, with activity/status updates separated from
+  answer content in stream mode.
+- Coder reflection learning is now grounded in concrete run evidence and recurring
+  evaluator issues are decay-ranked so stale one-offs lose influence.
+- Runtime architecture documentation and handoff notes now reflect the active
+  `dev` integration line, durability services, outbox, semantic memory, and
+  self-improvement loop.
+
+### Fixed
+
+- Hardened destructive-command detection by canonicalizing bash input before
+  permission-gate matching.
+- Normalized contradictory dispatch flags at the dispatcher boundary to avoid
+  silent misroutes.
+- Bounded semantic embedding query time and preserved lexical ranking when
+  semantic candidates are skipped by budget.
+
+## [0.3.1] - 2026-05-25
+
+### Added
+
+- Durable long-running agent runs can persist across process restarts and expose
+  operator controls/status through Telegram command surfaces.
+- Termux installer support for Android-hosted setup paths.
+
 ### Fixed
 
 - `/update` now preserves dirty local checkouts by stashing tracked and untracked
   changes, pulling upstream, reapplying the stash, then rebuilding/restarting.
+- `/update` falls back to `origin/main` when the current branch ref is missing.
+- Telegram delivery timeout recovery now keeps operator feedback and final delivery
+  paths consistent across delayed runs.
+- Durable long-run timeout handling now reports state transitions more clearly and
+  recovers long-running work through the long-run service.
+- Telegram long-run feedback now includes hardened status reporting for runs that
+  continue beyond normal response windows.
+- TUI startup now removes a stale Unix socket before binding.
+
+## [0.3.0] - 2026-05-11
+
+### Fixed
+
+- Release version bump to `0.3.0`.
 
 ## [0.2.2] - 2026-05-11
 

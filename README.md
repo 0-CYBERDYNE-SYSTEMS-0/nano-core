@@ -650,17 +650,24 @@ Versioning and official release flow are documented in `docs/RELEASE.md`.
 [Edit diagram](https://excalidraw.com/#json=0rOfumv4kb5ez_gK2ech9,ElC66pp_di48sBQlyj3lnA) — source at `assets/architecture.excalidraw`
 
 ```text
-Telegram/WhatsApp -> SQLite -> host router/scheduler -> containerized Pi runtime -> chat response
+Telegram/WhatsApp → pipeline dispatcher → Chat/Coding/Cron pipeline → pi-runner → chat response
 ```
 
-Core files:
+Key modules:
 
-- `src/index.ts` - channel ingestion, routing, admin command policy
+- `src/index.ts` - Orchestrator wiring (~2,100 lines): constructs services and `*Deps` objects
+- `src/pipeline/message-dispatch-pipeline.ts` - Primary message dispatch orchestrator
+- `src/pipeline/pipeline-dispatcher.ts` - Routes requests to Chat/Coding/Cron pipelines
 - `src/pi-runner.ts` - Pi subprocess launch, sandbox wiring, snapshots, runtime event emission
-- `src/sandbox.ts` - optional `bwrap`/Docker wrapping for Pi runs
-- `src/task-scheduler.ts` - scheduler mode switch (`v2` default, `legacy` fallback)
-- `src/cron/` - cron v2 adapters and timer-based scheduler service
-- `src/db.ts` - persistence
+- `src/evaluator.ts` - Post-run quality scoring with evaluator verdict persistence
+- `src/long-run-service.ts` - Durable agent runs; restart triage and recovery
+- `src/outbox.ts` - At-least-once delivery outbox with deduplication
+- `src/heartbeat-service.ts` - Periodic main-session heartbeat
+- `src/self-improve-signals.ts` - Deterministic lexical signal extraction for skill improvement
+- `src/skill-history.ts` - Skill version snapshots and rollback support
+- `src/memory-embeddings.ts` - Optional semantic re-ranking via Ollama embeddings
+- `src/streaming/` - Platform-agnostic streaming adapters (Telegram, WhatsApp)
+- `src/db.ts` - SQLite persistence
 
 ## Q&A
 
