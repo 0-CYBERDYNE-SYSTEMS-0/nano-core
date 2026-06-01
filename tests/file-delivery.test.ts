@@ -115,7 +115,7 @@ test('normalizeFileDeliveryRequest accepts legacy deliver_file payloads', () => 
   });
 
   assert.deepEqual(normalized, {
-    type: 'farm_action',
+    type: 'file_delivery',
     action: 'deliver_file',
     requestId: 'legacy-video-1',
     params: {
@@ -136,6 +136,6 @@ test('normalizeFileDeliveryRequest rejects poison payloads', () => {
         requestId: 'bad-1',
         params: {},
       }),
-    /farm_action deliver_file or legacy deliver_file/,
+    /File delivery request must be file_delivery deliver_file/,
   );
 });

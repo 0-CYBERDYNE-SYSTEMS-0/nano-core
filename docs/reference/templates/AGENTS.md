@@ -30,7 +30,7 @@ When running as a scheduled task (no direct user message), your return value is 
 
 ### Memory Organization
 When you learn something important:
-- Create structured memory files (e.g., `crop-cycles.md`, `equipment.md`, `yields.md`)
+- Create structured memory files (e.g., `operations.md`, `equipment.md`, `schedules.md`)
 - Split files larger than 500 lines into folders
 - Index new memory files at the top of MEMORY.md
 

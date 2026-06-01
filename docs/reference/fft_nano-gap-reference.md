@@ -12,7 +12,7 @@ Snapshot commits:
 This is the persistent reference doc for:
 - The 3-repo comparison (`nano-core`, `nanoclaw`, `openclaw`)
 - The deep gap analysis between `nano-core` and `openclaw`
-- A practical plan to make `nano-core` as close as possible to `openclaw` behavior while preserving farm customizations
+- A practical plan to make `nano-core` as close as possible to `openclaw` behavior while preserving customizations
 
 ---
 
@@ -22,7 +22,7 @@ This is the persistent reference doc for:
 
 - `nanoclaw`: small, minimal, "edit the code directly" personal assistant.
 - `openclaw`: full gateway platform with many channels, agents, policies, tools, and docs.
-- `nano-core`: farm/operator-focused fork that keeps the small-host idea but adds structured workspace/memory and farm flows.
+- `nano-core`: operator-focused fork that keeps the small-host idea but adds structured workspace/memory and operational flows.
 
 ### Onboarding
 
@@ -170,7 +170,7 @@ ELI vibe-coder framing:
 ### What `nano-core` has today
 
 - Strong deterministic onboarding for the main workspace identity.
-- Farm-specific workflow integration and practical defaults.
+- Workflow integration and practical defaults.
 
 ### Gap (what is lacking)
 

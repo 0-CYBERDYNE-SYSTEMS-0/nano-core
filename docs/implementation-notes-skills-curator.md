@@ -6,7 +6,7 @@
   discovery pass: skill usage telemetry, agent-created skill provenance,
   self-improvement nudges, curator lifecycle, dry-run/reporting, pin/archive,
   restore, backup, and operator controls.
-- Adjusted the v1 toward farmer ergonomics after operator feedback: skills
+- Adjusted the v1 toward operator ergonomics after operator feedback: skills
   should stay organized without active thought. The curator should inspect all
   visible runtime skills for catalog/frontmatter quality, while destructive
   lifecycle operations remain limited to agent-created runtime skills.

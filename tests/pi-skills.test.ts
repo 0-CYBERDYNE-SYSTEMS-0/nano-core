@@ -75,7 +75,6 @@ test('syncProjectPiSkillsToGroupPiHome mirrors runtime skills and prunes stale m
     const res = syncProjectPiSkillsToGroupPiHome(projectRoot, groupPiHome);
 
     assert.equal(res.sourceDirExists, true);
-    assert.ok(res.copied.includes('fft-setup'));
     assert.ok(res.copied.includes('custom-skill'));
     assert.equal(res.removed.length, 0);
     assert.equal(
