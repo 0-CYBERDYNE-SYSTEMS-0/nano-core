@@ -708,7 +708,11 @@ function shouldAutoRouteLongRun(params: {
   ) {
     return false;
   }
-  if (params.shouldUseCodingWorker) return true;
+  // /coder and /coding requests must reach selectRunRoute() (coding_worker
+  // path). Returning true here would divert them into the durable long-run
+  // service, which calls the normal agent path with codingHint:'none' and
+  // skips plan/execute routing plus execute-mode worktree isolation.
+  if (params.shouldUseCodingWorker) return false;
   if (params.deps.isSubstantialCodingTask?.(params.latestUserText) === true) {
     return true;
   }
@@ -1773,6 +1777,13 @@ export function createMessageDispatcher(deps: MessageDispatcherDeps): {
         sourceRequestId: request.requestId,
         source: 'auto-route',
       });
+      // Advance the per-chat agent timestamp so the auto-routed trigger
+      // message is consumed from the chat backlog. Otherwise future prompt
+      // assembly (which uses getMessagesSince(lastAgentTimestamp)) will keep
+      // re-reading this message into later turns until an unrelated normal
+      // run happens to advance the timestamp.
+      deps.state.lastAgentTimestamp ||= {};
+      deps.state.lastAgentTimestamp[msg.chat_jid] = msg.timestamp;
       return 'started';
     }
 
