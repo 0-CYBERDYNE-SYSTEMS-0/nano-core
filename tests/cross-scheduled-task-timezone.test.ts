@@ -89,7 +89,7 @@ test('scheduled task with Europe/Paris tz reads Paris-date daily memory files (V
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@FarmFriend',
     added_at: new Date().toISOString(),
   };
 
@@ -216,7 +216,7 @@ test('machine_local_date in prompt reflects Paris time at execution (VAL-CROSS-0
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@FarmFriend',
     added_at: new Date().toISOString(),
   };
 
@@ -377,7 +377,7 @@ test('full e2e: cron task with Paris tz → correct effectiveTimezone → correc
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@FarmFriend',
     added_at: new Date().toISOString(),
   };
 

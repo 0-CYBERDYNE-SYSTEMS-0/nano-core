@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# One-time setup helper for nano-core.
+# One-time setup helper for FFT_nano.
 # - Installs Node deps
 # - Builds TypeScript
 # - Builds the agent container image
@@ -375,11 +375,11 @@ scaffold_mount_allowlist() {
 
 install_cli_launcher() {
   local bin_dir="${FFT_NANO_USER_BIN_DIR:-${HOME}/.local/bin}"
-  local launcher="${bin_dir}/fft"
+  local launcher="${bin_dir}/nano"
   mkdir -p "$bin_dir"
   {
     printf '#!/usr/bin/env bash\n'
-    printf 'exec node %q --repo %q "$@"\n' "${ROOT_DIR}/bin/fft.js" "$ROOT_DIR"
+    printf 'exec node %q --repo %q "$@"\n' "${ROOT_DIR}/bin/nano.js" "$ROOT_DIR"
   } >"$launcher"
   chmod +x "$launcher"
   say "CLI launcher installed: $launcher"
@@ -418,12 +418,12 @@ install_cli_launcher() {
     printf '\n'
     printf '# >>> nano-core CLI >>>\n'
     printf 'export PATH="%s:$PATH"\n' "$path_entry"
-    printf '# <<< nano-core CLI <<<\n'
+    printf '# <<< FFT_nano CLI <<<\n'
   } >>"$profile"
   say "Added ${bin_dir} to PATH in $profile (open a new shell, or run: export PATH=\"${bin_dir}:\$PATH\")."
 }
 
-say "nano-core setup (root: $ROOT_DIR)"
+say "FFT_nano setup (root: $ROOT_DIR)"
 parse_args "$@"
 
 need_cmd node

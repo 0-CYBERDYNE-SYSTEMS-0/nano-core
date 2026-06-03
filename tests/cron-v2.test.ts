@@ -13,11 +13,20 @@ import {
   computeErrorBackoffMs,
   getTaskDeliveryMode,
   resolveTaskNextRun,
+  runCronSchedulerTick,
   runScheduledTaskV2,
   shouldTriggerWakeNow,
 } from '../src/cron/service.ts';
 import { PARITY_CONFIG, TIMEZONE } from '../src/config.ts';
-import { closeDatabase, createTask, getTaskById, initDatabaseAtPath } from '../src/db.ts';
+import {
+  closeDatabase,
+  createTask,
+  getDeliveryByDedupeKey,
+  getTaskById,
+  initDatabaseAtPath,
+  listPendingDeliveries,
+} from '../src/db.ts';
+import { createOutboxDeliverer } from '../src/outbox.ts';
 import type { RegisteredGroup, ScheduledTask } from '../src/types.ts';
 import type { ContainerInput } from '../src/pi-runner.js';
 
@@ -202,7 +211,7 @@ test('runScheduledTaskV2 triggers wake_mode=now and announce delivery', async ()
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@FarmFriend',
     added_at: new Date().toISOString(),
   };
 
@@ -233,6 +242,96 @@ test('runScheduledTaskV2 triggers wake_mode=now and announce delivery', async ()
   assert.deepEqual(wakeReasons, ['cron:wake-now-task']);
 
   closeDatabase();
+});
+
+test('runScheduledTaskV2 routes announce through the outbox and survives a delivery outage', async () => {
+  const dbPath = makeTempDbPath();
+  initDatabaseAtPath(dbPath);
+
+  const task = makeTask({
+    id: 'outbox-task',
+    schedule_type: 'once',
+    delivery_mode: 'announce',
+    delivery_to: 'telegram:77',
+  });
+  createTask(task);
+
+  const group: RegisteredGroup = {
+    name: 'main',
+    folder: 'main',
+    trigger: '@FarmFriend',
+    added_at: new Date().toISOString(),
+  };
+
+  let channelUp = false;
+  const sends: Array<{ jid: string; text: string }> = [];
+  const outbox = createOutboxDeliverer({
+    sendMessage: async (jid, text) => {
+      if (!channelUp) return false;
+      sends.push({ jid, text });
+      return true;
+    },
+  });
+
+  const latest = getTaskById(task.id);
+  assert.ok(latest);
+  await runScheduledTaskV2(latest!, {
+    sendMessage: async () => {
+      throw new Error('cron must deliver via the outbox, not sendMessage');
+    },
+    registeredGroups: () => ({ 'telegram:1': group }),
+    runContainerTask: async () => ({ status: 'success', result: 'nightly ok' }),
+    runEvaluatorPass: async () => ({
+      pass: true,
+      score: 9,
+      issues: [],
+      feedback: '',
+      skipped: true,
+    }),
+    outbox,
+  });
+
+  // The channel was down: the announce is durably queued, not lost.
+  assert.equal(sends.length, 0);
+  const pending = listPendingDeliveries();
+  assert.equal(pending.length, 1);
+  assert.match(pending[0].dedupe_key, /^cron:outbox-task:\d+$/);
+  assert.equal(pending[0].destination, 'telegram:77');
+
+  // Channel recovers; flush delivers exactly once.
+  channelUp = true;
+  await outbox.flushPending();
+  assert.equal(sends.length, 1);
+  assert.deepEqual(sends[0].jid, 'telegram:77');
+  assert.match(sends[0].text, /\[scheduled:outbox-task\]/);
+  assert.equal(getDeliveryByDedupeKey(pending[0].dedupe_key)?.status, 'delivered');
+
+  closeDatabase();
+});
+
+test('runCronSchedulerTick re-flushes the delivery outbox each tick', async () => {
+  const dbPath = makeTempDbPath();
+  initDatabaseAtPath(dbPath);
+  try {
+    let flushes = 0;
+    const outbox = {
+      deliver: async () => true,
+      flushPending: async () => {
+        flushes += 1;
+        return { delivered: 0, stillPending: 0 };
+      },
+    };
+    // No due tasks; the tick should still flush the outbox so transient
+    // outages self-heal without a restart.
+    await runCronSchedulerTick({
+      sendMessage: async () => true,
+      registeredGroups: () => ({}),
+      outbox,
+    });
+    assert.equal(flushes, 1);
+  } finally {
+    closeDatabase();
+  }
 });
 
 test('runScheduledTaskV2 keeps recurring tasks active when group is missing', async () => {
@@ -280,7 +379,7 @@ test('runScheduledTaskV2 preserves typed subagent jobs from older task rows', as
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@FarmFriend',
     added_at: new Date().toISOString(),
   };
 
@@ -333,7 +432,7 @@ test('runScheduledTaskV2 passes explicit schedule_json.tz as effectiveTimezone (
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@FarmFriend',
     added_at: new Date().toISOString(),
   };
 
@@ -371,7 +470,7 @@ test('runScheduledTaskV2 falls back to host TIMEZONE when schedule_json has no t
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@FarmFriend',
     added_at: new Date().toISOString(),
   };
 
@@ -409,7 +508,7 @@ test('runScheduledTaskV2 with invalid tz falls back to validated host TIMEZONE (
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@FarmFriend',
     added_at: new Date().toISOString(),
   };
 
@@ -448,7 +547,7 @@ test('runScheduledTaskV2 suppresses failed evaluator details from delivered outp
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@FarmFriend',
     added_at: new Date().toISOString(),
   };
 
@@ -507,7 +606,7 @@ test('runScheduledTaskV2 with invalid schedule_json.tz still completes task succ
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@FarmFriend',
     added_at: new Date().toISOString(),
   };
 
@@ -554,7 +653,7 @@ test('runScheduledTaskV2 with invalid schedule_json.tz produces valid machine ti
   const group: RegisteredGroup = {
     name: 'main',
     folder: 'main',
-    trigger: '@nano-core',
+    trigger: '@FarmFriend',
     added_at: new Date().toISOString(),
   };
 
@@ -601,7 +700,7 @@ test('runScheduledTaskV2 with invalid process.env.TZ still executes tasks (VAL-C
     const group: RegisteredGroup = {
       name: 'main',
       folder: 'main',
-      trigger: '@nano-core',
+      trigger: '@FarmFriend',
       added_at: new Date().toISOString(),
     };
 

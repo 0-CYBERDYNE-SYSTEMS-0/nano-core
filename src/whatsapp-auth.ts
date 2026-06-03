@@ -123,7 +123,7 @@ async function connectSocket(phoneNumber?: string): Promise<void> {
       }
       console.log('\n✓ Successfully authenticated with WhatsApp!');
       console.log('  Credentials saved to store/auth/');
-      console.log('  You can now start the nano-core service.\n');
+      console.log('  You can now start the FFT_nano service.\n');
 
       // Give it a moment to save credentials, then exit
       setTimeout(() => process.exit(0), 1000);

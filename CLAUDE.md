@@ -11,16 +11,23 @@ Single Node.js host process: receives chat messages (Telegram/WhatsApp), runs `p
 ### Message Flow
 
 ```
-Telegram/WhatsApp → message-dispatch.ts → pi-runner.ts (spawns pi subprocess)
+Telegram/WhatsApp → pipeline/message-dispatch-pipeline.ts → pi-runner.ts (spawns pi subprocess)
                                         ↓
                               HostEventBus (host-events.ts)
                                         ↓
-                      telegram-streaming.ts / file-delivery.ts
+                      streaming/telegram-adapter.ts / file-delivery.ts
 ```
 
+- **Pipeline dispatcher** (`src/pipeline/pipeline-dispatcher.ts`): Routes requests to `ChatPipeline`, `CodingPipeline`, or `CronPipeline` based on run type.
 - **Host-local delivery** (preview/final): `pi-runner.ts` emits `HostEvent`s on `hostEventBus` — never writes files for this path.
 - **Cross-boundary IPC** (agent-authored actions): `pi` subprocess writes JSON to `messages/`, `tasks/`, `actions/`, `action_results/` directories; `startIpcWatcher()` in `index.ts` polls these.
 - **Evaluator loop**: After agent completes, `evaluator.ts` runs a second `pi` pass to score output quality; verdict JSON must never leak to users (see `boundary-ipc.ts:isInternalEvaluatorVerdictText`).
+- **Streaming subsystem** (`src/streaming/`): Platform-agnostic stream consumption with Telegram and WhatsApp adapters.
+- **Heartbeat service** (`src/heartbeat-service.ts`): Periodic main-session check using `HEARTBEAT.md`.
+- **Delivery outbox** (`src/outbox.ts`): At-least-once cron result delivery with deduplication.
+- **Long-run service** (`src/long-run-service.ts`): Durable `agent_runs`; restart triage and `resumeRecoverableRuns()`.
+- **Self-improvement signals** (`src/self-improve-signals.ts`): Deterministic lexical signal extraction for skill improvement.
+- **Skill versioning** (`src/skill-history.ts`): `.history/` snapshots and `skill_rollback` support.
 - **Cron service** (`src/cron/service.ts`): Drives scheduled tasks via SQLite, calls `runContainerAgent` and `runEvaluatorPass` directly.
 - **Coding orchestrator** (`src/coding-orchestrator.ts`): Manages plan/execute worker routing for coding tasks; uses ephemeral worktrees and evaluator refinement loops.
 - **Permission gate** (`src/permission-gate-policy.ts`): Blocks destructive bash commands for subagents or headless runs; `bash-guard.ts` classifies commands.
@@ -81,30 +88,41 @@ GitHub Actions:
 
 | File | Role |
 |---|---|
-| `src/index.ts` | Remaining orchestrator logic (~5700 lines, still being decomposed) |
+| `src/index.ts` | Orchestrator wiring (~2,100 lines): constructs services and `*Deps` objects |
 | `src/app-state.ts` | All global mutable state, type definitions, `hostEventBus` singleton |
-| `src/app.ts` | `main()`, startup, shutdown, `connectWhatsApp` |
-| `src/message-dispatch.ts` | `processMessage`, `runDirectSessionTurn`, queue logic |
-| `src/telegram-commands.ts` | Telegram command handling, settings panels, callback queries |
-| `src/pi-runner.ts` | Agent subprocess spawning, snapshots, runtime event emission |
+| `src/app.ts` | `main()`, startup/shutdown, `connectWhatsApp` |
+| `src/pipeline/message-dispatch-pipeline.ts` | Primary message dispatch orchestrator |
+| `src/pipeline/pipeline-dispatcher.ts` | Routes requests to Chat/Coding/Cron pipelines |
+| `src/pi-runner.ts` | Agent subprocess spawning, runtime event emission, snapshots |
 | `src/telegram-streaming.ts` | Visible Telegram preview registry and completion state |
+| `src/telegram-commands.ts` | Telegram command handling, settings panels, callback queries |
+| `src/telegram-delivery.ts` | Telegram delivery modes: append, draft, stream, off |
+| `src/telegram-settings.ts` | Telegram settings management panel |
+| `src/telegram-group-mgmt.ts` | Telegram group management |
 | `src/runtime/host-events.ts` | `HostEventBus` — typed EventEmitter hub for host-local delivery |
 | `src/runtime/boundary-ipc.ts` | Cross-boundary envelope parsing, evaluator verdict leak guard |
-| `src/evaluator.ts` | Post-run quality scoring; `shouldEvaluate()` threshold guard |
-| `src/coding-orchestrator.ts` | Plan/execute worker routing for coding tasks |
+| `src/evaluator.ts` | Post-run quality scoring; verdict persistence |
+| `src/coding-orchestrator.ts` | Plan/execute worker routing; ephemeral worktrees; evaluator refinement |
 | `src/cron/service.ts` | Scheduled task execution engine |
+| `src/long-run-service.ts` | Durable agent runs; restart triage + `resumeRecoverableRuns()` |
+| `src/outbox.ts` | At-least-once delivery outbox with dedupe |
+| `src/heartbeat-service.ts` | Periodic main-session heartbeat using `HEARTBEAT.md` |
+| `src/memory-backend.ts` / `src/memory-search.ts` | Memory facade / lexical search |
+| `src/memory-embeddings.ts` | Optional semantic re-ranking via Ollama embeddings |
+| `src/skill-history.ts` | Skill version snapshots and rollback support |
+| `src/self-improve-signals.ts` | Deterministic lexical signal extraction for skill improvement |
+| `src/state-persistence.ts` | JSON snapshot persistence for crash recovery |
+| `src/update-service.ts` | Self-update with stash/unstash for dirty checkouts |
+| `src/web-control-center.ts` | Web dashboard server |
+| `src/tui-coordination.ts` | TUI gateway coordination |
+| `src/host-coordination.ts` | Host-level coordination service |
 | `src/permission-gate-policy.ts` | Tool permission decisions for subagents/headless runs |
-| `src/memory-backend.ts` | Unified memory search/retrieval facade |
+| `src/streaming/` | Platform-agnostic streaming adapters (Telegram, WhatsApp) |
 | `src/config.ts` | All configuration constants and env var defaults |
 
-## Active Refactoring
+## Completed Refactoring
 
-4-phase decomposition of `index.ts` is in progress:
-
-- **Phase 1** (DONE): Extract `app-state`, `chat-preferences`, `telegram-streaming`, `telegram-commands`, `message-dispatch`, `app`.
-- **Phase 2** (IN PROGRESS): Replace file-based IPC with EventEmitter for host-local delivery. Cross-boundary sandbox IPC files remain.
-- **Phase 3** (IN PROGRESS): Consolidate draft streaming to one path via `TelegramPreviewRegistry`; `telegram-draft-ipc.ts` pending cleanup.
-- **Phase 4** (IN PROGRESS): Collapse completion resolver to use preview/completed registry state; shared message-dispatch helper pending.
+The `index.ts` decomposition (8,030 → ~2,100 lines) and the host-local EventEmitter delivery migration are complete. The Agent Durability & Self-Improvement pass (resume, outbox, evaluator feedback, cron/subagent memory, semantic memory, skill versioning) is complete.
 
 ## Conventions
 

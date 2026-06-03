@@ -90,7 +90,7 @@ timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$OUT_DIR"
 archive_path="$OUT_DIR/${NAME_PREFIX}-backup-${timestamp}.tar.gz"
 
-echo "nano-core state backup"
+echo "FFT_nano state backup"
 echo "  root:      $ROOT_DIR"
 echo "  workspace: $WORKSPACE_DIR"
 echo "  out:       $archive_path"

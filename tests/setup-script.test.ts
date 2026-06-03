@@ -225,9 +225,9 @@ test('setup.sh installs pinned fft launcher and shell PATH block when auto-link 
   );
 
   assert.equal(result.status, 0, `stdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
-  const launcher = readFileSync(path.join(userBinDir, 'fft'), 'utf8');
+  const launcher = readFileSync(path.join(userBinDir, 'nano'), 'utf8');
   const realFixtureRoot = realpathSync(fixtureRoot);
-  assert.match(launcher, new RegExp(`${realFixtureRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/bin/fft\\.js`));
+  assert.match(launcher, new RegExp(`${realFixtureRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/bin/nano\\.js`));
   assert.match(launcher, new RegExp(`--repo ${realFixtureRoot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`));
   assert.match(launcher, /"\$@"/);
 

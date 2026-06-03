@@ -21,12 +21,12 @@ fi
 runtime="none"
 if command -v docker >/dev/null 2>&1; then
   runtime="docker"
-elif [[ "${CONTAINER_RUNTIME:-}" == "host" ]] && [[ "${FFT_NANO_ALLOW_HOST_RUNTIME:-}" == "1" ]]; then
+elif [[ "${CONTAINER_RUNTIME:-}" == "host" ]] && [[ "${NANO_CORE_ALLOW_HOST_RUNTIME:-}" == "1" ]]; then
   runtime="host"
 fi
 
 if [[ "$runtime" == "none" ]]; then
-  echo "no supported runtime found (install Docker, or set CONTAINER_RUNTIME=host with FFT_NANO_ALLOW_HOST_RUNTIME=1)"
+  echo "no supported runtime found (install Docker, or set CONTAINER_RUNTIME=host with NANO_CORE_ALLOW_HOST_RUNTIME=1)"
   exit 1
 fi
 

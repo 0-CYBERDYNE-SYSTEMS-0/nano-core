@@ -84,6 +84,54 @@ export function initDatabaseAtPath(dbPath: string): void {
       FOREIGN KEY (task_id) REFERENCES scheduled_tasks(id)
     );
     CREATE INDEX IF NOT EXISTS idx_task_run_logs ON task_run_logs(task_id, run_at);
+
+    CREATE TABLE IF NOT EXISTS agent_runs (
+      id TEXT PRIMARY KEY,
+      chat_jid TEXT NOT NULL,
+      group_folder TEXT NOT NULL,
+      kind TEXT NOT NULL,
+      status TEXT NOT NULL,
+      prompt TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      started_at TEXT,
+      finished_at TEXT,
+      last_progress_at TEXT,
+      current_phase TEXT,
+      current_detail TEXT,
+      result TEXT,
+      error TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_agent_runs_chat_created ON agent_runs(chat_jid, created_at);
+    CREATE INDEX IF NOT EXISTS idx_agent_runs_status ON agent_runs(status);
+
+    CREATE TABLE IF NOT EXISTS evaluator_verdicts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      request_id TEXT,
+      group_folder TEXT NOT NULL,
+      chat_jid TEXT,
+      run_type TEXT NOT NULL,
+      pass INTEGER NOT NULL,
+      score INTEGER NOT NULL,
+      issues TEXT,
+      refinements INTEGER DEFAULT 0,
+      created_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_eval_verdicts_group ON evaluator_verdicts(group_folder, created_at);
+
+    CREATE TABLE IF NOT EXISTS delivery_outbox (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      dedupe_key TEXT NOT NULL UNIQUE,
+      destination TEXT NOT NULL,
+      body TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 5,
+      last_error TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      delivered_at TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_delivery_outbox_status ON delivery_outbox(status, created_at);
   `);
 
   // Add sender_name column if it doesn't exist (migration for existing DBs)
@@ -124,6 +172,22 @@ export function initDatabaseAtPath(dbPath: string): void {
     /* column already exists */
   }
 
+  // Durability + self-improvement columns on agent_runs (migration for existing DBs)
+  const agentRunMigrations = [
+    `ALTER TABLE agent_runs ADD COLUMN recovery_state TEXT`,
+    `ALTER TABLE agent_runs ADD COLUMN worktree_path TEXT`,
+    `ALTER TABLE agent_runs ADD COLUMN evaluator_score INTEGER`,
+    `ALTER TABLE agent_runs ADD COLUMN evaluator_pass INTEGER`,
+    `ALTER TABLE agent_runs ADD COLUMN resume_attempts INTEGER`,
+  ];
+  for (const migration of agentRunMigrations) {
+    try {
+      db.exec(migration);
+    } catch {
+      /* column already exists */
+    }
+  }
+
   const hadMessagesFts = !!db
     .prepare(
       `SELECT 1 AS present FROM sqlite_master WHERE type='table' AND name='messages_fts'`,
@@ -161,6 +225,8 @@ export function initDatabaseAtPath(dbPath: string): void {
   if (!hadMessagesFts) {
     db.exec(`INSERT INTO messages_fts(messages_fts) VALUES ('rebuild')`);
   }
+
+  triageActiveAgentRunsOnStartup();
 }
 
 export function closeDatabase(): void {
@@ -696,4 +762,434 @@ export function searchMessagesByFts(
   return db
     .prepare(sql)
     .all(ftsQuery, ...chatJids, limit) as TranscriptSearchRow[];
+}
+
+export type AgentRunKind = 'agent_long';
+export type AgentRunStatus =
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'aborted'
+  | 'interrupted';
+
+export type AgentRunRecoveryState = 'recoverable' | 'dead' | 'resumed';
+
+export interface AgentRunRecord {
+  id: string;
+  chat_jid: string;
+  group_folder: string;
+  kind: AgentRunKind;
+  status: AgentRunStatus;
+  prompt: string;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  last_progress_at: string | null;
+  current_phase: string | null;
+  current_detail: string | null;
+  result: string | null;
+  error: string | null;
+  recovery_state: AgentRunRecoveryState | null;
+  worktree_path: string | null;
+  evaluator_score: number | null;
+  evaluator_pass: number | null;
+  resume_attempts: number | null;
+}
+
+export function createAgentRun(input: {
+  id: string;
+  chatJid: string;
+  groupFolder: string;
+  kind: AgentRunKind;
+  prompt: string;
+  createdAt?: string;
+  resumeAttempts?: number;
+}): AgentRunRecord {
+  const createdAt = input.createdAt || new Date().toISOString();
+  db.prepare(
+    `
+    INSERT INTO agent_runs (
+      id, chat_jid, group_folder, kind, status, prompt, created_at, resume_attempts
+    ) VALUES (?, ?, ?, ?, 'queued', ?, ?, ?)
+  `,
+  ).run(
+    input.id,
+    input.chatJid,
+    input.groupFolder,
+    input.kind,
+    input.prompt,
+    createdAt,
+    input.resumeAttempts ?? 0,
+  );
+  return getAgentRunById(input.id) as AgentRunRecord;
+}
+
+export function getAgentRunById(id: string): AgentRunRecord | undefined {
+  return db.prepare(`SELECT * FROM agent_runs WHERE id = ?`).get(id) as
+    | AgentRunRecord
+    | undefined;
+}
+
+export function listAgentRunsForChat(
+  chatJid: string,
+  limit = 10,
+): AgentRunRecord[] {
+  const safeLimit = Number.isFinite(limit)
+    ? Math.max(1, Math.min(50, Math.floor(limit)))
+    : 10;
+  return db
+    .prepare(
+      `
+      SELECT * FROM agent_runs
+      WHERE chat_jid = ? AND kind = 'agent_long'
+      ORDER BY created_at DESC
+      LIMIT ?
+    `,
+    )
+    .all(chatJid, safeLimit) as AgentRunRecord[];
+}
+
+export function listActiveAgentRuns(chatJid?: string): AgentRunRecord[] {
+  const sql = chatJid
+    ? `
+      SELECT * FROM agent_runs
+      WHERE chat_jid = ? AND kind = 'agent_long' AND status IN ('queued', 'running')
+      ORDER BY created_at ASC
+    `
+    : `
+      SELECT * FROM agent_runs
+      WHERE kind = 'agent_long' AND status IN ('queued', 'running')
+      ORDER BY created_at ASC
+    `;
+  const statement = db.prepare(sql);
+  return (
+    chatJid ? statement.all(chatJid) : statement.all()
+  ) as AgentRunRecord[];
+}
+
+export function updateAgentRun(
+  id: string,
+  updates: Partial<{
+    status: AgentRunStatus;
+    started_at: string | null;
+    finished_at: string | null;
+    last_progress_at: string | null;
+    current_phase: string | null;
+    current_detail: string | null;
+    result: string | null;
+    error: string | null;
+    recovery_state: AgentRunRecoveryState | null;
+    worktree_path: string | null;
+    evaluator_score: number | null;
+    evaluator_pass: number | null;
+    resume_attempts: number | null;
+  }>,
+): void {
+  const fields: string[] = [];
+  const values: unknown[] = [];
+  for (const [key, value] of Object.entries(updates)) {
+    fields.push(`${key} = ?`);
+    values.push(value);
+  }
+  if (fields.length === 0) return;
+  values.push(id);
+  db.prepare(`UPDATE agent_runs SET ${fields.join(', ')} WHERE id = ?`).run(
+    ...values,
+  );
+}
+
+/**
+ * On host restart, triage runs that were in flight instead of blindly failing
+ * them. A run whose worktree still exists on disk is marked `interrupted` +
+ * `recoverable` and its worktree is preserved so work can be resumed; a run
+ * with no surviving worktree is marked `failed` + `dead`. The dead-path error
+ * string is kept stable (`host_restarted_before_completion`) so downstream
+ * consumers and existing behavior are unaffected.
+ */
+export function triageActiveAgentRunsOnStartup(): {
+  recoverable: number;
+  dead: number;
+} {
+  const now = new Date().toISOString();
+  const inFlight = db
+    .prepare(
+      `SELECT id, worktree_path FROM agent_runs
+       WHERE kind = 'agent_long' AND status IN ('queued', 'running')`,
+    )
+    .all() as Array<{ id: string; worktree_path: string | null }>;
+
+  const markRecoverable = db.prepare(
+    `UPDATE agent_runs
+     SET status = 'interrupted', recovery_state = 'recoverable',
+         finished_at = ?, error = 'host_restarted_mid_run'
+     WHERE id = ?`,
+  );
+  const markDead = db.prepare(
+    `UPDATE agent_runs
+     SET status = 'failed', recovery_state = 'dead',
+         finished_at = ?, error = 'host_restarted_before_completion'
+     WHERE id = ?`,
+  );
+
+  let recoverable = 0;
+  let dead = 0;
+  for (const run of inFlight) {
+    const hasWorktree = !!run.worktree_path && fs.existsSync(run.worktree_path);
+    if (hasWorktree) {
+      markRecoverable.run(now, run.id);
+      recoverable += 1;
+    } else {
+      markDead.run(now, run.id);
+      dead += 1;
+    }
+  }
+  return { recoverable, dead };
+}
+
+/**
+ * List runs that were interrupted by a restart but whose workspace survives,
+ * so an operator or a resume consumer can pick them back up.
+ */
+export function listRecoverableAgentRuns(chatJid?: string): AgentRunRecord[] {
+  const sql = chatJid
+    ? `SELECT * FROM agent_runs
+       WHERE chat_jid = ? AND kind = 'agent_long'
+         AND status = 'interrupted' AND recovery_state = 'recoverable'
+       ORDER BY created_at ASC`
+    : `SELECT * FROM agent_runs
+       WHERE kind = 'agent_long'
+         AND status = 'interrupted' AND recovery_state = 'recoverable'
+       ORDER BY created_at ASC`;
+  const statement = db.prepare(sql);
+  return (
+    chatJid ? statement.all(chatJid) : statement.all()
+  ) as AgentRunRecord[];
+}
+
+// ---------------------------------------------------------------------------
+// Evaluator verdict persistence (closes the self-improvement feedback loop)
+// ---------------------------------------------------------------------------
+
+export interface EvaluatorVerdictInput {
+  requestId?: string;
+  groupFolder: string;
+  chatJid?: string;
+  runType: string;
+  pass: boolean;
+  score: number;
+  issues: string[];
+  refinements?: number;
+}
+
+export interface EvaluatorStats {
+  total: number;
+  passes: number;
+  passRate: number;
+  recentIssues: string[];
+}
+
+/**
+ * Persist an evaluator verdict so the scoring the system already pays for is
+ * no longer discarded. Recorded verdicts feed `getEvaluatorStats`, which the
+ * coding orchestrator prepends to future runs as learned context.
+ */
+export function recordEvaluatorVerdict(input: EvaluatorVerdictInput): void {
+  if (!db) return;
+  db.prepare(
+    `INSERT INTO evaluator_verdicts (
+       request_id, group_folder, chat_jid, run_type, pass, score, issues, refinements, created_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    input.requestId ?? null,
+    input.groupFolder,
+    input.chatJid ?? null,
+    input.runType,
+    input.pass ? 1 : 0,
+    Math.round(input.score),
+    JSON.stringify(input.issues ?? []),
+    input.refinements ?? 0,
+    new Date().toISOString(),
+  );
+}
+
+/**
+ * Rolling pass-rate and the top recurring issues for a group, used to give the
+ * next run awareness of how prior runs in the same workspace fared. Issues are
+ * ranked by a recency- and failure-weighted score with decay (see below), not
+ * pure recency, so stale one-offs drop out and persistent failures rise.
+ */
+export function getEvaluatorStats(
+  groupFolder: string,
+  limit = 20,
+): EvaluatorStats {
+  if (!db) return { total: 0, passes: 0, passRate: 0, recentIssues: [] };
+  const safeLimit = Number.isFinite(limit)
+    ? Math.max(1, Math.min(100, Math.floor(limit)))
+    : 20;
+  const rows = db
+    .prepare(
+      `SELECT pass, issues FROM evaluator_verdicts
+       WHERE group_folder = ?
+       ORDER BY created_at DESC
+       LIMIT ?`,
+    )
+    .all(groupFolder, safeLimit) as Array<{
+    pass: number;
+    issues: string | null;
+  }>;
+
+  const total = rows.length;
+  const passes = rows.filter((r) => r.pass === 1).length;
+
+  // Reliability-weighted recurring issues (rows are newest-first). Each
+  // occurrence is scored by recency (newer verdicts count more, via geometric
+  // decay) and by whether the verdict failed — an issue noted on a run that
+  // failed is a far stronger "avoid this" signal than one noted on a run that
+  // passed anyway. Issues whose accumulated score decays below the floor (old
+  // one-offs, stale passing-run notes that never recurred and never correlated
+  // with failure) are dropped rather than surfaced, so one bad lesson can't
+  // poison every future run indefinitely.
+  const RECENCY_DECAY = 0.85;
+  const PASSING_WEIGHT = 0.25;
+  const MIN_ISSUE_SCORE = 0.15;
+  const issueScores = new Map<string, number>();
+  rows.forEach((row, idx) => {
+    if (!row.issues) return;
+    let parsed: unknown[];
+    try {
+      parsed = JSON.parse(row.issues) as unknown[];
+    } catch {
+      return; // ignore malformed issues json
+    }
+    const weight =
+      Math.pow(RECENCY_DECAY, idx) * (row.pass === 0 ? 1 : PASSING_WEIGHT);
+    const seenInRow = new Set<string>();
+    for (const issue of parsed) {
+      if (typeof issue !== 'string') continue;
+      if (seenInRow.has(issue)) continue; // count an issue once per verdict
+      seenInRow.add(issue);
+      issueScores.set(issue, (issueScores.get(issue) ?? 0) + weight);
+    }
+  });
+
+  const recentIssues = [...issueScores.entries()]
+    .filter(([, score]) => score >= MIN_ISSUE_SCORE)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([issue]) => issue);
+
+  return {
+    total,
+    passes,
+    passRate: total > 0 ? passes / total : 0,
+    recentIssues,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Delivery outbox (at-least-once + dedupe for non-interactive finals/cron)
+// ---------------------------------------------------------------------------
+
+export type DeliveryOutboxStatus = 'pending' | 'delivered' | 'failed';
+
+export interface DeliveryOutboxRecord {
+  id: number;
+  dedupe_key: string;
+  destination: string;
+  body: string;
+  status: DeliveryOutboxStatus;
+  attempts: number;
+  max_attempts: number;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+  delivered_at: string | null;
+}
+
+/**
+ * Enqueue an outbound message idempotently. The `dedupeKey` is UNIQUE, so a
+ * second enqueue for the same logical message is a no-op — this is what
+ * prevents double-posting when a producer (cron re-run, resumed run, retry)
+ * re-emits the same final. Returns the existing/new row plus whether it was a
+ * duplicate so callers can skip re-delivering an already-delivered message.
+ */
+export function enqueueDelivery(input: {
+  dedupeKey: string;
+  destination: string;
+  body: string;
+  maxAttempts?: number;
+}): { record: DeliveryOutboxRecord; duplicate: boolean } {
+  const now = new Date().toISOString();
+  const result = db
+    .prepare(
+      `INSERT OR IGNORE INTO delivery_outbox (
+         dedupe_key, destination, body, status, attempts, max_attempts, created_at, updated_at
+       ) VALUES (?, ?, ?, 'pending', 0, ?, ?, ?)`,
+    )
+    .run(
+      input.dedupeKey,
+      input.destination,
+      input.body,
+      input.maxAttempts ?? 5,
+      now,
+      now,
+    );
+  const record = db
+    .prepare(`SELECT * FROM delivery_outbox WHERE dedupe_key = ?`)
+    .get(input.dedupeKey) as DeliveryOutboxRecord;
+  return { record, duplicate: result.changes === 0 };
+}
+
+/**
+ * Pending entries that still have attempts left, oldest first. Drives both the
+ * inline delivery attempt and the startup/periodic flush.
+ */
+export function listPendingDeliveries(limit = 100): DeliveryOutboxRecord[] {
+  const safeLimit = Number.isFinite(limit)
+    ? Math.max(1, Math.min(500, Math.floor(limit)))
+    : 100;
+  return db
+    .prepare(
+      `SELECT * FROM delivery_outbox
+       WHERE status = 'pending' AND attempts < max_attempts
+       ORDER BY created_at ASC
+       LIMIT ?`,
+    )
+    .all(safeLimit) as DeliveryOutboxRecord[];
+}
+
+export function getDeliveryByDedupeKey(
+  dedupeKey: string,
+): DeliveryOutboxRecord | undefined {
+  return db
+    .prepare(`SELECT * FROM delivery_outbox WHERE dedupe_key = ?`)
+    .get(dedupeKey) as DeliveryOutboxRecord | undefined;
+}
+
+/** Mark an outbox entry delivered. Idempotent. */
+export function markDeliveryDelivered(id: number): void {
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE delivery_outbox
+     SET status = 'delivered', attempts = attempts + 1,
+         delivered_at = ?, updated_at = ?, last_error = NULL
+     WHERE id = ? AND status != 'delivered'`,
+  ).run(now, now, id);
+}
+
+/**
+ * Record a failed attempt. Increments the attempt counter; once the cap is hit
+ * the entry is marked `failed` so the flush stops retrying it (and an operator
+ * can see it stuck). Below the cap it stays `pending` for the next flush.
+ */
+export function markDeliveryFailedAttempt(id: number, error: string): void {
+  const now = new Date().toISOString();
+  db.prepare(
+    `UPDATE delivery_outbox
+     SET attempts = attempts + 1,
+         status = CASE WHEN attempts + 1 >= max_attempts THEN 'failed' ELSE 'pending' END,
+         last_error = ?, updated_at = ?
+     WHERE id = ? AND status != 'delivered'`,
+  ).run(error.slice(0, 500), now, id);
 }

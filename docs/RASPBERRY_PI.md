@@ -141,19 +141,7 @@ Expected:
 - both services `active`
 - no startup loop errors in recent logs
 
-## 10. Farm demo/production setup (optional)
-
-From repo root:
-
-```bash
-./scripts/farm-bootstrap.sh --mode demo
-# or
-./scripts/farm-bootstrap.sh --mode production
-```
-
-This handles companion dashboard fetch, HA startup, and onboarding flow.
-
-## 11. Update procedure
+## 10. Update procedure
 
 ```bash
 cd ~/nano-core
@@ -163,7 +151,7 @@ git pull --ff-only
 # or, after `npm link`: fft service restart
 ```
 
-## 12. Fast troubleshooting
+## 11. Fast troubleshooting
 
 Docker not reachable:
 

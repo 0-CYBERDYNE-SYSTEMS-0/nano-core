@@ -131,7 +131,7 @@ function startFakeTelegramApi(): Promise<{
         };
 
         if (method === 'getMe') {
-          json({ ok: true, result: { id: 1, username: 'nano-coreBot' } });
+          json({ ok: true, result: { id: 1, username: 'FarmFriendBot' } });
           return;
         }
         if (method === 'getUpdates') {
@@ -388,7 +388,7 @@ test(
     const group: RegisteredGroup = {
       name: 'Leak E2E',
       folder: groupFolder,
-      trigger: '@nano-core',
+      trigger: '@FarmFriend',
       added_at: '2026-05-21T00:00:00.000Z',
     };
     const sentMessages: string[] = [];
@@ -411,17 +411,17 @@ test(
             jid: chatJid,
             name: 'Leak E2E',
             folder: groupFolder,
-            trigger: '@nano-core',
+            trigger: '@FarmFriend',
           },
         },
         chatRunPreferences: {},
       },
       constants: {
-        assistantName: 'nano-core',
+        assistantName: 'FarmFriend',
         mainGroupFolder: groupFolder,
         mainWorkspaceDir: workspaceDir,
         tuiSenderName: 'TUI',
-        triggerPattern: /@nano-core/i,
+        triggerPattern: /@FarmFriend/i,
       },
       activeChatRuns: new Map(),
       activeChatRunsById: new Map(),
@@ -446,7 +446,7 @@ test(
           groupFolder,
           chatJid,
           isMain: true,
-          assistantName: 'nano-core',
+          assistantName: 'FarmFriend',
           requestId: runId,
           noContinue: true,
           isEvaluatorRun: true,
@@ -566,7 +566,7 @@ test(
     }
 
     const statusText = formatStatusReport({
-      assistantName: 'nano-core',
+      assistantName: 'FarmFriend',
       version: 'test',
       runtime: 'host',
       serviceStartedAt: '2026-05-21T11:00:00.000Z',
@@ -632,7 +632,7 @@ test(
             jid: 'telegram:424242',
             name: 'Leak Runtime',
             folder: 'main',
-            trigger: '@nano-core',
+            trigger: '@FarmFriend',
             added_at: '2026-05-21T00:00:00.000Z',
           },
         },
@@ -684,7 +684,7 @@ test(
       cwd: runtimeDir,
       env: {
         ...process.env,
-        ASSISTANT_NAME: 'nano-core',
+        ASSISTANT_NAME: 'FarmFriend',
         CONTAINER_RUNTIME: 'host',
         FFT_NANO_MAIN_WORKSPACE_DIR: workspaceDir,
         FFT_NANO_ALLOW_HOST_RUNTIME: '1',

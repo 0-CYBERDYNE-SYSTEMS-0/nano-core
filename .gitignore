@@ -40,8 +40,7 @@ skills/runtime/docs/
 skills/runtime/document-skills/
 skills/runtime/dreamhost-manager/
 skills/runtime/fft-canvas-dynamic-ops/
-skills/runtime/fft-farm-autonomy/
-skills/runtime/fft-farm-validate/
+
 skills/runtime/gemini/
 skills/runtime/grok/
 skills/runtime/hf-dataset-creator/
@@ -84,7 +83,7 @@ agents-sdk-docs
 
 # Dev orchestration (orchestrator/droid infrastructure - local only)
 .factory/
-fft-experience/
+nano-experience/
 
 # Claude Code planning artifacts (local only)
 docs/superpowers/

@@ -185,10 +185,12 @@ var nodes = [
   // ── Orchestrator (y ~240) ──
   { id: 'app',          label: 'App Bootstrap',          sub: 'src/app.ts',                      layer: 'orchestrator', x: 80,   y: 240, w: 150, h: 46, status: 'new',
     desc: 'Extracted from index.ts (433 lines). main() entry point, startup sequence, shutdown handler, singleton lock, connectWhatsApp delegation. Initializes all subsystems and wires event handlers.' },
-  { id: 'msg-dispatch', label: 'Message Dispatch',      sub: 'src/message-dispatch.ts',          layer: 'orchestrator', x: 290,  y: 240, w: 160, h: 46, status: 'new',
-    desc: 'Extracted from index.ts (687 lines). processMessage(), runDirectSessionTurn(), message queue logic. Routes inbound messages to agent runs. Manages active run tracking and queue modes (collect/interrupt/followup/steer).' },
-  { id: 'index',        label: 'Main Router',           sub: 'src/index.ts (4545 lines)',        layer: 'orchestrator', x: 520,  y: 240, w: 160, h: 46, status: 'refactored',
-    desc: 'Central orchestrator — reduced from 6809 to 4545 lines. Still owns IPC watcher loop, heartbeat loop, Telegram event routing, completion state resolution. Being decomposed in phases.' },
+  { id: 'msg-dispatch', label: 'Message Dispatch',      sub: 'src/pipeline/message-dispatch-pipeline.ts', layer: 'orchestrator', x: 290,  y: 240, w: 160, h: 46, status: 'refactored',
+    desc: 'Primary message dispatch orchestrator (~1500 lines). processMessage(), runDirectSessionTurn(), message queue logic. Routes inbound messages to agent runs. Manages active run tracking and queue modes (collect/interrupt/followup/steer).' },
+  { id: 'pipeline-dp', label: 'Pipeline Dispatcher',   sub: 'src/pipeline/pipeline-dispatcher.ts', layer: 'orchestrator', x: 520,  y: 240, w: 160, h: 46, status: 'new',
+    desc: 'Routes requests to ChatPipeline, CodingPipeline, or CronPipeline based on run type. Replaces direct dispatch logic.' },
+  { id: 'index',        label: 'Main Router',           sub: 'src/index.ts (~2100 lines)',        layer: 'orchestrator', x: 720,  y: 240, w: 160, h: 46, status: 'refactored',
+    desc: 'Orchestrator wiring (~2100 lines). Constructs services and *Deps objects. Owns IPC watcher loop, Telegram event routing, completion state resolution.' },
   { id: 'chat-prefs',   label: 'Chat Preferences',      sub: 'src/chat-preferences.ts',          layer: 'orchestrator', x: 750,  y: 240, w: 160, h: 46, status: 'new',
     desc: 'Extracted from index.ts (415 lines). Normalizers for provider/model/thinkLevel/verboseMode/queueMode. Queue parsing, preference persistence to SQLite, usage stats helpers.' },
   { id: 'app-state',    label: 'App State',              sub: 'src/app-state.ts',                 layer: 'orchestrator', x: 980,  y: 240, w: 150, h: 46, status: 'new',
@@ -205,8 +207,8 @@ var nodes = [
     desc: 'wrapWithSandbox() — optional process isolation. Supports bubblewrap (bwrap), docker, or none. Wraps the PI subprocess command with sandbox flags.' },
 
   // ── Streaming (y ~500) ──
-  { id: 'runtime-hub',  label: 'Runtime Event Hub',      sub: 'src/pi-runtime-events.ts',         layer: 'streaming',    x: 80,   y: 500, w: 170, h: 46, status: 'new',
-    desc: 'EventEmitter-based hub (73 lines). Replaces file-based IPC for host-local preview delivery. PiRuntimeEventHub with subscribe/emit. Two event kinds: telegram_preview_update (draft text) and agent_message (final text). Ordered processor ensures sequential handling.' },
+  { id: 'runtime-hub',  label: 'Runtime Event Hub',      sub: 'src/runtime/host-events.ts',       layer: 'streaming',    x: 80,   y: 500, w: 170, h: 46, status: 'refactored',
+    desc: 'HostEventBus — typed EventEmitter hub (host-events.ts). Replaces file-based IPC for host-local preview delivery. Two event kinds: telegram_preview_update (draft text) and agent_message (final text). Ordered processor ensures sequential handling.' },
   { id: 'preview-reg',  label: 'Preview Registry',       sub: 'src/telegram-streaming.ts',        layer: 'streaming',    x: 310,  y: 500, w: 170, h: 46, status: 'new',
     desc: 'TelegramPreviewRegistry (163 lines). Single-path visible preview streaming. Tracks per-run message preview state (messageId, lastText). Manages disabled runs (TTL-based), completed runs, and stream completion resolution. Replaces dual-path draft/message mode.' },
   { id: 'ipc-files',    label: 'IPC File Layer',          sub: 'data/ipc/{group}/messages/',       layer: 'streaming',    x: 540,  y: 500, w: 170, h: 46, status: 'legacy',

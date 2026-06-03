@@ -34,7 +34,7 @@ import {
   type SkillSyncResult,
 } from './pi-skills.js';
 import { noteSkillCatalogUse } from './skill-lifecycle.js';
-import { normalizeTelegramDraftText } from './telegram.js';
+import { normalizeTelegramPreviewText } from './telegram.js';
 import { ensureMemoryScaffold } from './memory-paths.js';
 import { ensureMainWorkspaceBootstrap } from './workspace-bootstrap.js';
 import { auditToolExecution } from './bash-guard.js';
@@ -63,9 +63,6 @@ import { buildSystemPrompt, type WorkspacePaths } from './system-prompt.js';
 import { resolvePiExecutable } from './pi-executable.js';
 import { wrapWithSandbox } from './sandbox.js';
 import type { RegisteredGroup } from './types.js';
-import { hostEventBus } from './app-state.js';
-import { createHostEventId } from './runtime/host-events.js';
-
 export interface ContainerInput {
   prompt: string;
   groupFolder: string;
@@ -157,10 +154,16 @@ export type ContainerProgressEvent =
   | {
       kind: 'assistant';
       at: number;
+      text?: string;
     }
   | {
       kind: 'thinking';
       at: number;
+    }
+  | {
+      kind: 'delta';
+      at: number;
+      text: string;
     }
   | {
       kind: 'wait';
@@ -232,8 +235,19 @@ export interface ExtensionUIResponse {
 
 export function shouldBuildRetrievedMemoryContext(input: {
   isMain: boolean;
+  isScheduledTask?: boolean;
+  isSubagent?: boolean;
 }): boolean {
-  return MEMORY_RETRIEVAL_GATE_ENABLED && input.isMain;
+  // Memory retrieval was previously main-chat only, leaving cron tasks and
+  // subagents to run blind. Extend it to those paths so memory injection is
+  // consistent across the surfaces that benefit from prior context, still
+  // behind the same env gate.
+  return (
+    MEMORY_RETRIEVAL_GATE_ENABLED &&
+    (input.isMain ||
+      input.isScheduledTask === true ||
+      input.isSubagent === true)
+  );
 }
 
 type CodingHint =
@@ -471,6 +485,8 @@ export function collectRuntimeSecrets(
     'MODAL_API_KEY',
     'NVIDIA_API_KEY',
     'FFT_NANO_DRY_RUN',
+    'HA_URL',
+    'HA_TOKEN',
     'FFT_NANO_PROMPT_FILE_MAX_CHARS',
     'FFT_NANO_PROMPT_TOTAL_MAX_CHARS',
   ] as const;
@@ -635,13 +651,14 @@ function truncateRunCaptureText(value: string): {
 function writeRawRunCapture(params: {
   groupDir: string;
   requestId?: string;
-  reason: 'error' | 'empty_final';
+  reason: 'error' | 'empty_final' | 'timeout';
   code: number | null;
   stdout: string;
   stderr: string;
   stdoutTruncated?: boolean;
   provider?: string;
   model?: string;
+  timeoutMs?: number;
 }): void {
   try {
     const outDir = path.join(params.groupDir, 'logs', 'pi-runs');
@@ -659,6 +676,7 @@ function writeRawRunCapture(params: {
       code: params.code,
       provider: params.provider || null,
       model: params.model || null,
+      timeoutMs: params.timeoutMs || null,
       stdout: stdout.text,
       stderr: stderr.text,
       truncated: {
@@ -920,6 +938,9 @@ export async function runContainerAgent(
   const startTime = Date.now();
   const projectRoot = process.cwd();
   const codingHint = normalizeCodingHint(input.codingHint);
+  let extendHardTimeoutForWait:
+    | ((requestTimeoutMs: number | undefined) => void)
+    | null = null;
 
   let groupDir: string;
   try {
@@ -1223,15 +1244,51 @@ export async function runContainerAgent(
 
   // Hoisted reference so timeout/abort handlers can kill the active child process.
   let activeChild: import('child_process').ChildProcess | null = null;
+  let runFinalized = false;
+  let activeChildSnapshot: {
+    stdout: string;
+    stderr: string;
+    stdoutTruncated?: boolean;
+  } = {
+    stdout: '',
+    stderr: '',
+    stdoutTruncated: false,
+  };
+  let settleActiveLocal:
+    | ((value: {
+        code: number | null;
+        stdout: string;
+        stderr: string;
+        streamedDraft: boolean;
+        visibleAssistantText?: string;
+        stdoutTruncated?: boolean;
+        retryFresh?: boolean;
+      }) => void)
+    | null = null;
 
   const killActiveChild = () => {
     if (!activeChild) return;
     const ref = activeChild;
     if (ref.exitCode !== null || ref.signalCode !== null) return;
-    ref.kill('SIGTERM');
+    const signal = (sig: NodeJS.Signals) => {
+      if (ref.pid && process.platform !== 'win32') {
+        try {
+          process.kill(-ref.pid, sig);
+          return;
+        } catch {
+          // Fall back to signaling the direct child below.
+        }
+      }
+      ref.kill(sig);
+    };
+    signal('SIGTERM');
+    ref.stdin?.destroy();
+    ref.stdout?.destroy();
+    ref.stderr?.destroy();
+    ref.unref();
     const forceKillTimer = setTimeout(() => {
       if (ref.exitCode === null && ref.signalCode === null) {
-        ref.kill('SIGKILL');
+        signal('SIGKILL');
       }
     }, 5_000);
     forceKillTimer.unref?.();
@@ -1329,6 +1386,7 @@ export async function runContainerAgent(
         cwd: wp.groupDir,
         env,
         stdio: ['pipe', 'pipe', 'pipe'],
+        detached: process.platform !== 'win32',
       });
       const closeRpcInput = () => {
         if (
@@ -1353,6 +1411,11 @@ export async function runContainerAgent(
         );
       }
       activeChild = child;
+      activeChildSnapshot = {
+        stdout: '',
+        stderr: '',
+        stdoutTruncated: false,
+      };
       onProgressEvent?.({
         kind: 'spawn',
         at: Date.now(),
@@ -1402,23 +1465,14 @@ export async function runContainerAgent(
       let lastDraftSentAt = 0;
       let lastDraftText = '';
       const publishDraftPreview = (text: string, force = false) => {
+        if (runFinalized || localSettled) return;
         if (!canStreamTelegramDraft) return;
-        const normalized = normalizeTelegramDraftText(text);
+        const normalized = normalizeTelegramPreviewText(text);
         if (!normalized) return;
         const now = Date.now();
         if (!force && now - lastDraftSentAt < draftMinIntervalMs) return;
         if (normalized === lastDraftText) return;
-        const requestId = (input.requestId || '').trim();
-        if (!requestId) return;
-        hostEventBus.publish({
-          kind: 'telegram_preview_requested',
-          id: createHostEventId('preview'),
-          createdAt: new Date(now).toISOString(),
-          source: 'pi-runner',
-          chatJid: input.chatJid,
-          requestId,
-          text: normalized,
-        });
+        onProgressEvent?.({ kind: 'delta', at: now, text: normalized });
         streamedDraft = true;
         lastDraftSentAt = now;
         lastDraftText = normalized;
@@ -1436,8 +1490,15 @@ export async function runContainerAgent(
         localSettled = true;
         if (ticker) clearInterval(ticker);
         if (staleTimer) clearTimeout(staleTimer);
+        activeChildSnapshot = {
+          stdout: value.stdout,
+          stderr: value.stderr,
+          stdoutTruncated: value.stdoutTruncated,
+        };
+        if (settleActiveLocal === settleLocal) settleActiveLocal = null;
         resolve(value);
       };
+      settleActiveLocal = settleLocal;
 
       const armStaleTimer = (
         delayMs: number | null = lifecyclePolicy.staleAfterMs,
@@ -1445,6 +1506,7 @@ export async function runContainerAgent(
         if (!delayMs) return;
         if (staleTimer) clearTimeout(staleTimer);
         staleTimer = setTimeout(() => {
+          if (runFinalized || localSettled) return;
           const now = Date.now();
           const retryFresh =
             useContinue &&
@@ -1487,7 +1549,7 @@ export async function runContainerAgent(
 
       const noteProgress = (
         event:
-          | { kind: 'assistant'; at: number }
+          | { kind: 'assistant'; at: number; text?: string }
           | { kind: 'thinking'; at: number }
           | {
               kind: 'tool';
@@ -1496,6 +1558,7 @@ export async function runContainerAgent(
               status: 'start' | 'ok' | 'error';
             },
       ) => {
+        if (runFinalized || localSettled) return;
         sawMeaningfulProgress = true;
         onProgressEvent?.(event);
         if (event.kind === 'tool') {
@@ -1517,6 +1580,7 @@ export async function runContainerAgent(
       };
 
       const noteActivity = (event?: { kind: 'stdout'; at: number }) => {
+        if (runFinalized || localSettled) return;
         if (event) onProgressEvent?.(event);
         armStaleTimer(
           sawToolActivity
@@ -1526,6 +1590,7 @@ export async function runContainerAgent(
       };
 
       const noteWaitState = (delayMs?: number, meaningful = true) => {
+        if (runFinalized || localSettled) return;
         if (meaningful) sawMeaningfulProgress = true;
         armStaleTimer(
           delayMs ??
@@ -1535,6 +1600,7 @@ export async function runContainerAgent(
       };
 
       const maybeSendDraft = (force = false) => {
+        if (runFinalized || localSettled) return;
         if (!assistantSoFar) return;
         let previewText = assistantSoFar;
         if (input.showReasoning && thinkingSoFar) {
@@ -1551,6 +1617,7 @@ export async function runContainerAgent(
         requestId: string,
         response: ExtensionUIResponse,
       ) => {
+        if (runFinalized || localSettled) return;
         if (
           !child.stdin ||
           child.stdin.destroyed ||
@@ -1574,6 +1641,7 @@ export async function runContainerAgent(
       const handleExtensionUIRequest = async (
         request: ExtensionUIRequest,
       ): Promise<void> => {
+        if (runFinalized || localSettled) return;
         logger.info(
           {
             requestId: request.id,
@@ -1583,12 +1651,6 @@ export async function runContainerAgent(
           },
           'Extension UI request from pi',
         );
-        onProgressEvent?.({
-          kind: 'wait',
-          at: Date.now(),
-          reason: 'extension_ui',
-        });
-
         const fireAndForgetMethods = new Set([
           'notify',
           'setStatus',
@@ -1603,14 +1665,20 @@ export async function runContainerAgent(
           return;
         }
 
-        noteWaitState(
-          Math.max(
-            lifecyclePolicy.waitStateStaleMs ??
-              lifecyclePolicy.staleAfterMs ??
-              0,
-            (request.timeout ?? 60_000) + 1_000,
-          ),
+        onProgressEvent?.({
+          kind: 'wait',
+          at: Date.now(),
+          reason: 'extension_ui',
+        });
+
+        const waitBudgetMs = Math.max(
+          lifecyclePolicy.waitStateStaleMs ?? lifecyclePolicy.staleAfterMs ?? 0,
+          (request.timeout ?? 60_000) + 1_000,
         );
+        noteWaitState(waitBudgetMs, request.method !== 'confirm');
+        if (request.method === 'confirm') {
+          extendHardTimeoutForWait?.(request.timeout);
+        }
 
         if (!onExtensionUIRequest) {
           logger.warn(
@@ -1651,6 +1719,7 @@ export async function runContainerAgent(
       };
 
       const processStdoutLine = (line: string) => {
+        if (runFinalized || localSettled) return;
         const trimmed = line.trim();
         if (!trimmed) return;
         try {
@@ -1750,7 +1819,11 @@ export async function runContainerAgent(
           if (delta) {
             if (delta.kind === 'append') assistantSoFar += delta.text;
             else assistantSoFar = delta.text;
-            noteProgress({ kind: 'assistant', at: Date.now() });
+            noteProgress({
+              kind: 'assistant',
+              at: Date.now(),
+              text: assistantSoFar,
+            });
             maybeSendDraft(false);
           }
         } catch {
@@ -1764,6 +1837,7 @@ export async function runContainerAgent(
       armStaleTimer(initialStaleDelayMs);
 
       child.stdout.on('data', (d: Buffer) => {
+        if (runFinalized || localSettled) return;
         const chunk = d.toString();
         noteActivity({ kind: 'stdout', at: Date.now() });
         if (!stdoutTruncated) {
@@ -1775,6 +1849,7 @@ export async function runContainerAgent(
             stdout += chunk;
           }
         }
+        activeChildSnapshot = { stdout, stderr, stdoutTruncated };
         lineBuffer += chunk;
         while (true) {
           const newlineIdx = lineBuffer.indexOf('\n');
@@ -1786,14 +1861,16 @@ export async function runContainerAgent(
       });
 
       child.stderr.on('data', (d: Buffer) => {
+        if (runFinalized || localSettled) return;
         if (stderr.length < STDERR_MAX_SIZE) {
           const chunk = d.toString();
           stderr += chunk.slice(0, STDERR_MAX_SIZE - stderr.length);
         }
+        activeChildSnapshot = { stdout, stderr, stdoutTruncated };
       });
 
       child.on('close', (code) => {
-        if (localSettled) return;
+        if (runFinalized || localSettled) return;
         // When stale timer kills the child via SIGTERM, the close event fires
         // synchronously BEFORE the stale callback finishes calling settleLocal.
         // staleKillInProgress flag tells us the stale timer already fired.
@@ -1812,6 +1889,7 @@ export async function runContainerAgent(
       });
 
       child.on('error', (err) => {
+        if (runFinalized || localSettled) return;
         settleLocal({
           code: 1,
           stdout,
@@ -1829,7 +1907,17 @@ export async function runContainerAgent(
     const finish = (output: ContainerOutput) => {
       if (settled) return;
       settled = true;
+      runFinalized = true;
       if (timeoutHandle) clearTimeout(timeoutHandle);
+      settleActiveLocal?.({
+        code: null,
+        stdout: activeChildSnapshot.stdout,
+        stderr: activeChildSnapshot.stderr,
+        streamedDraft: false,
+        stdoutTruncated: activeChildSnapshot.stdoutTruncated,
+      });
+      settleActiveLocal = null;
+      extendHardTimeoutForWait = null;
       resolve(output);
     };
 
@@ -1839,14 +1927,43 @@ export async function runContainerAgent(
     }
 
     const timeoutMs = lifecyclePolicy.hardTimeoutMs;
-    timeoutHandle = setTimeout(() => {
-      killActiveChild();
-      finish({
-        status: 'error',
-        result: null,
-        error: `Pi runner timed out after ${timeoutMs}ms`,
-      });
-    }, timeoutMs);
+    const armHardTimeout = (delayMs = timeoutMs) => {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
+      timeoutHandle = setTimeout(() => {
+        killActiveChild();
+        writeRawRunCapture({
+          groupDir: wp.groupDir,
+          requestId: input.requestId,
+          reason: 'timeout',
+          code: null,
+          stdout: activeChildSnapshot.stdout,
+          stderr: activeChildSnapshot.stderr,
+          stdoutTruncated: activeChildSnapshot.stdoutTruncated,
+          provider: input.provider,
+          model: input.model,
+          timeoutMs,
+        });
+        finish({
+          status: 'error',
+          result: null,
+          error: `Pi runner timed out after ${timeoutMs}ms`,
+        });
+      }, delayMs);
+    };
+    extendHardTimeoutForWait = (requestTimeoutMs) => {
+      const waitMs = Math.max(0, requestTimeoutMs ?? 60_000);
+      const graceMs = Math.min(Math.max(waitMs + 5_000, 30_000), 125_000);
+      logger.info(
+        {
+          group: group.name,
+          requestId: input.requestId,
+          graceMs,
+        },
+        'Extending Pi runner hard timeout for permission wait',
+      );
+      armHardTimeout(graceMs);
+    };
+    armHardTimeout();
 
     const onAbort = () => {
       if (timeoutHandle) clearTimeout(timeoutHandle);
@@ -1867,8 +1984,10 @@ export async function runContainerAgent(
         let didFreshRetry = false;
 
         while (attempt < FFT_NANO_MAX_RETRIES) {
+          if (settled) return;
           const useContinue = attempt === 0 && !effectiveInputNoContinue;
           lastRes = await runPi(useContinue);
+          if (settled) return;
 
           if (lastRes.code === 0) break; // success
 
@@ -1896,15 +2015,7 @@ export async function runContainerAgent(
             });
             // Give the fresh attempt its own full budget — the stale attempt already
             // consumed most of the original ceiling and would starve this retry.
-            if (timeoutHandle) clearTimeout(timeoutHandle);
-            timeoutHandle = setTimeout(() => {
-              killActiveChild();
-              finish({
-                status: 'error',
-                result: null,
-                error: `Pi runner timed out after ${timeoutMs}ms`,
-              });
-            }, timeoutMs);
+            armHardTimeout();
             lastRes = await runPi(false);
             if (lastRes.code === 0) break;
             finalError =
@@ -1942,6 +2053,7 @@ export async function runContainerAgent(
           });
 
           await sleep(delayMs);
+          if (settled) return;
         }
 
         // If all retries exhausted, try provider fallback chain

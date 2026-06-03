@@ -735,7 +735,7 @@ function renderBasePrompt(params: {
       '- Skills should stay organized without operator effort. Use skill_list/skill_view to inspect available procedural knowledge before repeating a workflow.',
     );
     lines.push(
-      '- Create or patch a skill only when a reusable workflow, pitfall, or operational pattern should be remembered procedurally.',
+      '- Create or patch a skill only when a reusable workflow, pitfall, or common operation pattern should be remembered procedurally.',
     );
     lines.push(
       '- Mutations are host-gated to agent-created runtime skills; repo and personal source skills may be read and reported but not destructively curated.',
@@ -754,6 +754,9 @@ function renderBasePrompt(params: {
     );
     lines.push(
       '- Support file: {"type":"skill_action","action":"skill_write_file","requestId":"<id>","params":{"name":"skill-name","filePath":"references/example.md","fileContent":"..."}}',
+    );
+    lines.push(
+      '- Rollback (undo a bad patch; restores the previous SKILL.md version): {"type":"skill_action","action":"skill_rollback","requestId":"<id>","params":{"name":"skill-name"}}',
     );
     lines.push('Wait for status=success before relying on a skill mutation.');
     lines.push('');
@@ -849,7 +852,7 @@ function renderOverlayPrompt(params: {
   lines.push(
     JSON.stringify(
       {
-        schema: 'fft_nano.input_meta.v1',
+        schema: 'nano-core.input_meta.v1',
         group_folder: params.input.groupFolder,
         chat_jid: params.input.chatJid,
         assistant_name: params.assistantName,

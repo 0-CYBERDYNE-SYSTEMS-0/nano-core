@@ -6,12 +6,12 @@
 [![Release Readiness](https://img.shields.io/github/actions/workflow/status/0-CYBERDYNE-SYSTEMS-0/nano-core/release-readiness.yml?branch=main&label=release%20readiness)](https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core/actions/workflows/release-readiness.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-An autonomous AI coworker that runs on your farm's hardware. It learns your operation, texts you updates, writes code to automate your equipment, and gets smarter every season. No subscriptions. No cloud dependency. MIT licensed.
+An autonomous AI coworker that runs on your hardware. It learns your operation, texts you updates, writes code to automate your equipment, and gets smarter over time. No subscriptions. No cloud dependency. MIT licensed.
 
 ## Quick Start
 
 ```bash
-curl -fsSL https://farm-friend.com/fft-nano/install.sh | bash
+curl -fsSL https://get.nano-core.dev/install.sh | bash
 ```
 
 Runs on Raspberry Pi, your own server, or local hardware. Chat via Telegram or WhatsApp.
@@ -22,9 +22,9 @@ Runs on Raspberry Pi, your own server, or local hardware. Chat via Telegram or W
 |-------------------|-------------------|-------------------|
 | Carries context across sessions. Learns your operation over time. | Discovers and controls equipment via Telegram. Writes automation code automatically. | OpenAI, OpenCode Go, Anthropic, Gemini, OpenRouter, Ollama, LM Studio. Local-first. |
 
-## Farm-Proven
+## Proven
 
-Built by a farmer with 24 years of field experience. Three years of real operational testing. Designed for real farms running real equipment.
+Built with 24 years of field experience. Three years of real operational testing. Designed for real operations running real equipment.
 
 ## Project Status
 
@@ -43,7 +43,7 @@ This is the canonical install-and-run flow.
 ### 1. Run the installer
 
 ```bash
-curl -fsSL https://farm-friend.com/fft-nano/install.sh | bash
+curl -fsSL https://get.nano-core.dev/install.sh | bash
 ```
 
 The installer downloads the latest stable release, installs missing basics where it can, chooses Docker when it is already healthy, falls back to host runtime when Docker is unavailable, then runs `./scripts/onboard-all.sh`.
@@ -75,7 +75,7 @@ The guided flow performs:
 
 Profile defaults:
 - fresh installs default to `core` profile
-- existing farm-oriented installs auto-preserve to `farm` profile when farm signals/artifacts are detected
+- existing installs preserve their profile when signals/artifacts are detected
 
 If you are upgrading an existing install and want to preserve all local state (`~/nano`, `.env`, `data/`, `groups/`) before changes:
 
@@ -91,10 +91,10 @@ Choose runtime at install time:
 
 ```bash
 # isolated Docker runtime
-curl -fsSL https://farm-friend.com/fft-nano/install.sh | bash -s -- --runtime docker
+curl -fsSL https://get.nano-core.dev/install.sh | bash -s -- --runtime docker
 
 # host runtime fallback
-curl -fsSL https://farm-friend.com/fft-nano/install.sh | bash -s -- --runtime host
+curl -fsSL https://get.nano-core.dev/install.sh | bash -s -- --runtime host
 ```
 
 ### All Setup Options
@@ -250,7 +250,7 @@ The `fft` CLI is the primary interface after install. When CLI linking is unavai
 | Command | Description |
 |---------|-------------|
 | `fft onboard [options]` | Run the full guided onboarding flow |
-| `fft profile <status\|set\|apply> [core\|farm]` | Show or switch operator/assistant profile |
+| `fft profile <status\|set\|apply> [core]` | Show or switch operator/assistant profile |
 | `fft start [telegram-only]` | Start the host service |
 | `fft dev [telegram-only]` | Start in development mode |
 | `fft tui [--url ws://127.0.0.1:28989] [--session main] [--deliver]` | Attach the terminal UI |
@@ -455,45 +455,6 @@ cd nano-core
 
 For Pi, `./scripts/onboard-all.sh` is the recommended install path. `./scripts/setup.sh` remains the lower-level setup/build helper if you intentionally want setup without the full onboarding flow.
 
-## Farm Onboarding (Demo vs Production)
-
-Farm onboarding uses four scripts:
-
-- `scripts/farm-bootstrap.sh`
-- `scripts/farm-demo.sh`
-- `scripts/farm-onboarding.sh`
-- `scripts/farm-validate.sh`
-
-Bootstrap contract:
-
-```bash
-./scripts/farm-bootstrap.sh \
-  --mode demo|production \
-  --dash-path /abs/path \
-  --ha-url http://localhost:8123 \
-  --open-browser yes|no \
-  --token <optional> \
-  --companion-repo https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_demo_dash.git \
-  --companion-ref <branch-or-commit>
-```
-
-Behavior:
-
-- `demo`: starts HA + telemetry simulator and validates demo path.
-- `production`: discovers entities, builds mapping profile, validates readiness.
-- Companion dashboard repo is auto-cloned/pulled if missing/clean.
-- Production control actions are blocked until validation status is `pass`.
-
-Pre-demo health check (PASS/FAIL):
-
-```bash
-npm run farm:doctor
-```
-
-Checks include Docker daemon, HA reachability/auth, `com.nano-core` runtime status, and fresh `data/farm-state/current.json` with `haConnected=true`.
-
-Details: `docs/FARM_ONBOARDING.md`
-
 ## Telegram Operations
 
 Telegram is enabled when `TELEGRAM_BOT_TOKEN` is set.
@@ -650,17 +611,24 @@ Versioning and official release flow are documented in `docs/RELEASE.md`.
 [Edit diagram](https://excalidraw.com/#json=0rOfumv4kb5ez_gK2ech9,ElC66pp_di48sBQlyj3lnA) — source at `assets/architecture.excalidraw`
 
 ```text
-Telegram/WhatsApp -> SQLite -> host router/scheduler -> containerized Pi runtime -> chat response
+Telegram/WhatsApp → pipeline dispatcher → Chat/Coding/Cron pipeline → pi-runner → chat response
 ```
 
-Core files:
+Key modules:
 
-- `src/index.ts` - channel ingestion, routing, admin command policy
+- `src/index.ts` - Orchestrator wiring (~2,100 lines): constructs services and `*Deps` objects
+- `src/pipeline/message-dispatch-pipeline.ts` - Primary message dispatch orchestrator
+- `src/pipeline/pipeline-dispatcher.ts` - Routes requests to Chat/Coding/Cron pipelines
 - `src/pi-runner.ts` - Pi subprocess launch, sandbox wiring, snapshots, runtime event emission
-- `src/sandbox.ts` - optional `bwrap`/Docker wrapping for Pi runs
-- `src/task-scheduler.ts` - scheduler mode switch (`v2` default, `legacy` fallback)
-- `src/cron/` - cron v2 adapters and timer-based scheduler service
-- `src/db.ts` - persistence
+- `src/evaluator.ts` - Post-run quality scoring with evaluator verdict persistence
+- `src/long-run-service.ts` - Durable agent runs; restart triage and recovery
+- `src/outbox.ts` - At-least-once delivery outbox with deduplication
+- `src/heartbeat-service.ts` - Periodic main-session heartbeat
+- `src/self-improve-signals.ts` - Deterministic lexical signal extraction for skill improvement
+- `src/skill-history.ts` - Skill version snapshots and rollback support
+- `src/memory-embeddings.ts` - Optional semantic re-ranking via Ollama embeddings
+- `src/streaming/` - Platform-agnostic streaming adapters (Telegram, WhatsApp)
+- `src/db.ts` - SQLite persistence
 
 ## Q&A
 

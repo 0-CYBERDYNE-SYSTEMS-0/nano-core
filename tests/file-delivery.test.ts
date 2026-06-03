@@ -4,7 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { processFileDeliveryRequest } from '../src/file-delivery.js';
+import {
+  normalizeFileDeliveryRequest,
+  processFileDeliveryRequest,
+} from '../src/file-delivery.js';
 import type { FileDeliveryRequest, RegisteredGroup } from '../src/types.js';
 
 function makeRequest(filePath: string): FileDeliveryRequest {
@@ -96,5 +99,43 @@ test('processFileDeliveryRequest rejects paths outside the source workspace', as
   assert.match(
     result.error || '',
     new RegExp(workspaceDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+  );
+});
+
+test('normalizeFileDeliveryRequest accepts file_delivery payloads', () => {
+  const normalized = normalizeFileDeliveryRequest({
+    type: 'file_delivery',
+    action: 'deliver_file',
+    requestId: 'video-1',
+    params: {
+      filePath: 'out.mp4',
+      caption: 'ready',
+      kind: 'video',
+    },
+  });
+
+  assert.deepEqual(normalized, {
+    type: 'file_delivery',
+    action: 'deliver_file',
+    requestId: 'video-1',
+    params: {
+      filePath: 'out.mp4',
+      caption: 'ready',
+      kind: 'video',
+      chatJid: undefined,
+    },
+  });
+});
+
+test('normalizeFileDeliveryRequest rejects poison payloads', () => {
+  assert.throws(
+    () =>
+      normalizeFileDeliveryRequest({
+        type: 'deliver_file',
+        action: 'something_else',
+        requestId: 'bad-1',
+        params: {},
+      }),
+    /type 'file_delivery'/,
   );
 });

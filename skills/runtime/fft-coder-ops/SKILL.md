@@ -1,11 +1,11 @@
 ---
 name: fft-coder-ops
-description: Operate nano-core coding delegation flows safely using /coder and /coder-plan, preserving main-chat-only policy, request-id tracking, and non-duplicative streaming behavior.
+description: Operate FFT_nano coding delegation flows safely using /coder and /coder-plan, preserving main-chat-only policy, request-id tracking, and non-duplicative streaming behavior.
 ---
 
 # FFT Coder Ops
 
-Use this skill when handling coding delegation operations in nano-core.
+Use this skill when handling coding delegation operations in FFT_nano.
 
 ## When to use this skill
 

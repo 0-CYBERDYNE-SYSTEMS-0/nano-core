@@ -423,7 +423,7 @@ function checkRuntimeProfile(): CheckResult {
     id: 'runtime.profile',
     level: 'pass',
     summary: 'Runtime profile resolved',
-    detail: `profile=${FFT_PROFILE} source=${PROFILE_DETECTION.source}`,
+    detail: `profile=${FFT_PROFILE} feature_farm=false source=${PROFILE_DETECTION.source}`,
   };
 }
 

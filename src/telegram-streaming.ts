@@ -1,8 +1,20 @@
-import { normalizeTelegramDraftText, type TelegramBot } from './telegram.js';
+import {
+  normalizeTelegramPreviewText,
+  splitTelegramPreviewText,
+  type TelegramBot,
+} from './telegram.js';
 import { logger } from './logger.js';
 
 export interface TelegramMessagePreviewState {
+  // Active (last) bubble id — retained for callers that take a single id.
   messageId: number;
+  // All preview bubble ids in order; a long reply spans more than one.
+  messageIds: number[];
+  // Current text rendered in each bubble (parallel to messageIds), used to
+  // skip unchanged edits.
+  bubbleTexts: string[];
+  // Full accumulated preview text (never truncated), for downstream consumers
+  // that fall back to the streamed text.
   lastText: string;
   updatedAt: number;
 }
@@ -10,6 +22,8 @@ export interface TelegramMessagePreviewState {
 export interface TelegramMessageStreamState {
   mode: 'message';
   messageId: number;
+  messageIds: number[];
+  bubbleTexts: string[];
   lastText: string;
   updatedAt: number;
 }
@@ -52,10 +66,12 @@ export function resolveTelegramStreamCompletionState(params: {
 }
 
 const RUN_STATUS_PREVIEW_PREFIXES = [
+  'Agent status:',
   'Coder status:',
   'Skill manager status:',
   'Librarian status:',
   'Run status:',
+  'Working on your reply',
 ];
 
 export function isTelegramRunStatusPreviewText(text: string): boolean {
@@ -133,14 +149,15 @@ class BaseTelegramStreamRegistry {
 
   appendToolTrail(runKey: string, entry: string): void {
     const trail = this.toolTrails.get(runKey) || [];
+    if (trail[trail.length - 1] === entry) return;
     trail.push(entry);
-    this.toolTrails.set(runKey, trail);
+    this.toolTrails.set(runKey, trail.slice(-8));
   }
 
   getToolTrailFooter(runKey: string): string | undefined {
     const trail = this.toolTrails.get(runKey);
     if (!trail || trail.length === 0) return undefined;
-    return trail.join(' → ');
+    return `Tools: ${trail.join(' → ')}`;
   }
 
   clearToolTrail(runKey: string): void {
@@ -164,6 +181,8 @@ class BaseTelegramStreamRegistry {
     return state?.mode === 'message'
       ? {
           messageId: state.messageId,
+          messageIds: [...state.messageIds],
+          bubbleTexts: [...state.bubbleTexts],
           lastText: state.lastText,
           updatedAt: state.updatedAt,
         }
@@ -174,6 +193,8 @@ class BaseTelegramStreamRegistry {
     this.streamStates.set(runKey, {
       mode: 'message',
       messageId: state.messageId,
+      messageIds: [...state.messageIds],
+      bubbleTexts: [...state.bubbleTexts],
       lastText: state.lastText,
       updatedAt: state.updatedAt,
     });
@@ -205,6 +226,8 @@ class BaseTelegramStreamRegistry {
     return state?.mode === 'message'
       ? {
           messageId: state.messageId,
+          messageIds: [...state.messageIds],
+          bubbleTexts: [...state.bubbleTexts],
           lastText: state.lastText,
           updatedAt: state.updatedAt,
         }
@@ -288,66 +311,92 @@ export async function updateTelegramPreview(params: {
 
   try {
     const now = Date.now();
-    const baseText = normalizeTelegramDraftText(params.text);
-    const nextText = params.toolTrailFooter
-      ? `${baseText}\n\n${params.toolTrailFooter}`
-      : baseText;
+    const footer = params.toolTrailFooter
+      ? `\n\n${params.toolTrailFooter}`
+      : '';
+    const fullText = params.text.replace(/\r\n/g, '\n');
     const state = params.registry.getStreamState(runKey);
     if (state?.mode === 'draft') {
       params.registry.clearDraftState(runKey);
     }
+    const existing = state?.mode === 'message' ? state : undefined;
 
-    if (
-      (!state || state.mode !== 'message') &&
-      nextText.length < MIN_PREVIEW_CHARS
-    ) {
+    // Split into bubble-sized bodies; the tool-trail footer rides the last
+    // bubble only so it follows the live tail without being duplicated.
+    const bodies = splitTelegramPreviewText(fullText);
+    if (bodies.length === 0) {
+      return { runKey, sent: false, disabled: false };
+    }
+    const targetTexts = bodies.map((body, i) =>
+      i === bodies.length - 1 ? `${body}${footer}` : body,
+    );
+
+    if (!existing && fullText.length + footer.length < MIN_PREVIEW_CHARS) {
       return { runKey, sent: false, disabled: false };
     }
 
-    if (state?.mode === 'message' && state.lastText === nextText) {
-      params.registry.setStreamState(runKey, { ...state, updatedAt: now });
+    const ids = existing ? [...existing.messageIds] : [];
+    const prevTexts = existing ? [...existing.bubbleTexts] : [];
+
+    const unchanged =
+      existing !== undefined &&
+      ids.length === targetTexts.length &&
+      targetTexts.every((text, i) => prevTexts[i] === text);
+    if (unchanged) {
+      params.registry.setStreamState(runKey, { ...existing, updatedAt: now });
       return {
         runKey,
         sent: false,
         disabled: false,
-        messageId: state.messageId,
+        messageId: ids[ids.length - 1],
       };
     }
 
-    if (state?.mode === 'message') {
-      await params.bot.editStreamMessage(
-        params.chatJid,
-        state.messageId,
-        nextText,
-      );
+    // Mirrors `ids`; persisted after each delivery so a transient failure
+    // mid-pagination never re-sends an already-delivered bubble on retry.
+    const committedTexts = [...prevTexts];
+    const persistProgress = () => {
       params.registry.setStreamState(runKey, {
         mode: 'message',
-        messageId: state.messageId,
-        lastText: nextText,
-        updatedAt: now,
+        messageId: ids[ids.length - 1],
+        messageIds: ids,
+        bubbleTexts: committedTexts,
+        lastText: fullText,
+        updatedAt: Date.now(),
       });
-      params.registry.clearFailures(runKey);
-      return {
-        runKey,
-        sent: true,
-        disabled: false,
-        messageId: state.messageId,
-      };
+    };
+
+    let sentAny = false;
+    for (let i = 0; i < targetTexts.length; i++) {
+      const text = targetTexts[i];
+      if (i < ids.length) {
+        if (committedTexts[i] !== text) {
+          await params.bot.editStreamMessage(params.chatJid, ids[i], text);
+          committedTexts[i] = text;
+          persistProgress();
+          sentAny = true;
+        }
+      } else {
+        const id = await params.bot.sendStreamMessage(params.chatJid, text);
+        ids.push(id);
+        committedTexts.push(text);
+        persistProgress();
+        sentAny = true;
+      }
     }
 
-    const messageId = await params.bot.sendStreamMessage(
-      params.chatJid,
-      nextText,
-    );
-    params.registry.setStreamState(runKey, {
-      mode: 'message',
-      messageId,
-      lastText: nextText,
-      updatedAt: now,
-    });
+    const activeId = ids[ids.length - 1];
     params.registry.clearFailures(runKey);
-    const pendingReaction = params.registry.consumePendingReaction(runKey);
-    return { runKey, sent: true, disabled: false, messageId, pendingReaction };
+    const pendingReaction = existing
+      ? undefined
+      : params.registry.consumePendingReaction(runKey);
+    return {
+      runKey,
+      sent: sentAny,
+      disabled: false,
+      messageId: activeId,
+      pendingReaction,
+    };
   } catch (err) {
     const failure = params.registry.recordFailure(runKey);
     return {
@@ -385,7 +434,7 @@ export async function updateTelegramDraftPreview(params: {
 
   try {
     const now = Date.now();
-    const baseText = normalizeTelegramDraftText(params.text);
+    const baseText = normalizeTelegramPreviewText(params.text);
     const nextText = params.toolTrailFooter
       ? `${baseText}\n\n${params.toolTrailFooter}`
       : baseText;

@@ -19,7 +19,6 @@ interface RuntimeResponse {
   runtime: { runtime: string; sessions: number; activeRuns: number };
   profile: {
     profile: string;
-    featureFarm: boolean;
     profileDetection: { source: string; reason: string };
   };
   build: {
@@ -592,7 +591,6 @@ export function App(): JSX.Element {
           <article className="panel stat">
             <h2>Profile</h2>
             <div className="stat-value">{runtime?.profile.profile || '-'}</div>
-            <p>farm {runtime?.profile.featureFarm ? 'on' : 'off'}</p>
             <p>{runtime?.profile.profileDetection.source || '-'}</p>
           </article>
           <article className="panel stat">

@@ -46,7 +46,7 @@ function writeRegisteredGroups(
     payload[group.jid] = {
       folder: group.folder,
       name: group.jid,
-      trigger: '@nano-core',
+      trigger: '@FarmFriend',
     };
   }
   fs.writeFileSync(

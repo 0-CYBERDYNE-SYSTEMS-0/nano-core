@@ -12,7 +12,7 @@ import { loadJson, saveJson } from './utils.js';
 export const TELEGRAM_JID_PREFIX = 'telegram:';
 const TELEGRAM_MAX_MESSAGE_LEN = 4096;
 const TELEGRAM_SAFE_MESSAGE_LEN = 4000;
-const TELEGRAM_DRAFT_PREFIX = '...';
+const TELEGRAM_PREVIEW_OVERFLOW_SUFFIX = '…';
 const TELEGRAM_PARSE_ERROR_RE =
   /can't parse entities|parse entities|find end of the entity/i;
 const TELEGRAM_MESSAGE_TOO_LONG_RE = /message is too long/i;
@@ -517,16 +517,30 @@ export function splitTelegramTextForHtmlLimit(
   return output;
 }
 
-export function normalizeTelegramDraftText(text: string): string {
+export function normalizeTelegramPreviewText(text: string): string {
   const normalized = text.replace(/\r\n/g, '\n');
   if (!normalized) return '.';
   if (normalized.length <= TELEGRAM_MAX_MESSAGE_LEN) return normalized;
-  const suffixLen = Math.max(
+  // Last-resort guard for a single bubble that still overflows (e.g. one
+  // unbreakable token). Keep the HEAD so the message never begins mid-word;
+  // pagination in updateTelegramPreview normally prevents reaching this path.
+  const headLen = Math.max(
     1,
-    TELEGRAM_MAX_MESSAGE_LEN - TELEGRAM_DRAFT_PREFIX.length,
+    TELEGRAM_MAX_MESSAGE_LEN - TELEGRAM_PREVIEW_OVERFLOW_SUFFIX.length,
   );
-  return `${TELEGRAM_DRAFT_PREFIX}${normalized.slice(-suffixLen)}`;
+  return `${normalized.slice(0, headLen)}${TELEGRAM_PREVIEW_OVERFLOW_SUFFIX}`;
 }
+
+// Split a streaming preview body into bubble-sized pieces. Previews are sent as
+// plain text (no parse_mode), so the limit applies to raw length. Returns []
+// for empty input so callers can skip delivery.
+export function splitTelegramPreviewText(text: string): string[] {
+  const normalized = text.replace(/\r\n/g, '\n');
+  if (!normalized) return [];
+  return splitTelegramText(normalized, TELEGRAM_SAFE_MESSAGE_LEN);
+}
+
+export const normalizeTelegramDraftText = normalizeTelegramPreviewText;
 
 export interface TelegramDraftOptions {
   messageThreadId?: number;
@@ -1187,7 +1201,7 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
     await apiPostWithRetry('sendMessageDraft', {
       chat_id: chatId,
       draft_id: draftId,
-      text: normalizeTelegramDraftText(text),
+      text: normalizeTelegramPreviewText(text),
       ...(typeof opts.messageThreadId === 'number' &&
       Number.isFinite(opts.messageThreadId)
         ? { message_thread_id: Math.trunc(opts.messageThreadId) }
@@ -1208,7 +1222,7 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
       'sendMessage',
       {
         chat_id: chatId,
-        text: normalizeTelegramDraftText(text),
+        text: normalizeTelegramPreviewText(text),
         disable_web_page_preview: true,
         ...(typeof opts.messageThreadId === 'number' &&
         Number.isFinite(opts.messageThreadId)
@@ -1242,7 +1256,7 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
       await apiPostWithRetry('editMessageText', {
         chat_id: chatId,
         message_id: messageId,
-        text: normalizeTelegramDraftText(text),
+        text: normalizeTelegramPreviewText(text),
         disable_web_page_preview: true,
         ...(typeof opts.messageThreadId === 'number' &&
         Number.isFinite(opts.messageThreadId)
@@ -1299,7 +1313,7 @@ export function createTelegramBot(opts: TelegramBotOptions): TelegramBot {
       await apiPostWithRetry('editMessageText', {
         chat_id: chatId,
         message_id: messageId,
-        text: normalizeTelegramDraftText(text),
+        text: normalizeTelegramPreviewText(text),
         disable_web_page_preview: true,
         reply_markup: buildReplyMarkup(keyboard),
       });

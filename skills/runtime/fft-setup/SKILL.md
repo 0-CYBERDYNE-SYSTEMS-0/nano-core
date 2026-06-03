@@ -1,94 +1,30 @@
 ---
 name: fft-setup
-description: Setup and bootstrap nano-core on macOS or Linux, including container runtime checks, dependency install/build, env wiring for Pi provider credentials, and first-run startup validation.
+description: Verify host prereqs (node, npm, container runtime) before running nano-core. Use when a user asks whether their machine can run nano-core, or when troubleshooting first-run setup failures.
 ---
 
-# FFT Setup
+# fft-setup
 
-Use this skill when the task is to install, bootstrap, or verify nano-core runtime setup.
+Host prereq checker for nano-core.
 
 ## When to use this skill
 
-- Use for initial host install/bootstrap and dependency checks.
-- Use when configuring provider credentials and runtime environment wiring.
-- Use for first-run startup verification on Telegram/WhatsApp paths.
+- Use when an operator asks "can I run nano-core on this machine" or "what's missing".
+- Use when a first-run setup fails and the cause is unclear.
 
 ## When not to use this skill
 
-- Do not use for normal day-2 operations or live farm control.
-- Do not use for pure code changes unrelated to environment setup.
-- Do not use when the user only wants runtime troubleshooting; use debug skill.
-
-## Scope
-
-- Host prerequisites (Node 20+, npm, runtime mode)
-- First-time bootstrap via project scripts
-- Provider/env setup for Pi runtime inside the container
-- First run validation for Telegram and/or WhatsApp
+- Do not use for general node/npm installation help — link the user to upstream docs.
 
 ## Guardrails
 
-- Never run destructive git commands (`git reset --hard`, `git checkout --`, force-push) unless explicitly requested.
+- Never run destructive git commands unless explicitly requested.
 - Preserve unrelated worktree changes.
-- Keep admin/delegation operations constrained to the main chat only.
+- Main/admin chat only for privileged actions.
+- Read-only diagnostic: do not install or upgrade anything.
 
-## Setup Flow
+## Workflow
 
-1. Verify prerequisites:
-   - `node -v` (must be v20+)
-   - `npm -v`
-   - Docker mode: `docker --version`
-   - Host mode (advanced): `CONTAINER_RUNTIME=host` + `FFT_NANO_ALLOW_HOST_RUNTIME=1`
-2. Bootstrap with project script:
-   - `./scripts/setup.sh`
-3. Populate `.env` from `.env.example` and fill provider vars.
-4. If WhatsApp is enabled, run one-time auth:
-   - `npm run auth`
-5. Start service:
-   - Dev: `./scripts/start.sh dev`
-   - Dev Telegram-only: `./scripts/start.sh dev telegram-only`
-   - Prod: `./scripts/start.sh start`
-
-## Provider Wiring (Pi runtime in container)
-
-Preferred variables in `.env`:
-
-- `PI_API`
-- `PI_MODEL`
-- `PI_API_KEY` (or provider-specific keys like `ZAI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`)
-- Optional: `PI_BASE_URL`
-
-Example (Z.AI/GLM):
-
-```dotenv
-PI_API=zai
-PI_MODEL=glm-4.7
-ZAI_API_KEY=replace-me
-```
-
-## Platform Notes
-
-### macOS
-
-- Runtime uses Docker by default.
-- Ensure Docker daemon is running:
-  - `docker info`
-- Optional unisolated host runtime requires explicit opt-in:
-  - `CONTAINER_RUNTIME=host`
-  - `FFT_NANO_ALLOW_HOST_RUNTIME=1`
-
-### Linux
-
-- Runtime uses Docker by default.
-- Ensure daemon is running before start:
-  - `docker info`
-
-## Setup Verification Checklist
-
-- `npm run typecheck` passes.
-- `npm test` passes.
-- Service starts without startup exceptions.
-- Telegram mode: `/status` responds.
-- Main chat behavior is correct:
-  - main chat responds to normal messages
-  - non-main chat requires `@nano-core` (or configured `@<ASSISTANT_NAME>`)
+1. Run `bash scripts/check-prereqs.sh` from the operator's checkout root.
+2. Report which prereqs are missing (if any).
+3. If the only failure is the container runtime, suggest Docker install steps or the `NANO_CORE_ALLOW_HOST_RUNTIME=1` env override (set explicitly, never default).

@@ -103,6 +103,15 @@ export interface AppRuntimeDeps {
   startHeartbeatLoop?: () => void;
   maybeRunBootMdOnce?: () => void;
   getContainerRuntime?: () => string;
+  resumeRecoverableLongRuns?: () => Promise<{
+    resumed: number;
+    abandoned: number;
+  }>;
+  flushDeliveryOutbox?: () => Promise<{
+    delivered: number;
+    stillPending: number;
+  }>;
+  runCuratorTick?: () => void;
 }
 
 export function createAppRuntime(deps: AppRuntimeDeps): {
@@ -116,7 +125,9 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
   main: () => Promise<void>;
 } {
   const PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1000; // every 6 hours
+  const CURATOR_TICK_INTERVAL_MS = 60 * 60 * 1000; // hourly idle check
   let pruneTimer: ReturnType<typeof setInterval> | null = null;
+  let curatorTimer: ReturnType<typeof setInterval> | null = null;
   let groupSyncTimer: ReturnType<typeof setInterval> | null = null;
 
   function startPruneLoop(): void {
@@ -131,6 +142,24 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
     if (pruneTimer !== null) {
       clearInterval(pruneTimer);
       pruneTimer = null;
+    }
+  }
+
+  // Idle curator: ticks hourly and runs skill-manager maintenance only when the
+  // host has been idle long enough (enforced by shouldRunSkillManager via
+  // minIdleHours), so curation happens independent of user traffic.
+  function startCuratorLoop(): void {
+    if (!deps.runCuratorTick) return;
+    curatorTimer = setInterval(() => {
+      deps.runCuratorTick?.();
+    }, CURATOR_TICK_INTERVAL_MS);
+    curatorTimer.unref?.();
+  }
+
+  function stopCuratorLoop(): void {
+    if (curatorTimer !== null) {
+      clearInterval(curatorTimer);
+      curatorTimer = null;
     }
   }
 
@@ -434,7 +463,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
         '║  2. Start the Docker daemon                                    ║',
       );
       console.error(
-        '║  3. Restart nano-core                                          ║',
+        '║  3. Restart nano-core                                         ║',
       );
       console.error(
         '╚════════════════════════════════════════════════════════════════╝\n',
@@ -477,6 +506,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
     exitCode: number,
   ): Promise<void> {
     stopPruneLoop();
+    stopCuratorLoop();
     stopDomainServicesForShutdown(signal);
     await deps.stopWebControlCenterService?.();
     await deps.stopTuiGatewayService?.();
@@ -514,6 +544,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
   async function main(): Promise<void> {
     registerShutdownHandlers();
     startPruneLoop();
+    startCuratorLoop();
     if (
       deps.constants.heartbeatActiveHoursRaw?.trim() &&
       deps.isWithinHeartbeatActiveHoursInvalid
@@ -552,7 +583,10 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
       return;
     }
     const telegramEnabled = !!deps.constants.telegramBotToken;
-    if (deps.constants.whatsappEnabled === false && !telegramEnabled) {
+    if (
+      deps.constants.whatsappEnabled === false &&
+      !telegramEnabled
+    ) {
       throw new Error(
         'No channels enabled. Set WHATSAPP_ENABLED=1 and/or TELEGRAM_BOT_TOKEN.',
       );
@@ -577,6 +611,30 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
       deps.startHeartbeatLoop?.();
     } else {
       deps.logger.info?.('WhatsApp disabled (WHATSAPP_ENABLED=0)');
+    }
+    // Re-attempt any outbox entries left undelivered by a prior crash now that
+    // delivery channels are up (at-least-once for cron announces).
+    if (deps.flushDeliveryOutbox) {
+      try {
+        const flushed = await deps.flushDeliveryOutbox();
+        if (flushed.delivered > 0 || flushed.stillPending > 0) {
+          deps.logger.info?.(flushed, 'Flushed pending delivery outbox');
+        }
+      } catch (err) {
+        deps.logger.warn?.({ err }, 'Delivery outbox flush failed');
+      }
+    }
+    // Resume long runs preserved by startup triage now that state is loaded and
+    // delivery channels are up, so resumed runs can stream/deliver normally.
+    if (deps.resumeRecoverableLongRuns) {
+      try {
+        const outcome = await deps.resumeRecoverableLongRuns();
+        if (outcome.resumed > 0 || outcome.abandoned > 0) {
+          deps.logger.info?.(outcome, 'Resumed interrupted long runs');
+        }
+      } catch (err) {
+        deps.logger.warn?.({ err }, 'Long-run resume consumer failed');
+      }
     }
     deps.maybeRunBootMdOnce?.();
   }
