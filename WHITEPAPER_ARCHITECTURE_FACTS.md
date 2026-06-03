@@ -1,10 +1,10 @@
-# FFT Nano — Whitepaper Architecture Facts
+# nano-core — Whitepaper Architecture Facts
 
-**Version:** 0.1.0
+**Version:** 0.4.0
 **Repository:** https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git
 **License:** MIT
 **Runtime:** Node.js >= 20, TypeScript, ESM
-**Codebase:** 88 TypeScript source files, 9,333 lines across the three core modules alone
+**Codebase:** Decomposed single-host runtime — message-dispatch-pipeline + pipeline-dispatcher + durable long-run service + delivery outbox + skill history/self-improve signals + semantic-memory re-rank + telegram streaming preview pagination (v0.4.0 release).
 
 ---
 
@@ -20,14 +20,11 @@
 | `autoresearch-create` | Create autonomous experiment/research loops |
 | `autoresearch-finalize` | Finalize and package research results |
 | `fft-coder-ops` | Coding agent orchestration (plan, execute, worktree management) |
-| `fft-dashboard-ops` | Dashboard deployment and management |
 | `fft-debug` | Debug snapshot collection and diagnostics |
-| `fft-farm-bootstrap` | Farm operation initial setup |
-| `fft-farm-onboarding` | Farm onboarding workflows |
-| `fft-farm-ops` | Day-to-day farm operations |
-| `fft-setup` | Prerequisite checking and installation |
+| `fft-setup` | Host prereq verification (node, npm, container runtime) |
 | `fft-telegram-ops` | Telegram bot management commands |
 | `rapid-research` | Quick research with templates and source logs |
+| `web-search` | Web search via local Ollama / external providers |
 
 **Evidence:** `ls skills/runtime/` — 12 directories each with `SKILL.md`
 
