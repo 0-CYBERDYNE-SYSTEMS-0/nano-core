@@ -37,7 +37,7 @@ OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-}"
 # Optional configuration
 OPERATOR_NAME="${OPERATOR_NAME:-Admin}"
 ASSISTANT_NAME="${ASSISTANT_NAME:-FFT-Agent}"
-FFT_REPO="${FFT_REPO:-https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git}"
+FFT_REPO="${FFT_REPO:-https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano.git}"
 FFT_BRANCH="${FFT_BRANCH:-main}"
 INSTALL_DIR="${INSTALL_DIR:-/opt/fft_nano}"
 

@@ -3,9 +3,9 @@
 This checkout is generated from the shared/core surface of `FFT_nano`.
 
 - Source repo: https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core
-- Source commit: v0.4.0
+- Source commit: 404193906da89a437537b880fb95f9c2da04a11b
 - Workflow run: local-manual-sync
-- Generated at: 2026-05-31T19:56:40.666Z
+- Generated at: 2026-06-02T17:50:31.488Z
 
 ## Skipped Source Files
 

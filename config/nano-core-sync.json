@@ -47,19 +47,19 @@
   "skipForbiddenFiles": true,
   "textReplacements": [
     {
-      "from": "https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano.git",
+      "from": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git",
       "to": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git"
     },
     {
-      "from": "https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano",
+      "from": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core",
       "to": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core"
     },
     {
-      "from": "https://farm-friend.com/fft-nano/",
+      "from": "https://farm-friend.com/nano-core/",
       "to": "https://farm-friend.com/nano-core/"
     },
     {
-      "from": "https://farm-friend.com/fft-nano",
+      "from": "https://farm-friend.com/nano-core",
       "to": "https://farm-friend.com/nano-core"
     }
   ],

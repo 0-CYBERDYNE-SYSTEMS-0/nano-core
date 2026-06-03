@@ -49,7 +49,7 @@ done
 if [[ -n "$out" ]]; then
   printf 'stub archive\\n' > "$out"
 else
-  printf 'https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core/releases/tag/vtest\\n'
+  printf 'https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano/releases/tag/vtest\\n'
 fi
 `,
   );

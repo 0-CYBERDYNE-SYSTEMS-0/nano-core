@@ -98,10 +98,10 @@ test('sync rewrites package metadata for nano-core', () => {
         description: 'old description',
         repository: {
           type: 'git',
-          url: 'https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano.git',
+          url: 'https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git',
         },
-        bugs: { url: 'https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano/issues' },
-        homepage: 'https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano#readme',
+        bugs: { url: 'https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core/issues' },
+        homepage: 'https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core#readme',
         bin: { fft: './bin/fft.js' },
       },
       null,
