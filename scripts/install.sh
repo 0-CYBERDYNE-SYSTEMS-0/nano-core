@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="${FFT_NANO_REPO:-0-CYBERDYNE-SYSTEMS-0/FFT_nano}"
+REPO="${FFT_NANO_REPO:-0-CYBERDYNE-SYSTEMS-0/nano-core}"
 REF="${FFT_NANO_REF:-latest}"
-INSTALL_DIR="${FFT_NANO_INSTALL_DIR:-$HOME/FFT_nano}"
+INSTALL_DIR="${FFT_NANO_INSTALL_DIR:-$HOME/nano-core}"
 FORCE="${FFT_NANO_FORCE:-0}"
 AUTO_LINK="${FFT_NANO_AUTO_LINK:-1}"
 
@@ -87,7 +87,7 @@ install_node_linux() {
   fi
   say "Installing Node.js 20..."
   local tmp
-  tmp="$(mktemp -t fft-nano-node-setup.XXXXXX)"
+  tmp="$(mktemp -t nano-core-node-setup.XXXXXX)"
   curl -fsSL https://deb.nodesource.com/setup_20.x -o "$tmp"
   run_privileged bash "$tmp"
   rm -f "$tmp"
@@ -205,7 +205,7 @@ download_archive() {
     url="https://github.com/${REPO}/archive/${ref}.tar.gz"
   fi
 
-  say "Downloading FFT_nano ${ref}..."
+  say "Downloading nano-core ${ref}..."
   curl -fsSL "$url" -o "$out"
 }
 
@@ -220,7 +220,7 @@ set_env_value() {
   local key="$2"
   local value="$3"
   local tmp
-  tmp="$(mktemp -t fft-nano-env.XXXXXX)"
+  tmp="$(mktemp -t nano-core-env.XXXXXX)"
 
   if [[ -f "$file" ]]; then
     awk -v key="$key" -v value="$value" '
@@ -278,7 +278,7 @@ seed_env_from_shell() {
 }
 
 main() {
-  say "FFT_nano installer"
+  say "nano-core installer"
   say "Install directory: ${INSTALL_DIR}"
 
   if is_termux; then
@@ -326,14 +326,14 @@ main() {
 
   local resolved_ref archive tmpdir extracted
   resolved_ref="$(resolve_ref)"
-  tmpdir="$(mktemp -d -t fft-nano-install.XXXXXX)"
-  archive="$tmpdir/fft_nano.tar.gz"
+  tmpdir="$(mktemp -d -t nano-core-install.XXXXXX)"
+  archive="$tmpdir/nano-core.tar.gz"
   download_archive "$resolved_ref" "$archive"
 
   mkdir -p "$(dirname "$INSTALL_DIR")"
   tar -xzf "$archive" -C "$tmpdir"
-  extracted="$(find "$tmpdir" -mindepth 1 -maxdepth 1 -type d -name 'FFT_nano-*' -print -quit)"
-  [[ -n "$extracted" ]] || fail "Downloaded archive did not contain an FFT_nano source directory."
+  extracted="$(find "$tmpdir" -mindepth 1 -maxdepth 1 -type d -name 'nano-core-*' -print -quit)"
+  [[ -n "$extracted" ]] || fail "Downloaded archive did not contain a nano-core source directory."
   if [[ -d "$INSTALL_DIR" ]]; then
     rmdir "$INSTALL_DIR"
   fi
@@ -356,7 +356,7 @@ main() {
     build_termux_user_args "$@"
     ./scripts/onboard-all.sh "${runtime_args[@]}" "${TERMUX_USER_ARGS[@]}"
     say ""
-    say "Termux install complete. Run FFT_nano in the foreground from ${INSTALL_DIR}:"
+    say "Termux install complete. Run nano-core in the foreground from ${INSTALL_DIR}:"
     say "  ./scripts/start.sh start"
     say "Keep the Termux session running; Android daemon persistence is not installed."
   else

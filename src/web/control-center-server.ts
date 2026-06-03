@@ -559,10 +559,15 @@ export async function startWebControlCenterServer(
   options: WebControlCenterServerOptions,
 ): Promise<WebControlCenterServer> {
   const authToken = options.authToken.trim();
-  const authRequired = options.accessMode !== 'localhost';
+  const isLoopbackHost =
+    options.host === '127.0.0.1' ||
+    options.host === '::1' ||
+    options.host === 'localhost';
+  const authRequired =
+    options.accessMode !== 'localhost' || !isLoopbackHost;
   if (authRequired && !authToken) {
     throw new Error(
-      'FFT_NANO_WEB_ACCESS_MODE is lan/remote but FFT_NANO_WEB_AUTH_TOKEN is empty.',
+      'FFT_NANO_WEB_ACCESS_MODE is lan/remote or FFT_NANO_WEB_HOST is non-loopback, but FFT_NANO_WEB_AUTH_TOKEN is empty.',
     );
   }
 

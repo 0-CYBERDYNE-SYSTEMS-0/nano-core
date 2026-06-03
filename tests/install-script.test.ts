@@ -70,7 +70,7 @@ while [[ "$#" -gt 0 ]]; do
       ;;
   esac
 done
-root="$dest/FFT_nano-vtest"
+root="$dest/nano-core-vtest"
 mkdir -p "$root/scripts"
 cat > "$root/.env.example" <<'ENV'
 PI_API=replace-me

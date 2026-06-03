@@ -375,11 +375,11 @@ scaffold_mount_allowlist() {
 
 install_cli_launcher() {
   local bin_dir="${FFT_NANO_USER_BIN_DIR:-${HOME}/.local/bin}"
-  local launcher="${bin_dir}/fft"
+  local launcher="${bin_dir}/nano"
   mkdir -p "$bin_dir"
   {
     printf '#!/usr/bin/env bash\n'
-    printf 'exec node %q --repo %q "$@"\n' "${ROOT_DIR}/bin/fft.js" "$ROOT_DIR"
+    printf 'exec node %q --repo %q "$@"\n' "${ROOT_DIR}/bin/nano.js" "$ROOT_DIR"
   } >"$launcher"
   chmod +x "$launcher"
   say "CLI launcher installed: $launcher"
@@ -404,8 +404,8 @@ install_cli_launcher() {
 
   mkdir -p "$(dirname "$profile")"
   touch "$profile"
-  if grep -Fq "# >>> FFT_nano CLI >>>" "$profile"; then
-    say "PATH profile already contains FFT_nano CLI block: $profile"
+  if grep -Fq "# >>> nano-core CLI >>>" "$profile"; then
+    say "PATH profile already contains nano-core CLI block: $profile"
     return
   fi
 
@@ -416,7 +416,7 @@ install_cli_launcher() {
 
   {
     printf '\n'
-    printf '# >>> FFT_nano CLI >>>\n'
+    printf '# >>> nano-core CLI >>>\n'
     printf 'export PATH="%s:$PATH"\n' "$path_entry"
     printf '# <<< FFT_nano CLI <<<\n'
   } >>"$profile"
