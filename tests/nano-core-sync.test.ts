@@ -102,7 +102,7 @@ test('sync rewrites package metadata for nano-core', () => {
         },
         bugs: { url: 'https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core/issues' },
         homepage: 'https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core#readme',
-        bin: { fft: './bin/fft.js' },
+        bin: { nano: './bin/nano.js' },
       },
       null,
       2,
