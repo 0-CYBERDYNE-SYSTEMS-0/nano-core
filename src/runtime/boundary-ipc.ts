@@ -15,7 +15,9 @@ export interface BoundaryEnvelope<TPayload = unknown> {
 }
 
 export interface BoundaryActionEnvelope<
-  TPayload extends MemoryActionRequest | SkillActionRequest =
+  TPayload extends
+    | MemoryActionRequest
+    | SkillActionRequest =
     | MemoryActionRequest
     | SkillActionRequest,
 > extends BoundaryEnvelope<TPayload> {

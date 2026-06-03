@@ -2,63 +2,19 @@ import os from 'os';
 import path from 'path';
 
 import { PARITY_CONFIG, PARITY_CONFIG_PATH } from './parity-config.js';
+import {
+  FEATURE_FARM,
+  FFT_PROFILE,
+  PROFILE_DETECTION,
+  type FFTProfile,
+} from './profile.js';
 
-// ── Profile detection ─────────────────────────────────────────────────────────
-
-export type FFTProfile = 'core' | 'farm';
-
-export interface ProfileDetection {
-  source: 'env' | 'auto_preserve' | 'default';
-  reason: string;
-}
-
-function parseBool(value: string | undefined): boolean | null {
-  if (typeof value !== 'string') return null;
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) return null;
-  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
-  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
-  return null;
-}
-
-function normalizeProfile(value: string | undefined): FFTProfile | null {
-  if (typeof value !== 'string') return null;
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'core' || normalized === 'farm') return normalized;
-  return null;
-}
-
-function resolveProfile(): {
-  profile: FFTProfile;
-  detection: ProfileDetection;
-} {
-  const explicit = normalizeProfile(process.env.FFT_PROFILE);
-  if (explicit) {
-    return {
-      profile: explicit,
-      detection: { source: 'env', reason: `FFT_PROFILE=${explicit}` },
-    };
-  }
-
-  return {
-    profile: 'core',
-    detection: {
-      source: 'default',
-      reason: 'profile detection complete',
-    },
-  };
-}
-
-const _profileResolution = resolveProfile();
-
-// Hardcode to 'core' at runtime
-export const FFT_PROFILE: FFTProfile = 'core';
-export const PROFILE_DETECTION: ProfileDetection = _profileResolution.detection;
-export const FEATURE_FARM: boolean = false;
+export type { FFTProfile };
+export type ProfileDetection = typeof PROFILE_DETECTION;
 
 // ── Core config ───────────────────────────────────────────────────────────────
 
-const DEFAULT_ASSISTANT_NAME = 'fft_nano';
+const DEFAULT_ASSISTANT_NAME = 'nano-core';
 
 export const ASSISTANT_NAME =
   process.env.ASSISTANT_NAME || DEFAULT_ASSISTANT_NAME;
@@ -84,7 +40,7 @@ function expandHomePath(input: string): string {
 export const MOUNT_ALLOWLIST_PATH = path.join(
   HOME_DIR,
   '.config',
-  'fft_nano',
+  'nano-core',
   'mount-allowlist.json',
 );
 export const STORE_DIR = path.resolve(PROJECT_ROOT, 'store');
@@ -319,3 +275,4 @@ export const FFT_NANO_PROVIDER_FALLBACK_ENABLED = envFlag(
 );
 
 export { PARITY_CONFIG, PARITY_CONFIG_PATH };
+export { FEATURE_FARM, FFT_PROFILE, PROFILE_DETECTION };

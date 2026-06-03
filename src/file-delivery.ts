@@ -68,13 +68,9 @@ export function normalizeFileDeliveryRequest(
   }
 
   const request = raw as Record<string, any>;
-  const isCanonical =
-    request.type === 'file_delivery' && request.action === 'deliver_file';
-  const isLegacy =
-    request.type === 'deliver_file' && request.action === 'deliver_file';
-  if (!isCanonical && !isLegacy) {
+  if (request.type !== 'file_delivery') {
     throw new Error(
-      'File delivery request must be file_delivery deliver_file or legacy deliver_file',
+      "File delivery request must have type 'file_delivery'",
     );
   }
   if (typeof request.requestId !== 'string' || !request.requestId.trim()) {

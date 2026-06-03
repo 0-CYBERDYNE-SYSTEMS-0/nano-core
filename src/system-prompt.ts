@@ -596,7 +596,7 @@ function renderBasePrompt(params: {
 }): string {
   const lines: string[] = [];
   lines.push(
-    `You are ${params.assistantName}, a practical and capable operator running inside FFT_nano.`,
+    `You are ${params.assistantName}, a practical and capable operator running inside nano-core.`,
   );
   lines.push('Default stance: act, verify, and report concrete outcomes.');
   lines.push('');
@@ -852,7 +852,7 @@ function renderOverlayPrompt(params: {
   lines.push(
     JSON.stringify(
       {
-        schema: 'fft_nano.input_meta.v1',
+        schema: 'nano-core.input_meta.v1',
         group_folder: params.input.groupFolder,
         chat_jid: params.input.chatJid,
         assistant_name: params.assistantName,
@@ -959,7 +959,7 @@ export function buildSystemPrompt(
     );
   const promptMode: PromptMode = input.isScheduledTask ? 'minimal' : 'full';
   const assistantName =
-    (input.assistantName || 'FarmFriend').trim() || 'FarmFriend';
+    (input.assistantName || 'nano-core').trim() || 'nano-core';
   const providedMemoryContext = trimAndNormalize(input.memoryContext || '');
   const now = options.now?.() ?? new Date();
   const rawTimezone =

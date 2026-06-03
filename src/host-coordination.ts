@@ -42,10 +42,7 @@ import { executeMemoryAction } from './memory-action-gateway.js';
 import { executeSkillAction } from './skill-lifecycle.js';
 import { writeJsonFileAtomic } from './atomic-write.js';
 import type { StatusTelemetry } from './status-report.js';
-import type {
-  MemoryActionRequest,
-  SkillActionRequest,
-} from './types.js';
+import type { MemoryActionRequest, SkillActionRequest } from './types.js';
 import type { CronV2Schedule } from './cron/types.js';
 import {
   resolveCronExecutionPlan,
@@ -59,6 +56,7 @@ export interface HostCoordinationDeps {
     chatJid: string,
     messageId: number,
     text: string,
+    messageIds?: number[],
   ) => Promise<boolean>;
   sendAgentResultMessage: (
     chatJid: string,
@@ -219,6 +217,7 @@ export async function deliverRuntimeAgentMessage(
         params.chatJid,
         previewState.messageId,
         params.text,
+        previewState.messageIds,
       );
       if (!finalized) {
         await deps.sendTelegramAgentReply(params.chatJid, params.text);

@@ -12,7 +12,7 @@ import type { FileDeliveryRequest, RegisteredGroup } from '../src/types.js';
 
 function makeRequest(filePath: string): FileDeliveryRequest {
   return {
-    type: 'farm_action',
+    type: 'file_delivery',
     action: 'deliver_file',
     requestId: `deliver-${Date.now().toString(36)}`,
     params: {
@@ -102,11 +102,11 @@ test('processFileDeliveryRequest rejects paths outside the source workspace', as
   );
 });
 
-test('normalizeFileDeliveryRequest accepts legacy deliver_file payloads', () => {
+test('normalizeFileDeliveryRequest accepts file_delivery payloads', () => {
   const normalized = normalizeFileDeliveryRequest({
-    type: 'deliver_file',
+    type: 'file_delivery',
     action: 'deliver_file',
-    requestId: 'legacy-video-1',
+    requestId: 'video-1',
     params: {
       filePath: 'out.mp4',
       caption: 'ready',
@@ -117,7 +117,7 @@ test('normalizeFileDeliveryRequest accepts legacy deliver_file payloads', () => 
   assert.deepEqual(normalized, {
     type: 'file_delivery',
     action: 'deliver_file',
-    requestId: 'legacy-video-1',
+    requestId: 'video-1',
     params: {
       filePath: 'out.mp4',
       caption: 'ready',
@@ -136,6 +136,6 @@ test('normalizeFileDeliveryRequest rejects poison payloads', () => {
         requestId: 'bad-1',
         params: {},
       }),
-    /File delivery request must be file_delivery deliver_file/,
+    /type 'file_delivery'/,
   );
 });

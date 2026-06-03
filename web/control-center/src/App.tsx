@@ -19,7 +19,6 @@ interface RuntimeResponse {
   runtime: { runtime: string; sessions: number; activeRuns: number };
   profile: {
     profile: string;
-    featureFarm: boolean;
     profileDetection: { source: string; reason: string };
   };
   build: {

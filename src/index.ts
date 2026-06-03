@@ -13,7 +13,6 @@ import makeWASocket, {
 import {
   ASSISTANT_NAME,
   DATA_DIR,
-  FEATURE_FARM,
   FFT_NANO_CODER_GATE_MODE,
   FFT_NANO_ONBOARDING_MODE,
   FFT_NANO_TUI_AUTH_TOKEN,
@@ -296,6 +295,7 @@ import {
 } from './status-report.js';
 import {
   dispatchLegacyMessageEnvelope,
+  wrapLegacyActionEnvelope,
   wrapLegacyMessageEnvelope,
 } from './runtime/boundary-ipc.js';
 import { createAppRuntime } from './app.js';
@@ -1964,16 +1964,18 @@ async function finalizeTelegramToolProgress(
 async function deleteTelegramPreviewMessage(
   chatJid: string,
   messageId: number,
+  messageIds?: number[],
 ): Promise<void> {
-  return tdDeleteTelegramPreviewMessage(chatJid, messageId);
+  return tdDeleteTelegramPreviewMessage(chatJid, messageId, messageIds);
 }
 
 async function finalizeTelegramPreviewMessage(
   chatJid: string,
   messageId: number,
   text: string,
+  messageIds?: number[],
 ): Promise<boolean> {
-  return tdFinalizeTelegramPreviewMessage(chatJid, messageId, text);
+  return tdFinalizeTelegramPreviewMessage(chatJid, messageId, text, messageIds);
 }
 
 function buildHostCoordinationDeps(): HostCoordinationDeps {
@@ -2106,6 +2108,6 @@ main().catch(async (err) => {
   stopDomainServicesForShutdown('startup_error');
   await stopWebControlCenterService();
   await stopTuiGatewayService();
-  logger.error({ err }, 'Failed to start FFT_nano');
+  logger.error({ err }, 'Failed to start nano-core');
   process.exit(1);
 });

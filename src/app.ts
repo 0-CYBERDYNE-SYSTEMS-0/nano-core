@@ -263,7 +263,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
         deps.logger.error?.(msg);
         if (process.platform === 'darwin') {
           exec(
-            `osascript -e 'display notification "${msg}" with title "FFT_nano" sound name "Basso"'`,
+            `osascript -e 'display notification "${msg}" with title "nano-core" sound name "Basso"'`,
           );
         }
         setTimeout(() => process.exit(1), 1000);
@@ -377,7 +377,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
     }
     deps.state.messageLoopRunning = true;
     deps.logger.info?.(
-      `FFT_nano running (trigger: @${deps.constants.assistantName})`,
+      `nano-core running (trigger: @${deps.constants.assistantName})`,
     );
     while (true) {
       try {
@@ -463,7 +463,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
         '║  2. Start the Docker daemon                                    ║',
       );
       console.error(
-        '║  3. Restart FFT_nano                                          ║',
+        '║  3. Restart nano-core                                         ║',
       );
       console.error(
         '╚════════════════════════════════════════════════════════════════╝\n',
@@ -498,7 +498,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
       clearInterval(groupSyncTimer);
       groupSyncTimer = null;
     }
-    deps.logger.info?.({ signal }, 'Shutting down FFT_nano services');
+    deps.logger.info?.({ signal }, 'Shutting down nano-core services');
   }
 
   async function shutdownAndExit(
@@ -556,7 +556,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
     }
     if (deps.constants.dataDir) {
       deps.acquireSingletonLock?.(
-        path.join(deps.constants.dataDir, 'fft_nano.lock'),
+        path.join(deps.constants.dataDir, 'nano-core.lock'),
       );
     }
     deps.ensureContainerSystemRunning?.();
