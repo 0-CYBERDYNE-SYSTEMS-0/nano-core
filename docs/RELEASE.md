@@ -71,13 +71,12 @@ git push origin vX.Y.Z
    - publish as a stable release, not a prerelease
 
 6. Publish the curl installer:
-   - upload `scripts/install.sh` to `https://get.nano-core.dev/install-test.sh`
-   - run the staged installer smoke tests from a clean temp directory and disposable Linux host/container
-   - upload the same tested file to `https://get.nano-core.dev/install.sh`
+   - The canonical installer URL is `https://raw.githubusercontent.com/0-CYBERDYNE-SYSTEMS-0/nano-core/main/scripts/install.sh`
+   - cutting a new tag is sufficient for installer consumers (the script resolves `FFT_NANO_REF=latest` to `releases/latest` automatically)
    - verify:
 
 ```bash
-curl -fsSL https://get.nano-core.dev/install.sh | head
+curl -fsSL https://raw.githubusercontent.com/0-CYBERDYNE-SYSTEMS-0/nano-core/main/scripts/install.sh | head
 ```
 
 ## Release Notes Expectations

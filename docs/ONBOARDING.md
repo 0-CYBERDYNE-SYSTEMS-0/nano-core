@@ -12,7 +12,7 @@ Telegram takes over as the main operator interface.
 
 ```bash
 # public installer (latest stable release)
-curl -fsSL https://get.nano-core.dev/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/0-CYBERDYNE-SYSTEMS-0/nano-core/main/scripts/install.sh | bash
 
 # guided wrapper (backup/setup/wizard/service/doctor)
 ./scripts/onboard-all.sh
@@ -21,7 +21,7 @@ curl -fsSL https://get.nano-core.dev/install.sh | bash
 ./scripts/onboard-all.sh --runtime host
 
 # public installer with explicit host runtime
-curl -fsSL https://get.nano-core.dev/install.sh | bash -s -- --runtime host
+curl -fsSL https://raw.githubusercontent.com/0-CYBERDYNE-SYSTEMS-0/nano-core/main/scripts/install.sh | bash -s -- --runtime host
 
 # full guided wrapper (same behavior as onboard-all)
 fft onboard

@@ -26,7 +26,7 @@ const REQUIRED_BASE_FILES: WorkspaceTemplateFileName[] = [
   'MEMORY.md',
 ];
 
-const WORKSPACE_STATE_DIRNAME = '.fft_nano';
+const WORKSPACE_STATE_DIRNAME = '.nano-core';
 const WORKSPACE_STATE_FILENAME = 'workspace-state.json';
 const WORKSPACE_STATE_VERSION = 1;
 

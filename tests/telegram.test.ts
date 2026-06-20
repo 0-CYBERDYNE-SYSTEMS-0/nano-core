@@ -198,7 +198,7 @@ test('markdownToTelegramHtml renders pipe tables as aligned pre block', () => {
   const html = markdownToTelegramHtml(md);
   assert.equal(
     html,
-    '<pre>Item | Count\n-----+------\nAlpha | 120\nBeta  | 80</pre>',
+    '<pre>Item  | Count\n------+------\nAlpha | 120\nBeta  | 80</pre>',
   );
 });
 

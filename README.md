@@ -11,7 +11,7 @@ An autonomous AI coworker that runs on your hardware. It learns your operation, 
 ## Quick Start
 
 ```bash
-curl -fsSL https://get.nano-core.dev/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/0-CYBERDYNE-SYSTEMS-0/nano-core/main/scripts/install.sh | bash
 ```
 
 Runs on Raspberry Pi, your own server, or local hardware. Chat via Telegram or WhatsApp.

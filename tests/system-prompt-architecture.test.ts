@@ -899,10 +899,10 @@ test('buildSystemPrompt renders two-tier skill catalog with intact index under b
 
 test('buildSystemPrompt skips scaffold USER.md, IDENTITY.md, and TOOLS.md (A3)', () => {
   const scaffoldUser = [
-    '# FarmFriend Terminal - User Profile',
+    '# Nano Core Terminal - User Profile',
     '',
     '- Name:',
-    '- Operation / Farm:',
+    '- Operation:',
     '- Preferences:',
     '- Safety notes:',
   ].join('\n');
@@ -928,10 +928,10 @@ test('buildSystemPrompt skips scaffold USER.md, IDENTITY.md, and TOOLS.md (A3)',
   ].join('\n');
 
   const filledUser = [
-    '# FarmFriend Terminal - User Profile',
+    '# Nano Core Terminal - User Profile',
     '',
     '- Name: TD',
-    '- Operation / Farm:',
+    '- Operation:',
     '- Preferences:',
     '- Safety notes:',
   ].join('\n');
