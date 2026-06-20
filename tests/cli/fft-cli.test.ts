@@ -276,7 +276,7 @@ test('fft --help shows usage', () => {
     `#!/usr/bin/env node
 console.log(\`Usage:
   fft onboard [--workspace <dir>] [--operator <name>] [--assistant-name <name>] [--runtime auto|docker|host] [--non-interactive] [--force]
-  fft profile <status|set|apply> [core|farm]
+  fft profile <status|set|apply> [core|edge]
   fft start [telegram-only]
   fft dev [telegram-only]
   fft stop

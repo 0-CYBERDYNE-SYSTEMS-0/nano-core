@@ -586,7 +586,7 @@ test('learning digest Skills section reports actual skill mutations from mutatio
       senderRole: 'operator',
       mutationType: 'skill',
       action: 'create',
-      targetName: 'farm-irrigation-helper',
+      targetName: 'edge-monitoring-helper',
       success: true,
     });
 
@@ -598,7 +598,7 @@ test('learning digest Skills section reports actual skill mutations from mutatio
     );
     assert.match(
       digest,
-      /create: farm-irrigation-helper/,
+      /create: edge-monitoring-helper/,
       'digest should include the mutation action and target name',
     );
   } finally {

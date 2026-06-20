@@ -555,7 +555,7 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
       'Being asked to reflect is permission to look — it is NOT evidence that there is anything to save. Be exactly as selective as an automatic post-turn review. If there is no durable, reusable lesson, say so plainly and change nothing; a clean no-op is the correct and expected outcome.',
       '',
       'How to classify what you find:',
-      '- Durable facts, preferences, environment details, project/farm state → write to memory (MEMORY.md / memory files).',
+      '- Durable facts, preferences, environment details, project state → write to memory (MEMORY.md / memory files).',
       '- Reusable procedures, pitfalls with a reusable recovery, command sequences, troubleshooting recipes, or task-class behavior → create or patch an agent-owned runtime skill via skill_action.',
       '- Prefer patching an existing relevant agent-created skill over creating a near-duplicate. Create broad class-level skills, not narrow one-offs.',
       '- A user correction that changes how future work should be done is durable — capture it as procedural guidance.',

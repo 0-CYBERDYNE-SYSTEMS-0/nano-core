@@ -35,16 +35,16 @@ test('message fetchers exclude assistant-origin and tui-sender rows without drop
       chatJid: 'chat-1',
       sender: 'user@jid',
       senderName: 'User',
-      content: 'Need help with irrigation',
+      content: 'Need help with monitoring',
       timestamp: '2026-03-22T10:00:00.000Z',
       isFromMe: false,
     });
     storeHostMessage({
       id: 'a1',
       chatJid: 'chat-1',
-      sender: 'FarmFriend',
-      senderName: 'FarmFriend',
-      content: 'FarmFriend: Here is your update',
+      sender: 'OpenClaw',
+      senderName: 'OpenClaw',
+      content: 'OpenClaw: Here is your update',
       timestamp: '2026-03-22T10:00:01.000Z',
       isFromMe: true,
     });
@@ -53,7 +53,7 @@ test('message fetchers exclude assistant-origin and tui-sender rows without drop
       chatJid: 'chat-1',
       sender: 'user@jid',
       senderName: 'User',
-      content: 'FarmFriend: can you check irrigation?',
+      content: 'OpenClaw: can you check monitoring?',
       timestamp: '2026-03-22T10:00:01.500Z',
       isFromMe: false,
     });
@@ -62,7 +62,7 @@ test('message fetchers exclude assistant-origin and tui-sender rows without drop
       chatJid: 'chat-1',
       sender: 'chat-1',
       senderName: 'chat-1',
-      content: 'FarmFriend: outbound whatsapp echo',
+      content: 'OpenClaw: outbound whatsapp echo',
       timestamp: '2026-03-22T10:00:01.750Z',
       isFromMe: true,
     });
@@ -76,8 +76,8 @@ test('message fetchers exclude assistant-origin and tui-sender rows without drop
       isFromMe: false,
     });
 
-    const { messages } = getNewMessages(['chat-1'], '', 'FarmFriend');
-    const sinceRows = getMessagesSince('chat-1', '', 'FarmFriend');
+    const { messages } = getNewMessages(['chat-1'], '', 'OpenClaw');
+    const sinceRows = getMessagesSince('chat-1', '', 'OpenClaw');
 
     assert.deepEqual(
       messages.map((row) => row.id),
@@ -114,9 +114,9 @@ test('getPromptTranscriptMessages preserves chronological assistant and user con
     storeHostMessage({
       id: 'a1',
       chatJid: 'chat-2',
-      sender: 'FarmFriend',
-      senderName: 'FarmFriend',
-      content: 'FarmFriend: here are the headlines',
+      sender: 'OpenClaw',
+      senderName: 'OpenClaw',
+      content: 'OpenClaw: here are the headlines',
       timestamp: '2026-03-22T10:00:01.000Z',
       isFromMe: true,
     });

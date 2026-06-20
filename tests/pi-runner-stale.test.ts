@@ -470,7 +470,7 @@ setTimeout(() => {
     type: 'tool_call_start',
     toolName: 'web_search',
     toolCallId: 'call-1',
-    args: { query: 'ai for agriculture' },
+    args: { query: 'ai for operations' },
   }) + '\\n');
 }, 30);
 

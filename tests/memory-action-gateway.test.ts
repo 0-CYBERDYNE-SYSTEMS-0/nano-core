@@ -19,7 +19,7 @@ function makeRegisteredGroups(groups: Array<{ jid: string; folder: string }>): R
     out[g.jid] = {
       name: g.folder,
       folder: g.folder,
-      trigger: '@FarmFriend',
+      trigger: '@OpenClaw',
       added_at: new Date().toISOString(),
     };
   }
@@ -147,9 +147,9 @@ test('memory_search sessions returns transcript hits and respects main override'
     storeTextMessage({
       id: 'msg-1',
       chatJid: 'jid-group-a',
-      sender: 'farmer@jid',
-      senderName: 'Farmer',
-      content: 'Remember we irrigated field A tomatoes yesterday.',
+      sender: 'operator@jid',
+      senderName: 'Operator',
+      content: 'Remember we monitored field A tomatoes yesterday.',
       timestamp: new Date().toISOString(),
       isFromMe: false,
     });
@@ -165,7 +165,7 @@ test('memory_search sessions returns transcript hits and respects main override'
         action: 'memory_search',
         requestId: 'r3',
         params: {
-          query: 'irrigated tomatoes',
+          query: 'monitored tomatoes',
           sources: 'sessions',
           groupFolder,
           topK: 5,
@@ -197,7 +197,7 @@ test('memory_search includes NANO.md in document hits', async () => {
     fs.mkdirSync(groupDir, { recursive: true });
     fs.writeFileSync(
       path.join(groupDir, 'NANO.md'),
-      '# NANO\n\nOperational contract: greenhouse vents close before irrigation.\n',
+      '# NANO\n\nOperational contract: greenhouse vents close before monitoring.\n',
       'utf-8',
     );
     fs.writeFileSync(path.join(groupDir, 'MEMORY.md'), '# MEMORY\n\n', 'utf-8');
@@ -208,7 +208,7 @@ test('memory_search includes NANO.md in document hits', async () => {
         action: 'memory_search',
         requestId: 'r-nano-search',
         params: {
-          query: 'greenhouse vents close before irrigation',
+          query: 'greenhouse vents close before monitoring',
           sources: 'memory',
           topK: 5,
         },

@@ -47,8 +47,8 @@ test('skill actions create, view, patch, archive, and restore agent-created skil
         requestId: 'create-1',
         params: {
           groupFolder,
-          name: 'irrigation-check',
-          description: 'Check irrigation status consistently.',
+          name: 'monitoring-check',
+          description: 'Check monitoring status consistently.',
         },
       },
       { sourceGroup: groupFolder, isMain: true, registeredGroups: {} },
@@ -61,7 +61,7 @@ test('skill actions create, view, patch, archive, and restore agent-created skil
         type: 'skill_action',
         action: 'skill_view',
         requestId: 'view-1',
-        params: { groupFolder, name: 'irrigation-check' },
+        params: { groupFolder, name: 'monitoring-check' },
       },
       { sourceGroup: groupFolder, isMain: true, registeredGroups: {} },
     );
@@ -78,10 +78,10 @@ test('skill actions create, view, patch, archive, and restore agent-created skil
         requestId: 'patch-1',
         params: {
           groupFolder,
-          name: 'irrigation-check',
+          name: 'monitoring-check',
           content: skillMarkdown(
-            'irrigation-check',
-            'Updated irrigation workflow.',
+            'monitoring-check',
+            'Updated monitoring workflow.',
           ),
         },
       },
@@ -94,13 +94,13 @@ test('skill actions create, view, patch, archive, and restore agent-created skil
         type: 'skill_action',
         action: 'skill_archive',
         requestId: 'archive-1',
-        params: { groupFolder, name: 'irrigation-check' },
+        params: { groupFolder, name: 'monitoring-check' },
       },
       { sourceGroup: groupFolder, isMain: true, registeredGroups: {} },
     );
     assert.equal(archive.status, 'success');
     assert.equal(
-      fs.existsSync(path.join(skillsDir, '.archive', 'irrigation-check')),
+      fs.existsSync(path.join(skillsDir, '.archive', 'monitoring-check')),
       true,
     );
 
@@ -109,7 +109,7 @@ test('skill actions create, view, patch, archive, and restore agent-created skil
         type: 'skill_action',
         action: 'skill_restore',
         requestId: 'restore-1',
-        params: { groupFolder, name: 'irrigation-check' },
+        params: { groupFolder, name: 'monitoring-check' },
       },
       { sourceGroup: groupFolder, isMain: true, registeredGroups: {} },
     );
@@ -117,7 +117,7 @@ test('skill actions create, view, patch, archive, and restore agent-created skil
 
     report = buildSkillReport(skillsDir);
     assert.equal(
-      report.find((entry) => entry.name === 'irrigation-check')?.usage.state,
+      report.find((entry) => entry.name === 'monitoring-check')?.usage.state,
       'active',
     );
   } finally {

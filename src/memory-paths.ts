@@ -76,23 +76,23 @@ const DEFAULT_CANONICAL_BODIES: Record<string, string> = {
 };
 
 const DEFAULT_USER_BODY = [
-  '# FarmFriend Terminal - User Profile',
+  '# Nano Core Terminal - User Profile',
   '',
   '- Name:',
-  '- Operation / Farm:',
+  '- Operation:',
   '- Preferences:',
   '- Safety notes:',
 ].join('\n');
 
 const DEFAULT_IDENTITY_BODY = [
-  '# FarmFriend Terminal - Agent Identity',
+  '# Nano Core Terminal - Agent Identity',
   '',
-  'Name: FarmFriend Terminal',
-  'Role: Local-first assistant for agriculture and operations',
+  'Name: Nano Core Terminal',
+  'Role: Local-first assistant for operations',
 ].join('\n');
 
 const DEFAULT_TOOLS_BODY = [
-  '# FarmFriend Terminal - Tool Policy',
+  '# Nano Core Terminal - Tool Policy',
   '',
   'This file documents tool access policy. It is used as a pre-session tool manifest.',
   '',

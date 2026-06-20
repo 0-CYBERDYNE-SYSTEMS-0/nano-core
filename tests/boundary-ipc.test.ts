@@ -355,7 +355,7 @@ test('wrapLegacyActionEnvelope captures result path metadata for boundary writes
     {
       type: 'memory_action',
       action: 'memory_search',
-      params: { query: 'soil' },
+      params: { query: 'ground' },
       requestId: 'req-1',
     },
     'group-a',

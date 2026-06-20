@@ -47,14 +47,14 @@ test('FTS migration rebuild indexes existing transcript rows', () => {
         'jid-old',
         'user@jid',
         'User',
-        'We pruned the orchard and checked irrigation lines.',
+        'We pruned the orchard and checked monitoring lines.',
         new Date().toISOString(),
         0,
       );
     pre.close();
 
     initDatabaseAtPath(dbPath);
-    const hits = searchMessagesByFts(['jid-old'], 'orchard irrigation', 5);
+    const hits = searchMessagesByFts(['jid-old'], 'orchard monitoring', 5);
     assert.equal(hits.length > 0, true);
     assert.equal(hits[0].chat_jid, 'jid-old');
   } finally {

@@ -194,11 +194,11 @@ test('markdownToTelegramHtml marks long blockquotes expandable', () => {
 });
 
 test('markdownToTelegramHtml renders pipe tables as aligned pre block', () => {
-  const md = '| Crop | Acres |\n|------|-------|\n| Corn | 120 |\n| Soy | 80 |';
+  const md = '| Item | Count |\n|------|-------|\n| Alpha | 120 |\n| Beta | 80 |';
   const html = markdownToTelegramHtml(md);
   assert.equal(
     html,
-    '<pre>Crop | Acres\n-----+------\nCorn | 120\nSoy  | 80</pre>',
+    '<pre>Item | Count\n-----+------\nAlpha | 120\nBeta  | 80</pre>',
   );
 });
 
@@ -260,12 +260,12 @@ test('sendMessage delivers raw markdown via sendRichMessage (Bot API 10.1)', asy
     } as Response;
   }) as typeof fetch;
 
-  const md = '| Crop | Acres |\n|------|-------|\n| Corn | 120 |';
+  const md = '| Item | Count |\n|------|-------|\n| Alpha | 120 |';
   try {
     const bot = createTelegramBot({
       token: 'token',
-      assistantName: 'FarmFriend',
-      triggerPattern: /@FarmFriend/i,
+      assistantName: 'OpenClaw',
+      triggerPattern: /@OpenClaw/i,
     });
     await bot.sendMessage('telegram:1', md);
   } finally {
@@ -309,8 +309,8 @@ test('sendMessage falls back to HTML sendMessage and latches off when rich is un
   try {
     const bot = createTelegramBot({
       token: 'token',
-      assistantName: 'FarmFriend',
-      triggerPattern: /@FarmFriend/i,
+      assistantName: 'OpenClaw',
+      triggerPattern: /@OpenClaw/i,
     });
     await bot.sendMessage('telegram:1', 'first reply');
     await bot.sendMessage('telegram:1', 'second reply');
@@ -350,8 +350,8 @@ test('sendMessageWithKeyboard uses documented sendRichMessage reply_markup', asy
   try {
     const bot = createTelegramBot({
       token: 'token',
-      assistantName: 'FarmFriend',
-      triggerPattern: /@FarmFriend/i,
+      assistantName: 'OpenClaw',
+      triggerPattern: /@OpenClaw/i,
     });
     await bot.sendMessageWithKeyboard('telegram:1', '# Choose', [
       [{ text: 'Open', callbackData: 'open' }],
@@ -386,8 +386,8 @@ test('sendMessageDraft uses documented sendRichMessageDraft payload', async () =
   try {
     const bot = createTelegramBot({
       token: 'token',
-      assistantName: 'FarmFriend',
-      triggerPattern: /@FarmFriend/i,
+      assistantName: 'OpenClaw',
+      triggerPattern: /@OpenClaw/i,
     });
     await bot.sendMessageDraft('telegram:1', 7, '**working**', {
       messageThreadId: 3,
@@ -431,8 +431,8 @@ test('sendMessageDraft falls back when partial rich markdown is rejected', async
   try {
     const bot = createTelegramBot({
       token: 'token',
-      assistantName: 'FarmFriend',
-      triggerPattern: /@FarmFriend/i,
+      assistantName: 'OpenClaw',
+      triggerPattern: /@OpenClaw/i,
     });
     await bot.sendMessageDraft('telegram:1', 8, '```partial');
   } finally {
@@ -462,8 +462,8 @@ test('editStreamMessage finalizes with editMessageText.rich_message', async () =
   try {
     const bot = createTelegramBot({
       token: 'token',
-      assistantName: 'FarmFriend',
-      triggerPattern: /@FarmFriend/i,
+      assistantName: 'OpenClaw',
+      triggerPattern: /@OpenClaw/i,
     });
     await bot.editStreamMessage(
       'telegram:1',
@@ -546,8 +546,8 @@ test('createTelegramBot uploads video, audio, voice, and animation via Telegram 
   try {
     const bot = createTelegramBot({
       token: 'token',
-      assistantName: 'FarmFriend',
-      triggerPattern: /@FarmFriend/i,
+      assistantName: 'OpenClaw',
+      triggerPattern: /@OpenClaw/i,
     });
 
     await bot.sendVideo(

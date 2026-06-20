@@ -992,7 +992,7 @@ function renderBasePrompt(params: {
       '- Skills should stay organized without operator effort. Use skill_list/skill_view to inspect available procedural knowledge before repeating a workflow.',
     );
     lines.push(
-      '- Create or patch a skill only when a reusable workflow, pitfall, or farm operation pattern should be remembered procedurally.',
+      '- Create or patch a skill only when a reusable workflow, pitfall, or operation pattern should be remembered procedurally.',
     );
     lines.push(
       '- Mutations are host-gated to agent-created runtime skills; repo and personal source skills may be read and reported but not destructively curated.',
@@ -1023,7 +1023,7 @@ function renderBasePrompt(params: {
     );
     lines.push('```json');
     lines.push('{');
-    lines.push('  "type":"farm_action",');
+    lines.push('  "type":"deliver_file",');
     lines.push('  "action":"deliver_file",');
     lines.push('  "requestId":"<unique-id>",');
     lines.push('  "params":{');
@@ -1320,7 +1320,7 @@ export function buildSystemPrompt(
         ? 'minimal'
         : 'full';
   const assistantName =
-    (input.assistantName || 'FarmFriend').trim() || 'FarmFriend';
+    (input.assistantName || 'Nano Core').trim() || 'Nano Core';
   // LISO.5: maintenance runs use minimal bounded context — never retrieved memory,
   // even if a caller populated memoryContext.
   const providedMemoryContext =

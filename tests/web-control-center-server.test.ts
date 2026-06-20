@@ -60,7 +60,7 @@ test('web control center serves runtime status on localhost mode without auth', 
         activeRuns: 1,
       }),
       getProfileStatus: () => ({
-        profile: 'farm',
+        profile: 'core',
         featureFarm: true,
         profileDetection: { source: 'auto_preserve', reason: 'test' },
       }),

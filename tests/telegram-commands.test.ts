@@ -1147,13 +1147,13 @@ test('handleTelegramCommand /knowledge routes to host knowledge handler in main 
   const handled = await handlers.handleTelegramCommand({
     chatJid: 'telegram:main',
     chatName: 'Main',
-    content: '/knowledge ingest check irrigation pressure',
+    content: '/knowledge ingest check monitoring pressure',
   });
 
   assert.equal(handled, true);
   assert.equal(
     deps.sent[0]?.text,
-    'knowledge:ingest:check irrigation pressure:telegram:main',
+    'knowledge:ingest:check monitoring pressure:telegram:main',
   );
   assert.deepEqual(deps.audits[0], {
     chatJid: 'telegram:main',

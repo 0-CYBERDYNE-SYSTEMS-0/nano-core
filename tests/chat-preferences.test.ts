@@ -151,13 +151,13 @@ test('updateChatRunPreferences preserves sessionTitle through compaction', () =>
   const runtime = createRuntime();
 
   const titled = updateChatRunPreferences(runtime, 'telegram:1', (prefs) => {
-    prefs.sessionTitle = '  Farm Ops  ';
+    prefs.sessionTitle = '  Ops Console  ';
     return prefs;
   });
-  assert.equal(titled.sessionTitle, 'Farm Ops');
+  assert.equal(titled.sessionTitle, 'Ops Console');
   assert.equal(
     runtime.chatRunPreferences['telegram:1']?.sessionTitle,
-    'Farm Ops',
+    'Ops Console',
   );
 
   const withProvider = updateChatRunPreferences(
@@ -169,7 +169,7 @@ test('updateChatRunPreferences preserves sessionTitle through compaction', () =>
     },
   );
   assert.equal(withProvider.provider, 'zai');
-  assert.equal(withProvider.sessionTitle, 'Farm Ops');
+  assert.equal(withProvider.sessionTitle, 'Ops Console');
 
   updateChatRunPreferences(runtime, 'telegram:1', (prefs) => {
     delete prefs.provider;

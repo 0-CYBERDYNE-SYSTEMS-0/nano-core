@@ -334,7 +334,7 @@ export function runQuietSkillAgent(params: {
     'Do not use any tools that mutate files, execute commands, send messages, or schedule tasks.',
     'Do not inspect or edit skill files directly.',
     'You may only return a structured learning proposal in JSON format.',
-    'Keep skills organized for non-technical farm operators: clear names, valid frontmatter, class-level reusable workflows, and lean active catalog.',
+    'Keep skills organized for non-technical operators: clear names, valid frontmatter, class-level reusable workflows, and lean active catalog.',
     'You may only mutate host-allowed agent-created runtime skills. For source-owned skills, report issues instead of trying to modify them.',
   ].join('\n');
 
@@ -594,7 +594,7 @@ export function maybeRunSkillSelfImprovement(params: {
       'Review the completed conversation for reusable procedural knowledge.',
       signalLine,
       'Use skill_list first. Prefer patching an existing relevant agent-created skill over creating a near-duplicate. Create broad class-level skills with labeled sections, not narrow one-offs.',
-      'Capture: reusable workflows, command/tool/API pitfalls with a reusable recovery, farm/device operating procedures, troubleshooting recipes, and user corrections that change how future work should be done.',
+      'Capture: reusable workflows, command/tool/API pitfalls with a reusable recovery, device operating procedures, troubleshooting recipes, and user corrections that change how future work should be done.',
       'Do NOT create or patch skills for: one-off task narratives, raw transcripts, transient/environment outages without a reusable recovery, speculation, or anything whose only content is "remember that this happened".',
       'Never mutate source-owned project or personal skills — report those gaps in your summary instead. Keep frontmatter valid and descriptions practical. No-op when the lesson is not durable.',
       '',
@@ -793,7 +793,7 @@ export function maybeRunSkillManager(params: {
     prompt: [
       'Run a bounded skill manager review.',
       'Use skill_status and skill_view to inspect the active library.',
-      'Goal: keep farm/operator skills lean, organized, and valid. Clean frontmatter issues for agent-created skills by patching them. Report source-owned frontmatter issues in your final summary.',
+      'Goal: keep operator skills lean, organized, and valid. Clean frontmatter issues for agent-created skills by patching them. Report source-owned frontmatter issues in your final summary.',
       'Consolidate near-duplicate agent-created skills into class-level umbrella skills when useful. Archive only agent-created skills that are stale, duplicate, or fully absorbed.',
       ...efficacyLines, // WS5.4: efficacy lines (agent-inferred only, above sample floor) appear before the "Do not mutate" line
     ].join('\n'),

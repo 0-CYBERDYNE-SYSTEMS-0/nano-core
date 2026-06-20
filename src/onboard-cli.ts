@@ -463,13 +463,13 @@ function shouldRewriteSoulFile(existingBody: string, force: boolean): boolean {
   if (force) return true;
   if (!existingBody.trim()) return true;
   if (
-    /You are (?:FarmFriend|OpenClaw|FFT_nano): concise, practical, and technically rigorous\./i.test(
+    /You are (?:OpenClaw|FFT_nano): concise, practical, and technically rigorous\./i.test(
       existingBody,
     )
   ) {
     return true;
   }
-  if (/You are FarmFriend: an agricultural assistant\./i.test(existingBody)) {
+  if (/You are .+: an agricultural assistant\./i.test(existingBody)) {
     return true;
   }
   return false;

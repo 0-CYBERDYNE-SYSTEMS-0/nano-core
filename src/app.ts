@@ -27,8 +27,6 @@ export interface AppRuntimeDeps {
     heartbeatActiveHours?: unknown;
     dataDir?: string;
     fftProfile?: string;
-    featureFarm?: boolean;
-    farmStateEnabled?: boolean;
     profileDetection?: unknown;
     whatsappEnabled?: boolean;
     onboardingMode?: boolean;
