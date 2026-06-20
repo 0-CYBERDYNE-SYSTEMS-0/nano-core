@@ -1,4 +1,5 @@
 import type {
+  FarmActionRequest,
   MemoryActionRequest,
   RegisteredGroup,
   SkillActionRequest,
@@ -16,8 +17,10 @@ export interface BoundaryEnvelope<TPayload = unknown> {
 
 export interface BoundaryActionEnvelope<
   TPayload extends
+    | FarmActionRequest
     | MemoryActionRequest
     | SkillActionRequest =
+    | FarmActionRequest
     | MemoryActionRequest
     | SkillActionRequest,
 > extends BoundaryEnvelope<TPayload> {
@@ -58,7 +61,7 @@ export function wrapLegacyMessageEnvelope(
 }
 
 export function wrapLegacyActionEnvelope(
-  payload: MemoryActionRequest | SkillActionRequest,
+  payload: FarmActionRequest | MemoryActionRequest | SkillActionRequest,
   sourceGroup: string,
   resultPath: string,
   createdAt = new Date().toISOString(),

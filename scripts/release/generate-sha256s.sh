@@ -3,7 +3,7 @@ set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
   echo "Usage: $0 <tag> [owner/repo]" >&2
-  echo "Example: $0 v1.0.1 0-CYBERDYNE-SYSTEMS-0/FFT_nano" >&2
+  echo "Example: $0 v1.0.1 0-CYBERDYNE-SYSTEMS-0/nano-core" >&2
   exit 2
 fi
 

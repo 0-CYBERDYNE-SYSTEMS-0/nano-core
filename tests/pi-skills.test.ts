@@ -41,6 +41,185 @@ test('resolveProjectRuntimeSkillsDir resolves skills/runtime', () => {
   }
 });
 
+test('project skill manifest rejects undeclared runtime skill directories', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fft-pi-skills-'));
+
+  try {
+    const projectRoot = path.join(tempRoot, 'project');
+    const runtimeRoot = path.join(projectRoot, 'skills', 'runtime');
+    const setupRoot = path.join(projectRoot, 'skills', 'setup');
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(setupRoot, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(projectRoot, 'skills', 'manifest.json'),
+      JSON.stringify(
+        {
+          version: 'test',
+          required: [],
+          bundled: [],
+          setupOnly: [],
+        },
+        null,
+        2,
+      ),
+    );
+
+    const undeclaredSkillDir = path.join(runtimeRoot, 'undeclared-skill');
+    fs.mkdirSync(undeclaredSkillDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(undeclaredSkillDir, 'SKILL.md'),
+      '---\nname: undeclared-skill\ndescription: test\n---\n\n# undeclared\n',
+    );
+
+    const result = validateProjectPiSkills(projectRoot);
+    assert.equal(result.ok, false);
+    assert.equal(
+      result.issues.some(
+        (issue) =>
+          issue.file.endsWith(path.join('runtime', 'undeclared-skill')) &&
+          issue.message.includes('not declared'),
+      ),
+      true,
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('project skill sync mirrors only manifest-bundled runtime skills when manifest exists', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fft-pi-skills-'));
+
+  try {
+    const projectRoot = path.join(tempRoot, 'project');
+    const groupPiHome = path.join(tempRoot, 'group-home', '.pi');
+    const runtimeRoot = path.join(projectRoot, 'skills', 'runtime');
+    const setupRoot = path.join(projectRoot, 'skills', 'setup');
+    const dstSkillsRoot = path.join(groupPiHome, 'skills');
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+    fs.mkdirSync(setupRoot, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(projectRoot, 'skills', 'manifest.json'),
+      JSON.stringify(
+        {
+          version: 'test',
+          required: [],
+          bundled: ['declared-skill'],
+          setupOnly: [],
+        },
+        null,
+        2,
+      ),
+    );
+
+    for (const skillName of ['declared-skill', 'undeclared-skill']) {
+      const skillDir = path.join(runtimeRoot, skillName);
+      fs.mkdirSync(skillDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(skillDir, 'SKILL.md'),
+        `---\nname: ${skillName}\ndescription: test\n---\n\n# ${skillName}\n`,
+      );
+    }
+
+    const res = syncProjectPiSkillsToGroupPiHome(projectRoot, groupPiHome);
+
+    assert.ok(res.copied.includes('declared-skill'));
+    assert.equal(res.copied.includes('undeclared-skill'), false);
+    assert.equal(
+      fs.existsSync(path.join(dstSkillsRoot, 'declared-skill', 'SKILL.md')),
+      true,
+    );
+    assert.equal(
+      fs.existsSync(path.join(dstSkillsRoot, 'undeclared-skill')),
+      false,
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('synced skill on disk is visible in the runtime skill catalog with named tools', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fft-pi-skills-'));
+
+  try {
+    const projectRoot = path.join(tempRoot, 'project');
+    const groupPiHome = path.join(tempRoot, 'group-home', '.pi');
+    const runtimeRoot = path.join(projectRoot, 'skills', 'runtime');
+    const dstSkillsRoot = path.join(groupPiHome, 'skills');
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+
+    fs.writeFileSync(
+      path.join(projectRoot, 'skills', 'manifest.json'),
+      JSON.stringify(
+        {
+          version: 'test',
+          required: [],
+          bundled: ['experiment-loop'],
+          setupOnly: [],
+        },
+        null,
+        2,
+      ),
+    );
+
+    const skillDir = path.join(runtimeRoot, 'experiment-loop');
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(skillDir, 'SKILL.md'),
+      [
+        '---',
+        'name: experiment-loop',
+        'description: Run experiments through native tools.',
+        'allowed-tools: init_experiment, run_experiment, log_experiment',
+        '---',
+        '',
+        '# experiment-loop',
+        '',
+        '## When to use this skill',
+        '',
+        '- Use for benchmark loops that must call native experiment tools.',
+        '',
+      ].join('\n'),
+    );
+
+    syncProjectPiSkillsToGroupPiHome(projectRoot, groupPiHome);
+    const catalog = buildSkillCatalogEntries([dstSkillsRoot]);
+
+    assert.deepEqual(catalog, [
+      {
+        name: 'experiment-loop',
+        description: 'Run experiments through native tools.',
+        allowedTools: ['init_experiment', 'run_experiment', 'log_experiment'],
+        whenToUse: 'Use for benchmark loops that must call native experiment tools.',
+        source: 'project',
+      },
+    ]);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('autoresearch skill tool names stay backed by registered extension tools', () => {
+  const skillText = fs.readFileSync(
+    path.join(process.cwd(), 'skills/runtime/autoresearch-create/SKILL.md'),
+    'utf-8',
+  );
+  const extensionText = fs.readFileSync(
+    path.join(process.cwd(), 'src/extensions/pi-autoresearch/index.ts'),
+    'utf-8',
+  );
+
+  for (const toolName of [
+    'init_experiment',
+    'run_experiment',
+    'log_experiment',
+  ]) {
+    assert.match(skillText, new RegExp(`\\b${toolName}\\b`));
+    assert.match(extensionText, new RegExp(`name:\\s*'${toolName}'`));
+  }
+});
+
 test('syncProjectPiSkillsToGroupPiHome mirrors runtime skills and prunes stale managed skills', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fft-pi-skills-'));
 
@@ -552,7 +731,7 @@ test('synced external skills retain external source metadata for catalog entries
     assert.ok(res.copied.includes('field-inspector'));
     const manifest = JSON.parse(
       fs.readFileSync(
-        path.join(dstSkillsRoot, '.fft_nano_managed_skills.json'),
+        path.join(dstSkillsRoot, '.nano-core_managed_skills.json'),
         'utf-8',
       ),
     );
@@ -582,7 +761,7 @@ test('buildSkillCatalogEntries treats managed skills as project-owned despite st
       '---\nname: field-note-cleanup\ndescription: Keep field notes organized.\n---\n\n# field note cleanup\n',
     );
     fs.writeFileSync(
-      path.join(skillsRoot, '.fft_nano_managed_skills.json'),
+      path.join(skillsRoot, '.nano-core_managed_skills.json'),
       `${JSON.stringify({ managed: ['field-note-cleanup'] }, null, 2)}\n`,
     );
     fs.writeFileSync(
@@ -726,6 +905,155 @@ test('invalid symlink override falls back to valid project required skill', () =
       true,
     );
     assert.equal(res.skippedInvalid.includes('fft-debug'), false);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+// ── WS3.3 Provenance frontmatter ─────────────────────────────────────────────
+
+test('VAL-WS3-012: provenance is a valid frontmatter key', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fft-provenance-'));
+  try {
+    const projectRoot = path.join(tempRoot, 'project');
+    const runtimeRoot = path.join(projectRoot, 'skills', 'runtime');
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+
+    // Write a manifest so validateProjectPiSkills doesn't check REQUIRED_PROJECT_PI_SKILLS
+    fs.writeFileSync(
+      path.join(projectRoot, 'skills', 'manifest.json'),
+      JSON.stringify({ version: '1.0', required: [], bundled: ['agent-test-skill'], setupOnly: [] }, null, 2),
+    );
+
+    const skillDir = path.join(runtimeRoot, 'agent-test-skill');
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(skillDir, 'SKILL.md'),
+      [
+        '---',
+        'name: agent-test-skill',
+        'description: A skill for testing provenance validation.',
+        'provenance: agent-inferred',
+        '---',
+        '',
+        '# agent-test-skill',
+        '',
+        '## When to use this skill',
+        '',
+        '- Use for test coverage.',
+        '',
+      ].join('\n'),
+    );
+
+    const result = validateProjectPiSkills(projectRoot);
+    assert.equal(
+      result.ok,
+      true,
+      result.issues.map((i) => `${i.file}: ${i.message}`).join('\n'),
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('VAL-WS3-013: three provenance values are accepted', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fft-provenance-'));
+  try {
+    const projectRoot = path.join(tempRoot, 'project');
+    const runtimeRoot = path.join(projectRoot, 'skills', 'runtime');
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+
+    // Write a manifest so validateProjectPiSkills doesn't check REQUIRED_PROJECT_PI_SKILLS
+    const skillNames = [
+      'test-skill-operator-requested',
+      'test-skill-agent-inferred',
+      'test-skill-third-party-suggested',
+    ];
+    fs.writeFileSync(
+      path.join(projectRoot, 'skills', 'manifest.json'),
+      JSON.stringify({ version: '1.0', required: [], bundled: skillNames, setupOnly: [] }, null, 2),
+    );
+
+    const provenanceValues = [
+      'operator-requested',
+      'agent-inferred',
+      'third-party-suggested',
+    ];
+
+    for (let i = 0; i < provenanceValues.length; i++) {
+      const provenance = provenanceValues[i];
+      const skillName = skillNames[i];
+      const skillDir = path.join(runtimeRoot, skillName);
+      fs.mkdirSync(skillDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(skillDir, 'SKILL.md'),
+        [
+          '---',
+          `name: ${skillName}`,
+          'description: Testing provenance validation.',
+          `provenance: ${provenance}`,
+          '---',
+          '',
+          `# ${skillName}`,
+          '',
+          '## When to use this skill',
+          '',
+          '- Use for test coverage.',
+          '',
+        ].join('\n'),
+      );
+    }
+
+    const result = validateProjectPiSkills(projectRoot);
+    assert.equal(
+      result.ok,
+      true,
+      result.issues.map((i) => `${i.file}: ${i.message}`).join('\n'),
+    );
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('VAL-WS3-014: invalid provenance value fails validation with clear message', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'fft-provenance-'));
+  try {
+    const projectRoot = path.join(tempRoot, 'project');
+    const runtimeRoot = path.join(projectRoot, 'skills', 'runtime');
+    fs.mkdirSync(runtimeRoot, { recursive: true });
+
+    // Write a manifest so validateProjectPiSkills doesn't check REQUIRED_PROJECT_PI_SKILLS
+    fs.writeFileSync(
+      path.join(projectRoot, 'skills', 'manifest.json'),
+      JSON.stringify({ version: '1.0', required: [], bundled: ['invalid-provenance-skill'], setupOnly: [] }, null, 2),
+    );
+
+    const skillDir = path.join(runtimeRoot, 'invalid-provenance-skill');
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(skillDir, 'SKILL.md'),
+      [
+        '---',
+        'name: invalid-provenance-skill',
+        'description: Testing invalid provenance value.',
+        'provenance: who-dis',
+        '---',
+        '',
+        '# invalid-provenance-skill',
+        '',
+        '## When to use this skill',
+        '',
+        '- Use for test coverage.',
+        '',
+      ].join('\n'),
+    );
+
+    const result = validateProjectPiSkills(projectRoot);
+    assert.equal(result.ok, false);
+    const provenanceIssue = result.issues.find((i) =>
+      i.message.includes('provenance') && i.message.includes('who-dis'),
+    );
+    assert.notEqual(provenanceIssue, undefined, JSON.stringify(result.issues));
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

@@ -5,6 +5,7 @@ import { pathToFileURL } from 'url';
 
 import {
   DATA_DIR,
+  FEATURE_FARM,
   FFT_PROFILE,
   MAIN_WORKSPACE_DIR,
   PARITY_CONFIG,
@@ -20,6 +21,7 @@ import {
 } from './pi-executable.js';
 import type { SystemPromptReport } from './system-prompt.js';
 import { readWatchdogStatus } from './watchdog.js';
+import { getSandboxMode } from './sandbox.js';
 import { readMainWorkspaceState } from './workspace-bootstrap.js';
 
 type CheckLevel = 'pass' | 'warn' | 'fail';
@@ -72,7 +74,7 @@ function summarizeStatus(checks: CheckResult[]): CheckLevel {
 
 function formatReportText(report: DoctorReport): string {
   const lines = [
-    `nano-core doctor: ${report.status.toUpperCase()}`,
+    `FFT_nano doctor: ${report.status.toUpperCase()}`,
     `generated_at: ${report.generatedAt}`,
     `parity_config: ${report.configPath}`,
     '',
@@ -283,7 +285,7 @@ function checkPromptLifecycle(): CheckResult {
     'pi',
     'main',
     '.pi',
-    'fft_nano',
+    'nano-core',
     'prompt-state.json',
   );
   const manifestPath = path.join(
@@ -419,11 +421,50 @@ function checkStateDirs(): CheckResult {
 }
 
 function checkRuntimeProfile(): CheckResult {
+  if (FFT_PROFILE === 'farm' && !FEATURE_FARM) {
+    return {
+      id: 'runtime.profile',
+      level: 'warn',
+      summary: 'Profile is farm but farm feature paths are disabled',
+      detail: `source=${PROFILE_DETECTION.source} reason=${PROFILE_DETECTION.reason}`,
+    };
+  }
   return {
     id: 'runtime.profile',
     level: 'pass',
     summary: 'Runtime profile resolved',
-    detail: `profile=${FFT_PROFILE} feature_farm=false source=${PROFILE_DETECTION.source}`,
+    detail: `profile=${FFT_PROFILE} feature_farm=${FEATURE_FARM} source=${PROFILE_DETECTION.source}`,
+  };
+}
+
+function checkSandboxMode(): CheckResult {
+  const mode = getSandboxMode();
+  const overrideSet = process.env.FFT_NANO_ALLOW_UNSANDBOXED_HEADLESS === '1';
+  const overrideVar = 'FFT_NANO_ALLOW_UNSANDBOXED_HEADLESS';
+
+  // pass: sandbox is active (bwrap/docker) OR override is set
+  // warn: sandbox=none with no override
+  //
+  // Note: The fail condition ("autonomous loop configured to spawn without override")
+  // requires PARITY_CONFIG.cron.agentTasks.autoApprove which is part of WS2.6.
+  // Once WS2.6 is implemented, this check should be updated to:
+  //   if (mode === 'none' && !overrideSet && autoApproveEnabled) → fail
+
+  if (mode !== 'none' || overrideSet) {
+    return {
+      id: 'runtime.sandbox_mode',
+      level: 'pass',
+      summary: `Sandbox mode: ${mode}${overrideSet ? ' (override active)' : ''}`,
+      detail: `mode=${mode} ${overrideVar}=${overrideSet ? '1' : '(not set)'}`,
+    };
+  }
+
+  // sandbox=none without override: warn
+  return {
+    id: 'runtime.sandbox_mode',
+    level: 'warn',
+    summary: `Sandbox mode: ${mode} (no override active)`,
+    detail: `mode=${mode} ${overrideVar}=(not set)`,
   };
 }
 
@@ -468,6 +509,7 @@ export function buildDoctorReport(): DoctorReport {
   const checks: CheckResult[] = [
     checkStateDirs(),
     checkRuntimeProfile(),
+    checkSandboxMode(),
     checkPiRuntime(),
     checkWorkspaceFiles(),
     checkLegacyWorkspaceFiles(),

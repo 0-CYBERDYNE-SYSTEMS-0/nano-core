@@ -9,6 +9,8 @@ import {
 } from '@mariozechner/pi-tui';
 import { Socket } from 'net';
 
+import { getPlatformAdapter } from '../platform/index.js';
+
 import type {
   AgentEventPayload,
   ChatEventPayload,
@@ -40,7 +42,10 @@ interface CliOptions {
   localMode: boolean;
 }
 
-// Local mode: Unix socket client that implements the same interface as GatewayClient
+// Local mode: Unix socket client that implements the same interface as
+// GatewayClient. The wire protocol is one newline-delimited JSON frame
+// per line (matching the local server contract) so that both sides of
+// the local transport use the same simple, line-based framing.
 class LocalTuiConnection {
   private socket: Socket | null = null;
   private readonly socketPath: string;
@@ -55,6 +60,7 @@ class LocalTuiConnection {
   private readonly onClose?: (code: number, reason: string) => void;
   private connected = false;
   private buffer = '';
+  private connectPromise: Promise<void> | null = null;
 
   constructor(
     socketPath: string,
@@ -66,23 +72,43 @@ class LocalTuiConnection {
     this.onClose = onClose;
   }
 
-  async connect(): Promise<void> {
-    if (this.connected) return;
+  connect(): Promise<void> {
+    if (this.connected) return Promise.resolve();
+    if (this.connectPromise) return this.connectPromise;
+    this.connectPromise = new Promise<void>((resolve, reject) => {
+      const platformAdapter = getPlatformAdapter();
+      // The adapter hands back an unconnected socket; this client owns
+      // the connect call so it can wire the data/error/close handlers
+      // exactly once and avoid the "double connect" race that exists
+      // when an adapter pre-connects.
+      const socket = platformAdapter.connectLocalSocket();
+      this.socket = socket;
 
-    return new Promise<void>((resolve, reject) => {
-      this.socket = new Socket();
+      const fail = (err: Error) => {
+        if (this.connectPromise) {
+          this.connectPromise = null;
+        }
+        try {
+          socket.destroy();
+        } catch {
+          // ignore
+        }
+        this.socket = null;
+        reject(err);
+      };
 
-      this.socket.connect(this.socketPath, () => {
+      socket.once('error', fail);
+      socket.once('connect', () => {
+        socket.off('error', fail);
         this.connected = true;
+        this.connectPromise = null;
         resolve();
       });
-
-      this.socket.on('data', (data: Buffer) => {
+      socket.on('data', (data: Buffer) => {
         this.buffer += data.toString('utf8');
-        // Process complete messages (newline-delimited JSON)
+        // Newline-delimited JSON: each line is a complete frame.
         const lines = this.buffer.split('\n');
         this.buffer = lines.pop() || '';
-
         for (const line of lines) {
           if (!line.trim()) continue;
           try {
@@ -94,7 +120,7 @@ class LocalTuiConnection {
         }
       });
 
-      this.socket.on('close', () => {
+      socket.on('close', () => {
         this.connected = false;
         for (const [, pending] of this.pending) {
           pending.reject(new Error('Connection closed'));
@@ -103,10 +129,13 @@ class LocalTuiConnection {
         this.onClose?.(0, 'connection closed');
       });
 
-      this.socket.on('error', (err) => {
-        reject(err);
-      });
+      try {
+        socket.connect(this.socketPath);
+      } catch (err) {
+        fail(err instanceof Error ? err : new Error(String(err)));
+      }
     });
+    return this.connectPromise;
   }
 
   private handleFrame(frame: Record<string, unknown>): void {
@@ -165,7 +194,11 @@ class LocalTuiConnection {
 
   close(): void {
     this.connected = false;
-    this.socket?.destroy();
+    try {
+      this.socket?.end();
+    } catch {
+      // ignore
+    }
     this.socket = null;
   }
 }
@@ -176,6 +209,7 @@ interface SessionPrefs {
   thinkLevel?: ThinkLevel;
   reasoningLevel?: ReasoningLevel;
   verboseMode?: VerboseMode;
+  telegramDeliveryMode?: 'stream' | 'append' | 'off' | 'draft';
 }
 
 type SendMessageStatus = 'sent' | 'queued' | 'busy';
@@ -190,6 +224,7 @@ const DEFAULT_GATEWAY_TOKEN =
 
 const SLASH_COMMANDS: SlashCommand[] = [
   { name: 'help', description: 'Show slash command help' },
+  { name: 'settings', description: 'Show runtime controls' },
   { name: 'status', description: 'Show gateway status' },
   { name: 'sessions', description: 'List available sessions' },
   { name: 'session', description: 'Switch session key' },
@@ -198,11 +233,26 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { name: 'think', description: 'Set thinking level' },
   { name: 'reasoning', description: 'Set reasoning level' },
   { name: 'verbose', description: 'Cycle or set tool progress mode' },
-  { name: 'deliver', description: 'Set delivery mode (on/off)' },
+  { name: 'delivery', description: 'Set Telegram delivery mode' },
+  { name: 'mirror', description: 'Mirror TUI replies to the chat channel' },
+  { name: 'usage', description: 'Show usage counters' },
+  { name: 'queue', description: 'Show or set queue policy' },
+  { name: 'compact', description: 'Compact session context' },
+  { name: 'tasks', description: 'Inspect or manage scheduled tasks' },
+  { name: 'runs', description: 'Inspect durable runs' },
+  { name: 'learning', description: 'Show learning controls' },
+  { name: 'knowledge', description: 'Manage the knowledge wiki' },
+  { name: 'subagents', description: 'Manage delegated workers' },
+  { name: 'setup', description: 'Runtime provider setup' },
+  { name: 'groups', description: 'Manage registered groups' },
+  { name: 'skill_manager', description: 'Manage skill lifecycle' },
+  { name: 'approvals', description: 'List pending approvals' },
+  { name: 'reload', description: 'Reload runtime metadata' },
   { name: 'gateway', description: 'Gateway service action (status|restart)' },
   { name: 'new', description: 'Reset session before next run' },
   { name: 'reset', description: 'Alias for /new' },
-  { name: 'abort', description: 'Abort active run' },
+  { name: 'stop', description: 'Stop active run' },
+  { name: 'update', description: 'Update and restart the host' },
   { name: 'exit', description: 'Exit TUI' },
   { name: 'quit', description: 'Exit TUI' },
 ];
@@ -301,6 +351,7 @@ function helpText(): string {
   return [
     'Slash commands:',
     '/help',
+    '/settings',
     '/status',
     '/sessions',
     '/session <key>',
@@ -309,11 +360,21 @@ function helpText(): string {
     '/think <off|minimal|low|medium|high|xhigh>',
     '/reasoning <off|on|stream>',
     '/verbose [off|new|all|verbose]',
-    '/deliver <on|off>',
+    '/delivery <stream|append|off|draft>',
+    '/mirror <on|off>',
+    '/usage [all]',
+    '/queue [mode/debounce/cap/drop]',
+    '/compact [instructions]',
+    '/tasks [list|due|detail|runs|pause|resume|cancel]',
+    '/runs',
+    '/learning',
+    '/knowledge <action>',
+    '/subagents <action>',
+    '/setup, /groups, /skill_manager, /approvals',
     '/gateway <status|restart|doctor>',
     '/update - preserve local changes, pull, rebuild, and restart',
     '/new or /reset',
-    '/abort',
+    '/stop',
     '/exit',
   ].join('\n');
 }
@@ -407,12 +468,7 @@ export async function runTuiClient(opts: CliOptions): Promise<void> {
       if (activeRunId && evt.runId !== activeRunId) return;
 
       if (evt.stream === 'tool') {
-        if ((sessionPrefs.verboseMode || 'all') === 'off') return;
-        chatLog.upsertToolEvent(
-          evt.runId,
-          evt.data,
-          sessionPrefs.verboseMode || 'all',
-        );
+        chatLog.upsertToolEvent(evt.runId, evt.data, sessionPrefs.verboseMode);
         tui.requestRender();
         return;
       }
@@ -462,10 +518,15 @@ export async function runTuiClient(opts: CliOptions): Promise<void> {
     }, 50);
   };
 
-  // Create the appropriate client based on mode
-  const socketPath = '/tmp/fft_nano_tui.sock';
+  // Create the appropriate client based on mode. The local endpoint
+  // is resolved by the platform adapter so it works on Linux/macOS
+  // (XDG_RUNTIME_DIR or $HOME-based), Termux (PREFIX/var/run), and
+  // Windows (named pipe). We no longer hardcode /tmp/nano-core_tui.sock.
+  const localEndpoint = opts.localMode
+    ? getPlatformAdapter().resolveLocalSocketPath()
+    : null;
   const client = opts.localMode
-    ? new LocalTuiConnection(socketPath, onEvent, onClose)
+    ? new LocalTuiConnection(localEndpoint as string, onEvent, onClose)
     : new GatewayClient({ url: opts.url, onEvent, onClose });
 
   const tui = new TUI(new ProcessTerminal());
@@ -513,7 +574,7 @@ export async function runTuiClient(opts: CliOptions): Promise<void> {
 
   const updateHeader = () => {
     const modeLabel = opts.localMode
-      ? `local (${socketPath})`
+      ? `local (${localEndpoint})`
       : opts.url || DEFAULT_GATEWAY_URL;
     header.setText(
       theme.header(`FFT_nano TUI · ${modeLabel} · session ${sessionKey}`),
@@ -573,14 +634,27 @@ export async function runTuiClient(opts: CliOptions): Promise<void> {
   };
 
   const loadHistory = async (limit = 120) => {
-    const res = await client.request<{
+    let res: {
       sessionKey: string;
       messages: Array<{ role: string; text: string; timestamp: string }>;
-    }>('chat.history', {
-      sessionKey,
-      limit,
-    });
+    };
+    try {
+      res = await client.request<{
+        sessionKey: string;
+        messages: Array<{ role: string; text: string; timestamp: string }>;
+      }>('chat.history', {
+        sessionKey,
+        limit,
+      });
+    } catch (err) {
+      // Preserve the current chat log on failure.
+      const message = err instanceof Error ? err.message : String(err);
+      chatLog.addSystem(`history fetch failed: ${message}`);
+      throw err;
+    }
 
+    // Only clear and swap the chat log after the fetch succeeds so a failed
+    // request does not wipe the existing history.
     chatLog.clearAll();
     for (const message of res.messages) {
       if (message.role === 'user') chatLog.addUser(message.text);
@@ -787,6 +861,33 @@ export async function runTuiClient(opts: CliOptions): Promise<void> {
         break;
       }
 
+      case 'delivery': {
+        if (!args) {
+          chatLog.addSystem(
+            `Telegram delivery: ${sessionPrefs.telegramDeliveryMode || 'stream'}`,
+          );
+          break;
+        }
+        const value = args.trim().toLowerCase();
+        if (!['stream', 'append', 'off', 'draft'].includes(value)) {
+          chatLog.addSystem('usage: /delivery <stream|append|off|draft>');
+          break;
+        }
+        await client.request('sessions.patch', {
+          sessionKey,
+          telegramDeliveryMode: value,
+        });
+        sessionPrefs.telegramDeliveryMode = value as
+          | 'stream'
+          | 'append'
+          | 'off'
+          | 'draft';
+        chatLog.addSystem(`Telegram delivery set to ${value}`);
+        updateFooter();
+        break;
+      }
+
+      case 'mirror':
       case 'deliver': {
         if (!args) {
           chatLog.addSystem(`delivery: ${deliver ? 'on' : 'off'}`);
@@ -800,6 +901,28 @@ export async function runTuiClient(opts: CliOptions): Promise<void> {
         deliver = value === 'on';
         updateFooter();
         chatLog.addSystem(`delivery set to ${deliver ? 'on' : 'off'}`);
+        break;
+      }
+
+      case 'settings':
+      case 'usage':
+      case 'queue':
+      case 'compact':
+      case 'tasks':
+      case 'runs':
+      case 'learning':
+      case 'knowledge':
+      case 'subagents':
+      case 'setup':
+      case 'groups':
+      case 'skill_manager':
+      case 'approvals':
+      case 'reload': {
+        const result = await client.request<{ ok: boolean; text: string }>(
+          'operator.command',
+          { sessionKey, command: name, args },
+        );
+        chatLog.addSystem(result.text);
         break;
       }
 
@@ -870,6 +993,7 @@ export async function runTuiClient(opts: CliOptions): Promise<void> {
         chatLog.addSystem('session reset');
         break;
 
+      case 'stop':
       case 'abort':
         if (!activeRunId) {
           chatLog.addSystem('no active run');
@@ -1000,7 +1124,7 @@ export async function runTuiClient(opts: CliOptions): Promise<void> {
 
   await client.connect();
   await client.request('connect', {
-    client: 'fft_nano_tui',
+    client: 'nano-core_tui',
     token: DEFAULT_GATEWAY_TOKEN || undefined,
   });
   connectionStatus = 'connected';

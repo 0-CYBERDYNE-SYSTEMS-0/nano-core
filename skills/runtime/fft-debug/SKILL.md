@@ -28,10 +28,10 @@ Use this skill for incident triage and deterministic debugging of FFT_nano host 
 ## Fast Triage
 
 1. Confirm single instance lock:
-   - `ls -la data/fft_nano.lock`
+   - `ls -la data/nano-core.lock`
 2. Check startup/runtime logs:
-   - `tail -n 200 logs/fft_nano.log`
-   - `tail -n 200 logs/fft_nano.error.log`
+   - `tail -n 200 logs/nano-core.log`
+   - `tail -n 200 logs/nano-core.error.log`
 3. Check per-group container logs:
    - `ls -la groups/<group>/logs`
    - `tail -n 200 groups/<group>/logs/*`

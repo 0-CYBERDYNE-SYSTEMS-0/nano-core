@@ -7,6 +7,7 @@ export interface TelegramCommandMessage {
 export interface TelegramSetupInputMessage {
   chatJid: string;
   content: string;
+  messageId?: number;
 }
 
 export interface TelegramCommandCallbackQuery {
@@ -76,6 +77,7 @@ export interface TelegramCommandDeps {
     chatRunPreferences: Record<string, Record<string, any>>;
     registeredGroups: Record<string, any>;
     chatUsageStats: Record<string, unknown>;
+    learningPaused: boolean;
   };
   constants: {
     assistantName: string;
@@ -148,11 +150,22 @@ export interface TelegramCommandDeps {
   formatTasksText: (mode?: 'list' | 'due') => string;
   formatGroupsText: () => string;
   formatStatusText: (chatJid?: string) => string;
+  formatLearningDigest: () => string;
   formatHelpText: (isMainChat: boolean) => string;
   formatUsageText: (chatJid: string, scope?: 'chat' | 'all') => string;
   formatActiveSubagentsText: () => string;
   summarizeTask: (taskId: string) => string;
   formatTaskRunsText: (taskId: string, limit: number) => string;
+  formatPendingTasksText: (deps: {
+    registerToken: (
+      taskId: string,
+      groupFolder: string,
+      action: 'approve' | 'reject',
+    ) => string;
+  }) => {
+    text: string;
+    keyboard: Array<Array<{ text: string; callbackData: string }>>;
+  };
   handleKnowledgeCommand?: (params: {
     action: string;
     input: string;
@@ -168,11 +181,20 @@ export interface TelegramCommandDeps {
     input: string;
     chatJid: string;
   }) => Promise<string> | string;
-  runPiListModels: (searchText: string) => { text: string };
+  runPiListModels: (searchText: string) => { ok: boolean; text: string };
+  loadPiModels: (
+    forceRefresh?: boolean,
+  ) =>
+    | {
+        ok: true;
+        entries: Array<{ provider: string; model: string }>;
+        warnings?: string[];
+      }
+    | { ok: false; text: string };
   validateProviderModelRef: (
     provider: string,
     model: string,
-  ) => { ok: true } | { ok: false; text: string };
+  ) => { ok: true; warning?: string } | { ok: false; text: string };
   normalizeThinkLevel: (value: string) => string | null | undefined;
   normalizeReasoningLevel: (value: string) => string | null | undefined;
   normalizeTelegramDeliveryMode: (value: string) => string | null | undefined;
@@ -236,12 +258,41 @@ export interface TelegramCommandDeps {
     apiKeyEnv: string;
   };
   registerTelegramSettingsPanelAction: (chatJid: string, action: any) => string;
+  registerPendingTaskToken: (
+    taskId: string,
+    groupFolder: string,
+    action: 'approve' | 'reject',
+  ) => string;
   buildAdminPanelKeyboard: () => Array<
     Array<{ text: string; callbackData: string }>
   >;
   getTaskById: (taskId: string) => unknown;
   updateTask: (taskId: string, patch: Record<string, unknown>) => void;
   deleteTask: (taskId: string) => void;
+  getPendingTaskToken: (token: string) => {
+    taskId: string;
+    groupFolder: string;
+    action: 'approve' | 'reject';
+  } | null;
+  recordTaskAuditEvent: (
+    groupFolder: string,
+    event: {
+      taskId: string;
+      kind: string;
+      operatorJid?: string;
+      attemptedByJid?: string;
+      priorStatus?: string;
+      newStatus?: string | null;
+      promptPreview?: string;
+      scheduleType?: string;
+      scheduleValue?: string;
+      deliveryTo?: string | null;
+      deliveryMode?: string | null;
+      deleteAfterRun?: boolean;
+      createdBy?: 'operator' | 'agent';
+      senderRole?: 'operator' | 'member' | 'unknown';
+    },
+  ) => void;
   emitTuiChatEvent: (payload: any) => void;
   emitTuiAgentEvent: (payload: any) => void;
   emitRunProgress: (payload: {
@@ -391,7 +442,12 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
       params.provider,
       params.model,
     );
-    if (validation.ok) return validation;
+    if (validation.ok) {
+      if (validation.warning) {
+        await deps.sendMessage(params.chatJid, validation.warning);
+      }
+      return validation;
+    }
     await deps.sendMessage(params.chatJid, validation.text);
     return { ok: false };
   }
@@ -499,7 +555,7 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
       'Being asked to reflect is permission to look — it is NOT evidence that there is anything to save. Be exactly as selective as an automatic post-turn review. If there is no durable, reusable lesson, say so plainly and change nothing; a clean no-op is the correct and expected outcome.',
       '',
       'How to classify what you find:',
-      '- Durable facts, preferences, environment details, project state → write to memory (MEMORY.md / memory files).',
+      '- Durable facts, preferences, environment details, project/farm state → write to memory (MEMORY.md / memory files).',
       '- Reusable procedures, pitfalls with a reusable recovery, command sequences, troubleshooting recipes, or task-class behavior → create or patch an agent-owned runtime skill via skill_action.',
       '- Prefer patching an existing relevant agent-created skill over creating a near-duplicate. Create broad class-level skills, not narrow one-offs.',
       '- A user correction that changes how future work should be done is durable — capture it as procedural guidance.',
@@ -609,7 +665,7 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
         'none',
         requestId,
         deps.state.chatRunPreferences[params.chatJid] || {},
-        {},
+        { dryRun: params.action === 'dry-run' },
         abortController.signal,
       );
       deps.updateChatUsage(params.chatJid, run.usage);
@@ -1457,6 +1513,91 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
       return;
     }
 
+    // WS2.3: Handle pending task approve/reject callbacks
+    // These must be checked before the generic "not panel:" return
+    if (
+      q.data.startsWith('task:approve:') ||
+      q.data.startsWith('task:reject:')
+    ) {
+      // isMainChat guard - these are operator-only actions
+      if (!deps.isMainChat(q.chatJid)) {
+        deps.logTelegramCommandAudit(q.chatJid, q.data, false, 'non-main chat');
+        await deps.sendMessage(
+          q.chatJid,
+          `${deps.constants.assistantName}: task approval actions are only available in the main/admin chat.`,
+        );
+        return;
+      }
+
+      const colonIdx = q.data.indexOf(':');
+      const action = colonIdx >= 0 ? q.data.slice(0, colonIdx) : null; // 'task' or empty
+      const rest = colonIdx >= 0 ? q.data.slice(colonIdx + 1) : q.data;
+      const actionPartIdx = rest.indexOf(':');
+      if (actionPartIdx < 0) {
+        await deps.sendMessage(q.chatJid, 'Invalid task callback.');
+        return;
+      }
+      const taskAction = rest.slice(0, actionPartIdx); // 'approve' or 'reject'
+      const token = rest.slice(actionPartIdx + 1);
+
+      if (taskAction !== 'approve' && taskAction !== 'reject') {
+        await deps.sendMessage(q.chatJid, 'Invalid task callback action.');
+        return;
+      }
+
+      // Look up the token to get taskId and groupFolder
+      const tokenEntry = deps.getPendingTaskToken(token);
+      if (!tokenEntry) {
+        deps.logTelegramCommandAudit(
+          q.chatJid,
+          q.data,
+          false,
+          'token not found or expired',
+        );
+        await deps.sendMessage(
+          q.chatJid,
+          'This task approval button has expired. Run /tasks to refresh the pending list.',
+        );
+        return;
+      }
+
+      // Perform the action
+      if (taskAction === 'approve') {
+        // Flip status to 'active'
+        deps.updateTask(tokenEntry.taskId, { status: 'active' });
+        // Write audit line
+        deps.recordTaskAuditEvent(tokenEntry.groupFolder, {
+          taskId: tokenEntry.taskId,
+          kind: 'approve',
+          operatorJid: q.chatJid,
+          priorStatus: 'pending_approval',
+          newStatus: 'active',
+        });
+        deps.logTelegramCommandAudit(q.chatJid, q.data, true, 'task approved');
+        await deps.sendMessage(
+          q.chatJid,
+          `Task ${tokenEntry.taskId} approved. It will run on its next scheduled time.`,
+        );
+      } else {
+        // Reject: delete the row
+        deps.deleteTask(tokenEntry.taskId);
+        // Write audit line
+        deps.recordTaskAuditEvent(tokenEntry.groupFolder, {
+          taskId: tokenEntry.taskId,
+          kind: 'reject',
+          operatorJid: q.chatJid,
+          priorStatus: 'pending_approval',
+          newStatus: null,
+        });
+        deps.logTelegramCommandAudit(q.chatJid, q.data, true, 'task rejected');
+        await deps.sendMessage(
+          q.chatJid,
+          `Task ${tokenEntry.taskId} rejected and deleted.`,
+        );
+      }
+      return;
+    }
+
     if (!q.data.startsWith('panel:')) {
       return;
     }
@@ -1494,6 +1635,23 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
           kind: 'show-groups',
         });
         return;
+      case 'panel:pending-tasks': {
+        deps.logTelegramCommandAudit(q.chatJid, q.data, true, 'ok');
+        const pending = deps.formatPendingTasksText({
+          registerToken: (taskId, groupFolder, action) =>
+            deps.registerPendingTaskToken(taskId, groupFolder, action),
+        });
+        if (deps.state.telegramBot?.sendMessageWithKeyboard) {
+          await deps.state.telegramBot.sendMessageWithKeyboard(
+            q.chatJid,
+            pending.text,
+            pending.keyboard,
+          );
+        } else {
+          await deps.sendMessage(q.chatJid, pending.text);
+        }
+        return;
+      }
       case 'panel:health':
         deps.logTelegramCommandAudit(q.chatJid, q.data, true, 'ok');
         const healthResponse = deps.formatStatusText(q.chatJid);
@@ -1557,6 +1715,13 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
         );
         return true;
       case 'api-key': {
+        if (m.messageId && deps.state.telegramBot?.deleteMessage) {
+          try {
+            await deps.state.telegramBot.deleteMessage(m.chatJid, m.messageId);
+          } catch {
+            // Best-effort cleanup; Telegram may reject deletion by age/rights.
+          }
+        }
         const snapshot = deps.resolveRuntimeConfigSnapshot(
           deps.getRuntimeConfigEnv(),
         );
@@ -1567,7 +1732,7 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
         });
         await deps.sendMessage(
           m.chatJid,
-          `Saved API key in ${snapshot.apiKeyEnv}.`,
+          `Saved API key in ${snapshot.apiKeyEnv}. The key message was removed when Telegram permissions allowed it.`,
         );
         return true;
       }
@@ -1744,6 +1909,49 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
         message: { role: 'assistant', content: listed.text },
       });
       await deps.sendMessage(m.chatJid, listed.text);
+      return true;
+    }
+
+    if (cmd === '/refresh-models' || cmd === '/refresh_models') {
+      if (!isMainGroup) {
+        deps.logTelegramCommandAudit(m.chatJid, cmd, false, 'not main');
+        await deps.sendMessage(m.chatJid, 'Admin-only command.');
+        return true;
+      }
+      deps.logTelegramCommandAudit(m.chatJid, cmd, true, 'ok');
+      await deps.sendMessage(m.chatJid, 'Refreshing model list from providers...');
+      const refreshed = deps.loadPiModels(true);
+      if (!refreshed.ok) {
+        const text = `Refresh failed: ${refreshed.text}`;
+        deps.emitTuiChatEvent({
+          runId: `cmd-${cmd.slice(1)}-${Date.now()}`,
+          sessionKey: deps.getSessionKeyForChat(m.chatJid),
+          state: 'final',
+          message: { role: 'assistant', content: text },
+        });
+        await deps.sendMessage(m.chatJid, text);
+        return true;
+      }
+      const total = refreshed.entries.length;
+      const providerCounts = new Map<string, number>();
+      for (const entry of refreshed.entries) {
+        providerCounts.set(entry.provider, (providerCounts.get(entry.provider) || 0) + 1);
+      }
+      const providerSummary = Array.from(providerCounts.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([p, c]) => `${p}: ${c}`)
+        .join(', ');
+      const warningText = refreshed.warnings?.length
+        ? `\nWarnings:\n${refreshed.warnings.map((w) => `- ${w}`).join('\n')}`
+        : '';
+      const text = `Model list refreshed. ${total} models across ${providerCounts.size} providers.\n${providerSummary}${warningText}`;
+      deps.emitTuiChatEvent({
+        runId: `cmd-${cmd.slice(1)}-${Date.now()}`,
+        sessionKey: deps.getSessionKeyForChat(m.chatJid),
+        state: 'final',
+        message: { role: 'assistant', content: text },
+      });
+      await deps.sendMessage(m.chatJid, text);
       return true;
     }
 
@@ -2338,6 +2546,57 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
       return true;
     }
 
+    // WS6.2: /learning digest command - single operator surface for pause state,
+    // evaluator stats, recent skips, and pending task approvals.
+    if (cmd === '/learning') {
+      const sub = (rest[0] || '').toLowerCase();
+      // Main-chat only for all /learning commands (VAL-WS6-008)
+      if (!isMainGroup) {
+        deps.logTelegramCommandAudit(m.chatJid, cmd, false, 'not main/admin');
+        await deps.sendMessage(
+          m.chatJid,
+          `${deps.constants.assistantName}: /learning is only available in the main/admin chat.`,
+        );
+        return true;
+      }
+      if (sub === 'pause' || sub === 'resume') {
+        const newState = sub === 'pause';
+        if (deps.state.learningPaused === newState) {
+          deps.logTelegramCommandAudit(
+            m.chatJid,
+            cmd,
+            true,
+            `already ${sub}ed`,
+          );
+          await deps.sendMessage(
+            m.chatJid,
+            `Learning is already ${newState ? 'paused' : 'active'}.`,
+          );
+          return true;
+        }
+        deps.state.learningPaused = newState;
+        deps.saveState?.();
+        deps.logTelegramCommandAudit(m.chatJid, cmd, true, sub);
+        await deps.sendMessage(
+          m.chatJid,
+          newState
+            ? 'Learning paused. All autonomous loops will short-circuit.'
+            : 'Learning resumed.',
+        );
+        return true;
+      }
+      // Digest view
+      deps.logTelegramCommandAudit(m.chatJid, cmd, true, 'digest');
+      await deps.sendMessage(m.chatJid, deps.formatLearningDigest());
+      return true;
+    }
+
+    if (cmd === '/settings') {
+      deps.logTelegramCommandAudit(m.chatJid, cmd, true, 'ok');
+      await deps.sendTelegramSettingsPanel(m.chatJid, { kind: 'show-home' });
+      return true;
+    }
+
     if (!isMainGroup) {
       deps.logTelegramCommandAudit(m.chatJid, cmd, false, 'non-main chat');
       await deps.sendMessage(
@@ -2413,14 +2672,6 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
     }
 
     if (cmd === '/reflect') {
-      if (!isMainGroup) {
-        deps.logTelegramCommandAudit(m.chatJid, cmd, false, 'not main/admin');
-        await deps.sendMessage(
-          m.chatJid,
-          `${deps.constants.assistantName}: /reflect is only available in the main/admin chat.`,
-        );
-        return true;
-      }
       const first = (rest[0] || '').trim().toLowerCase();
       if (first === 'help') {
         deps.logTelegramCommandAudit(m.chatJid, cmd, true, 'help');
@@ -2439,6 +2690,19 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
       }
       const isDryRun = first === 'dry-run' || first === 'dry';
       const action: 'run' | 'dry-run' = isDryRun ? 'dry-run' : 'run';
+      if (action === 'run' && deps.state.learningPaused) {
+        deps.logTelegramCommandAudit(
+          m.chatJid,
+          cmd,
+          false,
+          'blocked: learning paused',
+        );
+        await deps.sendMessage(
+          m.chatJid,
+          'Learning is paused — run /learning resume first, or use /reflect dry-run.',
+        );
+        return true;
+      }
       const focus = (isDryRun ? rest.slice(1) : rest).join(' ').trim();
       deps.logTelegramCommandAudit(
         m.chatJid,
@@ -2456,15 +2720,21 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
       return true;
     }
 
+    const knowledgeLibrarianAction =
+      cmd === '/knowledge' &&
+      ['run', 'dry-run', 'log', 'progress', 'capture'].includes(
+        (rest[0] || '').trim().toLowerCase(),
+      );
     if (
       cmd === '/skill-manager' ||
       cmd === '/skill_manager' ||
       cmd === '/librarian' ||
-      cmd === '/curator'
+      cmd === '/curator' ||
+      knowledgeLibrarianAction
     ) {
       const isSkillManager =
         cmd === '/skill-manager' || cmd === '/skill_manager';
-      const isLibrarian = cmd === '/librarian';
+      const isLibrarian = cmd === '/librarian' || knowledgeLibrarianAction;
       const isDeprecatedCurator = cmd === '/curator';
 
       if (!isMainGroup) {
@@ -2669,9 +2939,31 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
         );
         return true;
       }
+      if (sub === 'pause' || sub === 'resume' || sub === 'cancel') {
+        const taskId = rest[1];
+        if (!taskId) {
+          await deps.sendMessage(m.chatJid, `Usage: /tasks ${sub} <taskId>`);
+          return true;
+        }
+        if (!deps.getTaskById(taskId)) {
+          await deps.sendMessage(m.chatJid, `Task not found: ${taskId}`);
+          return true;
+        }
+        if (sub === 'pause') {
+          deps.updateTask(taskId, { status: 'paused' });
+          await deps.sendMessage(m.chatJid, `Paused task: ${taskId}`);
+        } else if (sub === 'resume') {
+          deps.updateTask(taskId, { status: 'active' });
+          await deps.sendMessage(m.chatJid, `Resumed task: ${taskId}`);
+        } else {
+          deps.deleteTask(taskId);
+          await deps.sendMessage(m.chatJid, `Canceled task: ${taskId}`);
+        }
+        return true;
+      }
       await deps.sendMessage(
         m.chatJid,
-        'Usage: /tasks [list|due|detail <taskId>|runs <taskId> [limit]]',
+        'Usage: /tasks [list|due|detail <taskId>|runs <taskId> [limit]|pause <taskId>|resume <taskId>|cancel <taskId>]',
       );
       return true;
     }
@@ -2765,12 +3057,7 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
 
     if (cmd === '/panel') {
       deps.logTelegramCommandAudit(m.chatJid, cmd, true, 'ok');
-      if (!deps.state.telegramBot?.sendMessageWithKeyboard) return true;
-      await deps.state.telegramBot.sendMessageWithKeyboard(
-        m.chatJid,
-        'Admin panel:',
-        deps.buildAdminPanelKeyboard(),
-      );
+      await deps.sendTelegramSettingsPanel(m.chatJid, { kind: 'show-home' });
       return true;
     }
 

@@ -279,7 +279,7 @@ export async function runHeartbeatTurn(reason = 'interval'): Promise<void> {
           resolveGroupIpcPath(MAIN_GROUP_FOLDER),
           'current_tasks.json',
         ),
-        runtimeLogPath: path.join(process.cwd(), 'logs', 'fft_nano.log'),
+        runtimeLogPath: path.join(process.cwd(), 'logs', 'nano-core.log'),
       });
       logger.debug(
         { chatJid: mainChatJid, reason, checklistPath },

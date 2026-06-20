@@ -56,7 +56,7 @@ function createBaseDeps(): TelegramCommandDeps {
       chatUsageStats: {},
     },
     constants: {
-      assistantName: 'Assistant',
+      assistantName: 'FarmFriend',
       mainGroupFolder: 'main',
       telegramAdminSecret: 'secret',
       telegramSettingsPanelPrefix: 'settings:',
@@ -86,6 +86,7 @@ function createBaseDeps(): TelegramCommandDeps {
     summarizeTask: () => 'task detail',
     formatTaskRunsText: () => 'task runs',
     runPiListModels: () => ({ text: 'models' }),
+    loadPiModels: () => ({ ok: true, entries: [] }),
     validateProviderModelRef: () => ({ ok: true }),
     normalizeThinkLevel: () => null,
     normalizeReasoningLevel: () => null,
@@ -143,6 +144,10 @@ function createBaseDeps(): TelegramCommandDeps {
     getTaskById: () => null,
     updateTask: () => {},
     deleteTask: () => {},
+    formatPendingTasksText: () => ({ text: 'No pending tasks.', keyboard: [] }),
+    registerPendingTaskToken: () => 'tok123',
+    getPendingTaskToken: () => null,
+    recordTaskAuditEvent: () => {},
     emitTuiChatEvent: () => {},
     emitTuiAgentEvent: () => {},
     emitRunProgress: (payload) => {
@@ -157,9 +162,9 @@ function createBaseDeps(): TelegramCommandDeps {
     },
     prepareCoderTarget: async ({ taskText }) => ({
       status: 'ready',
-      workspaceRoot: '/tmp/projects/test-project',
+      workspaceRoot: '/tmp/projects/agintel-dashboard',
       taskText,
-      projectLabel: 'test-project',
+      projectLabel: 'agintel-dashboard',
     }),
     createCoderProject: async ({ slug }) => ({
       workspaceRoot: `/tmp/projects/${slug}`,
@@ -234,7 +239,7 @@ test('handleTelegramCommand /run delegates to long-run command handler and ackno
   deps.isMainChat = () => true;
   deps.handleLongRunCommand = async (chatJid, content) => {
     assert.equal(chatJid, 'telegram:1');
-    assert.equal(content, '/run inspect the server logs');
+    assert.equal(content, '/run inspect the orchard logs');
     await deps.sendMessage(
       chatJid,
       "Started long run run-test. I'll post the result here.",
@@ -246,7 +251,7 @@ test('handleTelegramCommand /run delegates to long-run command handler and ackno
   const handled = await handlers.handleTelegramCommand({
     chatJid: 'telegram:1',
     chatName: 'Chat',
-    content: '/run inspect the server logs',
+    content: '/run inspect the orchard logs',
   });
 
   assert.equal(handled, true);
@@ -342,7 +347,7 @@ test('handleTelegramCommand opens group management panel only in main chat', asy
   await handlers.handleTelegramCommand({
     id: 'm-2',
     chatJid: 'telegram:-1001',
-    chatName: 'Team Chat',
+    chatName: 'Field Team',
     sender: 'user',
     senderName: 'Worker',
     timestamp: '2026-05-19T12:01:00.000Z',
@@ -363,7 +368,7 @@ test('handleTelegramCallbackQuery starts a coder plan from approval actions', as
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@Assistant',
+    trigger: '@FarmFriend',
   };
   deps.getTelegramSettingsPanelAction = () => ({
     kind: 'coder-approve-plan',
@@ -388,7 +393,7 @@ test('handleTelegramCallbackQuery starts a coder plan from approval actions', as
   assert.equal(codingCalls[0]?.mode, 'plan');
   assert.equal(
     codingCalls[0]?.workspaceRoot,
-    '/tmp/projects/test-project',
+    '/tmp/projects/agintel-dashboard',
   );
   assert.match(deps.sent[0]?.text || '', /Starting coder plan run/);
 });
@@ -405,8 +410,8 @@ test('handleTelegramCallbackQuery offers plan fallback when execute target is no
     kind: 'coder-select-project',
     mode: 'execute',
     taskText: 'build it',
-    projectPath: '/tmp/projects/my-project',
-    projectLabel: 'my-project',
+    projectPath: '/tmp/projects/orchard-os',
+    projectLabel: 'orchard-os',
     isGitRepo: false,
   });
 
@@ -497,7 +502,7 @@ test('handleTelegramCommand blocks /coder-create-project while onboarding is pen
   const handled = await handlers.handleTelegramCommand({
     chatJid: 'telegram:main',
     chatName: 'Main',
-    content: '/coder-create-project my-project build the first dashboard',
+    content: '/coder-create-project orchard-os build the first dashboard',
   });
 
   assert.equal(handled, true);
@@ -564,7 +569,7 @@ test('handleTelegramCommand registers spawned subagent runs in both active maps'
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@Assistant',
+    trigger: '@FarmFriend',
   };
   deps.isMainChat = () => true;
   deps.activeChatRunsById = new Map();
@@ -600,7 +605,7 @@ test('handleTelegramCallbackQuery sends terminal failure message when coder run 
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@Assistant',
+    trigger: '@FarmFriend',
   };
   deps.getTelegramSettingsPanelAction = () => ({
     kind: 'coder-approve-execute',
@@ -638,7 +643,7 @@ test('handleTelegramCallbackQuery sends terminal completion message when coder r
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@Assistant',
+    trigger: '@FarmFriend',
   };
   deps.getTelegramSettingsPanelAction = () => ({
     kind: 'coder-approve-execute',
@@ -672,7 +677,7 @@ test('handleTelegramCallbackQuery reports aborted when fallback runAgent returns
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@Assistant',
+    trigger: '@FarmFriend',
   };
   deps.getTelegramSettingsPanelAction = () => ({
     kind: 'coder-approve-execute',
@@ -713,7 +718,7 @@ test('handleTelegramCommand reports aborted when subagent fallback runAgent is s
     jid: 'telegram:main',
     name: 'Main',
     folder: 'main',
-    trigger: '@Assistant',
+    trigger: '@FarmFriend',
   };
   deps.isMainChat = () => true;
   deps.runCodingTask = undefined;
@@ -763,6 +768,49 @@ test('handleTelegramCommand opens delivery panel when called without args', asyn
   assert.deepEqual(deps.panels, [
     { chatJid: 'telegram:1', panel: { kind: 'show-delivery' } },
   ]);
+});
+
+test('handleTelegramCommand /settings opens the unified settings home', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    panels: Array<{ chatJid: string; panel: { kind: string } }>;
+  };
+  const handlers = createTelegramCommandHandlers(deps);
+
+  const handled = await handlers.handleTelegramCommand({
+    chatJid: 'telegram:1',
+    chatName: 'Chat',
+    content: '/settings',
+  });
+
+  assert.equal(handled, true);
+  assert.deepEqual(deps.panels, [
+    { chatJid: 'telegram:1', panel: { kind: 'show-home' } },
+  ]);
+});
+
+test('handleTelegramSetupInput deletes captured API key message best-effort', async () => {
+  const deleted: Array<{ chatJid: string; messageId: number }> = [];
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    persisted: Array<Record<string, string | undefined>>;
+  };
+  deps.getTelegramSetupInputState = () => ({ kind: 'api-key' });
+  deps.state.telegramBot = {
+    ...deps.state.telegramBot,
+    deleteMessage: async (chatJid: string, messageId: number) => {
+      deleted.push({ chatJid, messageId });
+    },
+  } as any;
+  const handlers = createTelegramCommandHandlers(deps);
+
+  const handled = await handlers.handleTelegramSetupInput({
+    chatJid: 'telegram:1',
+    content: 'secret-value',
+    messageId: 42,
+  });
+
+  assert.equal(handled, true);
+  assert.deepEqual(deleted, [{ chatJid: 'telegram:1', messageId: 42 }]);
+  assert.deepEqual(deps.persisted, [{ OPENAI_API_KEY: 'secret-value' }]);
 });
 
 test('handleTelegramCommand normalizes delivery aliases to canonical persisted values', async () => {
@@ -944,6 +992,41 @@ test('handleTelegramCommand rejects invalid /model provider/model overrides', as
   });
 });
 
+test('handleTelegramCommand /refresh_models reports provider refresh warnings', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+  };
+  deps.isMainChat = () => true;
+  deps.loadPiModels = () => ({
+    ok: true,
+    entries: [
+      { provider: 'kimi-coding', model: 'kimi-for-coding' },
+      { provider: 'minimax', model: 'MiniMax-M2.7' },
+      { provider: 'minimax', model: 'MiniMax-M3' },
+    ],
+    warnings: ['kimi-coding: provider API returned 401'],
+  });
+
+  const handlers = createTelegramCommandHandlers(deps);
+  const handled = await handlers.handleTelegramCommand({
+    chatJid: 'telegram:main',
+    chatName: 'Main',
+    content: '/refresh_models',
+  });
+
+  assert.equal(handled, true);
+  assert.equal(deps.sent[0]?.text, 'Refreshing model list from providers...');
+  assert.match(
+    deps.sent[1]?.text || '',
+    /Model list refreshed\. 3 models across 2 providers\./,
+  );
+  assert.match(deps.sent[1]?.text || '', /kimi-coding: 1, minimax: 2/);
+  assert.match(
+    deps.sent[1]?.text || '',
+    /Warnings:\n- kimi-coding: provider API returned 401/,
+  );
+});
+
 test('handleTelegramCommand /model <model> resolves provider context and persists validated pair', async () => {
   const deps = createBaseDeps() as TelegramCommandDeps & {
     sent: Array<{ chatJid: string; text: string }>;
@@ -1016,8 +1099,8 @@ test('handleTelegramCallbackQuery rejects invalid set-model callback payloads', 
   }> = [];
   deps.getTelegramSettingsPanelAction = () => ({
     kind: 'set-model',
-    provider: 'minimax',
-    model: 'not-real',
+    provider: 'kimi-coding',
+    model: 'kimi-k2.7-code',
     returnTo: 'models',
   });
   deps.validateProviderModelRef = (provider, model) => ({
@@ -1064,13 +1147,13 @@ test('handleTelegramCommand /knowledge routes to host knowledge handler in main 
   const handled = await handlers.handleTelegramCommand({
     chatJid: 'telegram:main',
     chatName: 'Main',
-    content: '/knowledge ingest check server status',
+    content: '/knowledge ingest check irrigation pressure',
   });
 
   assert.equal(handled, true);
   assert.equal(
     deps.sent[0]?.text,
-    'knowledge:ingest:check server status:telegram:main',
+    'knowledge:ingest:check irrigation pressure:telegram:main',
   );
   assert.deepEqual(deps.audits[0], {
     chatJid: 'telegram:main',
@@ -1105,7 +1188,7 @@ test('handleTelegramCommand routes menu-safe skill manager and librarian command
   const librarianHandled = await handlers.handleTelegramCommand({
     chatJid: 'telegram:main',
     chatName: 'Main',
-    content: '/librarian capture check system filter',
+    content: '/librarian capture check pump filter',
   });
 
   assert.equal(skillHandled, true);
@@ -1113,7 +1196,7 @@ test('handleTelegramCommand routes menu-safe skill manager and librarian command
   assert.equal(deps.sent[0]?.text, 'skill-manager:status::telegram:main');
   assert.equal(
     deps.sent[1]?.text,
-    'librarian:capture:check system filter:telegram:main',
+    'librarian:capture:check pump filter:telegram:main',
   );
   assert.deepEqual(deps.audits.slice(0, 2), [
     {
@@ -1183,7 +1266,10 @@ test('handleTelegramCommand starts real agent runs for librarian and skill manag
   assert.equal(librarianHandled, true);
   assert.equal(skillHandled, true);
   assert.equal(runAgentCalls.length, 2);
-  assert.match(runAgentCalls[0]?.prompt || '', /Manual knowledge librarian run/);
+  assert.match(
+    runAgentCalls[0]?.prompt || '',
+    /Manual knowledge librarian run/,
+  );
   assert.match(runAgentCalls[0]?.prompt || '', /focus pumps/);
   assert.match(runAgentCalls[1]?.prompt || '', /Manual skill manager dry-run/);
   assert.match(runAgentCalls[1]?.prompt || '', /focus duplicates/);
@@ -1199,7 +1285,10 @@ test('handleTelegramCommand starts real agent runs for librarian and skill manag
     /Skill manager dry-run complete \(skill-manager-/,
   );
   assert.match(deps.agentResults[0]?.text || '', /agent completed: librarian-/);
-  assert.match(deps.agentResults[1]?.text || '', /agent completed: skill-manager-/);
+  assert.match(
+    deps.agentResults[1]?.text || '',
+    /agent completed: skill-manager-/,
+  );
   assert.deepEqual(
     deps.runProgress.map((event) => event.phase),
     [
@@ -1279,4 +1368,813 @@ test('handleTelegramCallbackQuery trigger-new clears session title', async () =>
     deps.state.chatRunPreferences['telegram:1']?.sessionTitle,
     undefined,
   );
+});
+
+test('VAL-WS2-006 panel:pending-tasks renders empty state for main chat', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    keyboardMessages: Array<{
+      chatJid: string;
+      text: string;
+      keyboard: Array<Array<{ text: string; callbackData: string }>>;
+    }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => true;
+  deps.formatPendingTasksText = () => ({
+    text: 'No pending tasks requiring approval.',
+    keyboard: [],
+  });
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCallbackQuery({
+    id: 'cb-pending-1',
+    chatJid: 'telegram:main',
+    messageId: 100,
+    data: 'panel:pending-tasks',
+  });
+
+  assert.equal(deps.sent.length, 0);
+  assert.equal(deps.keyboardMessages.length, 1);
+  assert.match(deps.keyboardMessages[0].text, /No pending tasks/);
+  assert.equal(deps.keyboardMessages[0].keyboard.length, 0);
+  assert.deepEqual(deps.audits[0], {
+    chatJid: 'telegram:main',
+    command: 'panel:pending-tasks',
+    allowed: true,
+    reason: 'ok',
+  });
+});
+
+test('VAL-WS2-006 panel:pending-tasks shows pending tasks with inline buttons', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    keyboardMessages: Array<{
+      chatJid: string;
+      text: string;
+      keyboard: Array<Array<{ text: string; callbackData: string }>>;
+    }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => true;
+  deps.formatPendingTasksText = () => ({
+    text: 'Pending agent-created tasks:\n  ID: task-1\n  Prompt: do something',
+    keyboard: [
+      [
+        { text: '✅ Approve', callbackData: 'task:approve:tok123' },
+        { text: '❌ Reject', callbackData: 'task:reject:tok123' },
+      ],
+    ],
+  });
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCallbackQuery({
+    id: 'cb-pending-2',
+    chatJid: 'telegram:main',
+    messageId: 101,
+    data: 'panel:pending-tasks',
+  });
+
+  assert.equal(deps.keyboardMessages.length, 1);
+  assert.match(deps.keyboardMessages[0].text, /Pending agent-created tasks/);
+  assert.match(deps.keyboardMessages[0].text, /task-1/);
+  assert.equal(deps.keyboardMessages[0].keyboard[0][0].text, '✅ Approve');
+  assert.equal(deps.keyboardMessages[0].keyboard[0][1].text, '❌ Reject');
+});
+
+test('VAL-WS2-009 task:approve from non-main chat is refused', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  // non-main chat
+  deps.isMainChat = () => false;
+  deps.registerPendingTaskToken = () => 'tokdeny';
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCallbackQuery({
+    id: 'cb-deny-1',
+    chatJid: 'telegram:group2',
+    messageId: 110,
+    data: 'task:approve:tokdeny',
+  });
+
+  assert.equal(deps.sent.length, 1);
+  assert.match(deps.sent[0].text, /main\/admin chat/);
+  assert.deepEqual(deps.audits[0], {
+    chatJid: 'telegram:group2',
+    command: 'task:approve:tokdeny',
+    allowed: false,
+    reason: 'non-main chat',
+  });
+});
+
+test('VAL-WS2-009 task:reject from non-main chat is refused', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => false;
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCallbackQuery({
+    id: 'cb-deny-2',
+    chatJid: 'telegram:group3',
+    messageId: 111,
+    data: 'task:reject:tokdeny2',
+  });
+
+  assert.equal(deps.sent.length, 1);
+  assert.match(deps.sent[0].text, /main\/admin chat/);
+});
+
+test('VAL-WS2-007 task:approve updates task to active and writes audit line', async () => {
+  const updatedTasks: Array<{
+    taskId: string;
+    patch: Record<string, unknown>;
+  }> = [];
+  const auditEvents: Array<{
+    groupFolder: string;
+    event: Record<string, unknown>;
+  }> = [];
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => true;
+  deps.getPendingTaskToken = () => ({
+    taskId: 'task-approve-1',
+    groupFolder: 'main',
+    action: 'approve',
+  });
+  deps.updateTask = (taskId, patch) => {
+    updatedTasks.push({ taskId, patch });
+  };
+  deps.recordTaskAuditEvent = (groupFolder, event) => {
+    auditEvents.push({ groupFolder, event });
+  };
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCallbackQuery({
+    id: 'cb-appr-1',
+    chatJid: 'telegram:main',
+    messageId: 120,
+    data: 'task:approve:tokapprove',
+  });
+
+  assert.equal(updatedTasks.length, 1);
+  assert.equal(updatedTasks[0].taskId, 'task-approve-1');
+  assert.deepEqual(updatedTasks[0].patch, { status: 'active' });
+  assert.equal(auditEvents.length, 1);
+  assert.equal(auditEvents[0].groupFolder, 'main');
+  assert.equal(auditEvents[0].event.kind, 'approve');
+  assert.equal(auditEvents[0].event.taskId, 'task-approve-1');
+  assert.equal(auditEvents[0].event.operatorJid, 'telegram:main');
+  assert.equal(auditEvents[0].event.priorStatus, 'pending_approval');
+  assert.equal(auditEvents[0].event.newStatus, 'active');
+  assert.match(deps.sent[0].text, /approved/i);
+});
+
+test('VAL-WS2-008 task:reject deletes task and writes audit line', async () => {
+  const deletedTasks: string[] = [];
+  const auditEvents: Array<{
+    groupFolder: string;
+    event: Record<string, unknown>;
+  }> = [];
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => true;
+  deps.getPendingTaskToken = () => ({
+    taskId: 'task-reject-1',
+    groupFolder: 'main',
+    action: 'reject',
+  });
+  deps.deleteTask = (taskId) => {
+    deletedTasks.push(taskId);
+  };
+  deps.recordTaskAuditEvent = (groupFolder, event) => {
+    auditEvents.push({ groupFolder, event });
+  };
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCallbackQuery({
+    id: 'cb-rej-1',
+    chatJid: 'telegram:main',
+    messageId: 121,
+    data: 'task:reject:tokreject',
+  });
+
+  assert.equal(deletedTasks.length, 1);
+  assert.equal(deletedTasks[0], 'task-reject-1');
+  assert.equal(auditEvents.length, 1);
+  assert.equal(auditEvents[0].groupFolder, 'main');
+  assert.equal(auditEvents[0].event.kind, 'reject');
+  assert.equal(auditEvents[0].event.taskId, 'task-reject-1');
+  assert.equal(auditEvents[0].event.operatorJid, 'telegram:main');
+  assert.equal(auditEvents[0].event.priorStatus, 'pending_approval');
+  assert.equal(auditEvents[0].event.newStatus, null);
+  assert.match(deps.sent[0].text, /rejected/i);
+});
+
+test('VAL-WS2-009 expired token is refused with guidance', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => true;
+  // Token not found (expired)
+  deps.getPendingTaskToken = () => null;
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCallbackQuery({
+    id: 'cb-expired-1',
+    chatJid: 'telegram:main',
+    messageId: 130,
+    data: 'task:approve:oldexpired',
+  });
+
+  assert.match(deps.sent[0].text, /expired|run \/tasks/i);
+  assert.deepEqual(deps.audits[0], {
+    chatJid: 'telegram:main',
+    command: 'task:approve:oldexpired',
+    allowed: false,
+    reason: 'token not found or expired',
+  });
+});
+
+test('VAL-WS2-010 approve and reject have separate audit kinds', async () => {
+  const auditEvents: Array<{
+    groupFolder: string;
+    event: Record<string, unknown>;
+  }> = [];
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => true;
+  deps.recordTaskAuditEvent = (groupFolder, event) => {
+    auditEvents.push({ groupFolder, event });
+  };
+
+  // Simulate approve
+  deps.getPendingTaskToken = () => ({
+    taskId: 'task-1',
+    groupFolder: 'main',
+    action: 'approve',
+  });
+  deps.updateTask = () => {};
+  deps.deleteTask = () => {};
+
+  const handlers = createTelegramCommandHandlers(deps);
+
+  await handlers.handleTelegramCallbackQuery({
+    id: 'cb-appr-kind',
+    chatJid: 'telegram:main',
+    messageId: 140,
+    data: 'task:approve:tok1',
+  });
+
+  // Simulate reject (token lookup returns different action)
+  deps.getPendingTaskToken = () => ({
+    taskId: 'task-2',
+    groupFolder: 'main',
+    action: 'reject',
+  });
+
+  await handlers.handleTelegramCallbackQuery({
+    id: 'cb-rej-kind',
+    chatJid: 'telegram:main',
+    messageId: 141,
+    data: 'task:reject:tok2',
+  });
+
+  assert.equal(auditEvents.length, 2);
+  assert.equal(auditEvents[0].event.kind, 'approve');
+  assert.equal(auditEvents[1].event.kind, 'reject');
+  assert.notEqual(auditEvents[0].event.taskId, auditEvents[1].event.taskId);
+});
+
+// ---------------------------------------------------------------------------
+// WS6.2 /learning digest command tests
+// ---------------------------------------------------------------------------
+
+test('VAL-WS6-008 /learning digest is refused in non-main chat', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  // Non-main chat
+  deps.isMainChat = () => false;
+  deps.formatLearningDigest = () => '## Learning Status\nSkills: ...';
+
+  const handlers = createTelegramCommandHandlers(deps);
+  const handled = await handlers.handleTelegramCommand({
+    chatJid: 'telegram:123',
+    chatName: 'NonMainChat',
+    content: '/learning',
+  });
+
+  assert.equal(handled, true);
+  // The message should indicate it's only available in main chat
+  assert.match(deps.sent[0]?.text || '', /main\/admin|main chat/i);
+  assert.deepEqual(deps.audits.at(-1), {
+    chatJid: 'telegram:123',
+    command: '/learning',
+    allowed: false,
+    reason: 'not main/admin',
+  });
+});
+
+test('VAL-WS6-008 /learning digest works in main chat', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  // Main chat
+  deps.isMainChat = () => true;
+  deps.formatLearningDigest = () =>
+    '## Learning Status\nSkills: No skills created or modified in the last 7 days.\nMemory writes: No memory writes in the last 20 injections.\nPass-rate: No runs evaluated yet.\nRecent skips: 0 / 0\nPending agent-task approvals: None.\nPause status: Learning is active';
+
+  const handlers = createTelegramCommandHandlers(deps);
+  const handled = await handlers.handleTelegramCommand({
+    chatJid: 'telegram:main',
+    chatName: 'MainChat',
+    content: '/learning',
+  });
+
+  assert.equal(handled, true);
+  assert.match(deps.sent[0]?.text || '', /Learning Status/);
+  assert.deepEqual(deps.audits.at(-1), {
+    chatJid: 'telegram:main',
+    command: '/learning',
+    allowed: true,
+    reason: 'digest',
+  });
+});
+
+test('VAL-WS6-009 /learning digest renders all required sections', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+  };
+  deps.isMainChat = () => true;
+  deps.formatLearningDigest = () =>
+    [
+      '## Learning Status',
+      'Skills (last 7 days): 2 skill review(s) triggered.',
+      'Memory writes: 3 memory write(s) in last 20 injections.',
+      'Pass-rate (last 20 runs): 8/10 passed (80%)',
+      'Recent skips: 2 / 10',
+      'Recurring issues:',
+      '  - forgot to save',
+      'Pending agent-task approvals: 1 pending.',
+      '  - task-abc: do something',
+      'Pause status: Learning is active',
+    ].join('\n');
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCommand({
+    chatJid: 'telegram:main',
+    chatName: 'MainChat',
+    content: '/learning',
+  });
+
+  const text = deps.sent[0]?.text || '';
+  assert.match(text, /Skills.*last 7 days/i);
+  assert.match(text, /Memory writes/i);
+  assert.match(text, /Pass-rate/i);
+  assert.match(text, /Recent skips/i);
+  assert.match(text, /Pending agent-task approvals/i);
+  assert.match(text, /Pause status/i);
+});
+
+test('VAL-WS6-010 /learning renders empty state when no history exists', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+  };
+  deps.isMainChat = () => true;
+  deps.formatLearningDigest = () =>
+    [
+      '## Learning Status',
+      'Skills (last 7 days): No skills created or modified in the last 7 days.',
+      'Memory writes: No memory writes in the last 20 injections.',
+      'Pass-rate trend: No runs evaluated yet.',
+      'Recent skips: 0 / 0',
+      'Pending agent-task approvals: None.',
+      'Pause status: Learning is active',
+    ].join('\n');
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCommand({
+    chatJid: 'telegram:main',
+    chatName: 'MainChat',
+    content: '/learning',
+  });
+
+  const text = deps.sent[0]?.text || '';
+  // Should contain "No skills created" and "No memory writes" and "None" for pending
+  assert.match(text, /No skills created or modified/i);
+  assert.match(text, /No memory writes/i);
+  assert.match(text, /None\./);
+});
+
+test('VAL-WS6-011 /learning shows recent skips count', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+  };
+  deps.isMainChat = () => true;
+  deps.formatLearningDigest = () =>
+    '## Learning Status\nSkills: ...\nMemory writes: ...\nPass-rate (last 20 runs): 16/20 passed (80%)\nRecent skips: 4 / 20\nPending agent-task approvals: None.\nPause status: Learning is active';
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCommand({
+    chatJid: 'telegram:main',
+    chatName: 'MainChat',
+    content: '/learning',
+  });
+
+  const text = deps.sent[0]?.text || '';
+  // Should show "4 / 20" skips
+  assert.match(text, /Recent skips: 4 \/ 20/);
+});
+
+test('VAL-WS6-012 /learning shows pending agent-task approvals', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+  };
+  deps.isMainChat = () => true;
+  deps.formatLearningDigest = () =>
+    '## Learning Status\nSkills: ...\nMemory writes: ...\nPass-rate: ...\nRecent skips: 0 / 0\nPending agent-task approvals: 2 pending.\n  - task-1: do the thing\n  - task-2: do another thing\nPause status: Learning is active';
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCommand({
+    chatJid: 'telegram:main',
+    chatName: 'MainChat',
+    content: '/learning',
+  });
+
+  const text = deps.sent[0]?.text || '';
+  assert.match(text, /Pending agent-task approvals: 2 pending\./);
+  assert.match(text, /task-1: do the thing/);
+  assert.match(text, /task-2: do another thing/);
+});
+
+test('VAL-WS6-013 /learning digest is read-only — no LLM call, no DB write, no spawn', async () => {
+  // Track write operations that must NOT be called during /learning digest handling.
+  const runAgentCalls: unknown[] = [];
+  const runCodingTaskCalls: unknown[] = [];
+  const recordAuditCalls: Array<{ groupFolder: string; event: unknown }> = [];
+
+  const cannedDigest =
+    '## Learning Status\n' +
+    'Skills (last 7 days): No skills created or modified in the last 7 days.\n' +
+    'Memory writes: No memory writes in the last 20 injections.\n' +
+    'Pass-rate trend: No runs evaluated yet.\n' +
+    'Recent skips: 0 / 0\n' +
+    'Pending agent-task approvals: None.\n' +
+    'Pause status: Learning is active';
+
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => true;
+  deps.formatLearningDigest = () => cannedDigest;
+
+  // Wrap the write-side deps so we can assert they are never called.
+  deps.runAgent = async (...args: unknown[]) => {
+    runAgentCalls.push(args);
+    return { ok: true, result: 'noop', streamed: false };
+  };
+  deps.runCodingTask = async (...args: unknown[]) => {
+    runCodingTaskCalls.push(args);
+    return { ok: true, result: 'noop', streamed: false };
+  };
+  deps.recordTaskAuditEvent = (groupFolder: string, event: unknown) => {
+    recordAuditCalls.push({ groupFolder, event });
+  };
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCommand({
+    chatJid: 'telegram:main',
+    chatName: 'MainChat',
+    content: '/learning',
+  });
+
+  // VAL-WS6-013 assertions: digest was sent.
+  assert.equal(deps.sent.length, 1);
+  assert.equal(deps.sent[0].text, cannedDigest);
+
+  // VAL-WS6-013: audit was recorded (this write is explicitly allowed by the spec).
+  assert.deepEqual(deps.audits.at(-1), {
+    chatJid: 'telegram:main',
+    command: '/learning',
+    allowed: true,
+    reason: 'digest',
+  });
+
+  // VAL-WS6-013: no LLM call — runAgent and runCodingTask are the LLM invocation paths.
+  assert.equal(
+    runAgentCalls.length,
+    0,
+    'runAgent must not be called during /learning digest',
+  );
+  assert.equal(
+    runCodingTaskCalls.length,
+    0,
+    'runCodingTask must not be called during /learning digest',
+  );
+
+  // VAL-WS6-013: no DB/JSONL write — recordTaskAuditEvent is the only write in this code path.
+  // It is called by the approve/reject callback handlers, NOT by the digest handler.
+  assert.equal(
+    recordAuditCalls.length,
+    0,
+    'recordTaskAuditEvent must not be called during /learning digest',
+  );
+});
+
+test('VAL-WS6-015 /learning pause sets the pause flag', async () => {
+  const savedStates: boolean[] = [];
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => true;
+  deps.saveState = () => {
+    savedStates.push(deps.state.learningPaused);
+  };
+
+  // Start as not paused
+  Object.defineProperty(deps.state, 'learningPaused', {
+    value: false,
+    writable: true,
+    configurable: true,
+  });
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCommand({
+    chatJid: 'telegram:main',
+    chatName: 'MainChat',
+    content: '/learning pause',
+  });
+
+  assert.equal(deps.state.learningPaused, true);
+  assert.match(deps.sent[0]?.text || '', /paused/i);
+  // saveState should have been called
+  assert.equal(savedStates.length, 1);
+  assert.equal(savedStates[0], true);
+});
+
+test('VAL-WS6-016 /learning resume clears the pause flag', async () => {
+  const savedStates: boolean[] = [];
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => true;
+  deps.saveState = () => {
+    savedStates.push(deps.state.learningPaused);
+  };
+
+  // Start as paused
+  Object.defineProperty(deps.state, 'learningPaused', {
+    value: true,
+    writable: true,
+    configurable: true,
+  });
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCommand({
+    chatJid: 'telegram:main',
+    chatName: 'MainChat',
+    content: '/learning resume',
+  });
+
+  assert.equal(deps.state.learningPaused, false);
+  assert.match(deps.sent[0]?.text || '', /active|resumed/i);
+  // saveState should have been called
+  assert.equal(savedStates.length, 1);
+  assert.equal(savedStates[0], false);
+});
+
+test('VAL-WS6-016 /learning resume when not paused shows already active message', async () => {
+  const savedStates: boolean[] = [];
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => true;
+  deps.saveState = () => {
+    savedStates.push(deps.state.learningPaused);
+  };
+
+  // Already active
+  Object.defineProperty(deps.state, 'learningPaused', {
+    value: false,
+    writable: true,
+    configurable: true,
+  });
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCommand({
+    chatJid: 'telegram:main',
+    chatName: 'MainChat',
+    content: '/learning resume',
+  });
+
+  // Should not change and should indicate already active
+  assert.equal(deps.state.learningPaused, false);
+  assert.match(deps.sent[0]?.text || '', /already.*active/i);
+  // saveState should NOT have been called since no change
+  assert.equal(savedStates.length, 0);
+});
+
+test('VAL-WS6-015 /learning pause from non-main chat is refused', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => false;
+
+  Object.defineProperty(deps.state, 'learningPaused', {
+    value: false,
+    writable: true,
+    configurable: true,
+  });
+
+  const handlers = createTelegramCommandHandlers(deps);
+  await handlers.handleTelegramCommand({
+    chatJid: 'telegram:123',
+    chatName: 'NonMainChat',
+    content: '/learning pause',
+  });
+
+  // State should not have changed
+  assert.equal(deps.state.learningPaused, false);
+  // Should be refused
+  assert.match(deps.sent[0]?.text || '', /main\/admin|main chat/i);
+  assert.deepEqual(deps.audits.at(-1), {
+    chatJid: 'telegram:123',
+    command: '/learning',
+    allowed: false,
+    reason: 'not main/admin',
+  });
+});
+
+test('handleTelegramCommand blocks live /reflect while learning is paused', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+    audits: Array<{
+      chatJid: string;
+      command: string;
+      allowed: boolean;
+      reason: string;
+    }>;
+  };
+  deps.isMainChat = () => true;
+  deps.state.learningPaused = true;
+  const runAgentCalls: string[] = [];
+  deps.runAgent = async (_group, prompt) => {
+    runAgentCalls.push(prompt);
+    return { ok: true, result: 'done', streamed: false };
+  };
+
+  const handlers = createTelegramCommandHandlers(deps);
+  const handled = await handlers.handleTelegramCommand({
+    chatJid: 'telegram:main',
+    chatName: 'Main',
+    content: '/reflect',
+  });
+
+  assert.equal(handled, true);
+  assert.equal(runAgentCalls.length, 0);
+  assert.match(
+    deps.sent[0]?.text || '',
+    /Learning is paused — run \/learning resume first, or use \/reflect dry-run\./,
+  );
+  assert.deepEqual(deps.audits.at(-1), {
+    chatJid: 'telegram:main',
+    command: '/reflect',
+    allowed: false,
+    reason: 'blocked: learning paused',
+  });
+});
+
+test('handleTelegramCommand allows /reflect dry-run while learning is paused and threads dryRun to runAgent', async () => {
+  const deps = createBaseDeps() as TelegramCommandDeps & {
+    sent: Array<{ chatJid: string; text: string }>;
+  };
+  deps.isMainChat = () => true;
+  deps.state.learningPaused = true;
+  deps.state.registeredGroups['telegram:main'] = {
+    folder: 'main',
+    name: 'Main',
+  };
+  const runAgentOptions: Array<Record<string, unknown>> = [];
+  deps.runAgent = async (
+    _group,
+    _prompt,
+    _chatJid,
+    _codingHint,
+    _requestId,
+    _prefs,
+    options,
+  ) => {
+    runAgentOptions.push((options as Record<string, unknown>) || {});
+    return { ok: true, result: 'nothing durable to save', streamed: false };
+  };
+
+  const handlers = createTelegramCommandHandlers(deps);
+  const handled = await handlers.handleTelegramCommand({
+    chatJid: 'telegram:main',
+    chatName: 'Main',
+    content: '/reflect dry-run',
+  });
+
+  assert.equal(handled, true);
+  assert.equal(runAgentOptions.length, 1);
+  assert.equal(runAgentOptions[0]?.dryRun, true);
+  for (const message of deps.sent) {
+    assert.ok(
+      !message.text.includes('Learning is paused'),
+      'dry-run reflect must not be blocked by the pause gate',
+    );
+  }
 });

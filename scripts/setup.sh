@@ -24,8 +24,8 @@ Options:
 
 Behavior:
   - Shared install/build steps run before runtime-specific preparation.
-  - If Docker is unavailable and runtime is still unresolved, setup prompts for host or docker.
-  - Host choice persists CONTAINER_RUNTIME=host and FFT_NANO_ALLOW_HOST_RUNTIME=1 in .env.
+  - If Docker is unavailable and runtime is still unresolved, setup defaults to host.
+  - Host choice persists CONTAINER_RUNTIME=host in .env.
 USAGE
 }
 
@@ -168,7 +168,7 @@ set_env_value() {
   local value="$2"
   local tmp
   local updated=0
-  tmp="$(mktemp -t fft_nano_env.XXXXXX)"
+  tmp="$(mktemp -t nano-core_env.XXXXXX)"
   if [[ -f .env ]]; then
     while IFS= read -r line || [[ -n "$line" ]]; do
       if [[ "$line" == "${key}="* ]]; then
@@ -188,7 +188,7 @@ set_env_value() {
 unset_env_value() {
   local key="$1"
   local tmp
-  tmp="$(mktemp -t fft_nano_env.XXXXXX)"
+  tmp="$(mktemp -t nano-core_env.XXXXXX)"
   if [[ -f .env ]]; then
     while IFS= read -r line || [[ -n "$line" ]]; do
       if [[ "$line" == "${key}="* ]]; then
@@ -202,9 +202,11 @@ unset_env_value() {
 
 persist_host_runtime() {
   set_env_value CONTAINER_RUNTIME host
-  set_env_value FFT_NANO_ALLOW_HOST_RUNTIME 1
+  unset_env_value FFT_NANO_ALLOW_HOST_RUNTIME
+  unset_env_value FFT_NANO_ALLOW_HOST_RUNTIME_IN_PROD
   export CONTAINER_RUNTIME=host
-  export FFT_NANO_ALLOW_HOST_RUNTIME=1
+  unset FFT_NANO_ALLOW_HOST_RUNTIME || true
+  unset FFT_NANO_ALLOW_HOST_RUNTIME_IN_PROD || true
 }
 
 persist_docker_first_runtime() {
@@ -218,7 +220,7 @@ persist_docker_first_runtime() {
 docker_available_and_healthy() {
   command -v docker >/dev/null 2>&1 || return 1
   local docker_err
-  docker_err="$(mktemp -t fft_nano_docker_info.XXXXXX)"
+  docker_err="$(mktemp -t nano-core_docker_info.XXXXXX)"
   if docker_daemon_healthy "$docker_err"; then
     rm -f "$docker_err"
     return 0
@@ -273,23 +275,9 @@ resolve_runtime() {
     return
   fi
 
-  if [[ ! -t 0 ]]; then
-    fail "Docker is unavailable. Install Docker, or re-run with --runtime host to continue without Docker."
-  fi
-
-  local choice
-  choice="$(prompt_runtime_choice)"
-  if [[ "$choice" == "host" ]]; then
-    persist_host_runtime
-    RESOLVED_RUNTIME="host"
-    return
-  fi
-
-  persist_docker_first_runtime auto
-  say ""
-  say "Docker-first runtime selected."
-  say "Install/start Docker, then re-run ./scripts/setup.sh to prepare the agent runtime."
-  exit 0
+  persist_host_runtime
+  RESOLVED_RUNTIME="host"
+  return
 }
 
 ensure_runtime_ready() {
@@ -297,7 +285,7 @@ ensure_runtime_ready() {
   if [[ "$runtime" == "docker" ]]; then
     need_cmd docker
     local docker_err
-    docker_err="$(mktemp -t fft_nano_docker_info.XXXXXX)"
+    docker_err="$(mktemp -t nano-core_docker_info.XXXXXX)"
     if ! docker_daemon_healthy "$docker_err"; then
       local err_preview
       err_preview="$(tr '\n' ' ' <"$docker_err" | sed 's/[[:space:]]\+/ /g' | cut -c1-220)"
@@ -314,13 +302,6 @@ ensure_runtime_ready() {
     fi
     rm -f "$docker_err"
     return
-  fi
-
-  if ! is_truthy "${FFT_NANO_ALLOW_HOST_RUNTIME:-0}"; then
-    fail "Host runtime requires explicit opt-in: FFT_NANO_ALLOW_HOST_RUNTIME=1"
-  fi
-  if [[ "${NODE_ENV:-}" == "production" ]] && ! is_truthy "${FFT_NANO_ALLOW_HOST_RUNTIME_IN_PROD:-0}"; then
-    fail "Host runtime is blocked in production unless FFT_NANO_ALLOW_HOST_RUNTIME_IN_PROD=1"
   fi
 
   local host_pi="$ROOT_DIR/node_modules/.bin/pi"
@@ -362,7 +343,7 @@ ensure_admin_secret() {
 }
 
 scaffold_mount_allowlist() {
-  local dst="${HOME}/.config/fft_nano/mount-allowlist.json"
+  local dst="${HOME}/.config/nano-core/mount-allowlist.json"
   if [[ -f "$dst" ]]; then
     return
   fi
@@ -375,11 +356,11 @@ scaffold_mount_allowlist() {
 
 install_cli_launcher() {
   local bin_dir="${FFT_NANO_USER_BIN_DIR:-${HOME}/.local/bin}"
-  local launcher="${bin_dir}/nano"
+  local launcher="${bin_dir}/fft"
   mkdir -p "$bin_dir"
   {
     printf '#!/usr/bin/env bash\n'
-    printf 'exec node %q --repo %q "$@"\n' "${ROOT_DIR}/bin/nano.js" "$ROOT_DIR"
+    printf 'exec node %q --repo %q "$@"\n' "${ROOT_DIR}/bin/fft.js" "$ROOT_DIR"
   } >"$launcher"
   chmod +x "$launcher"
   say "CLI launcher installed: $launcher"
@@ -404,8 +385,8 @@ install_cli_launcher() {
 
   mkdir -p "$(dirname "$profile")"
   touch "$profile"
-  if grep -Fq "# >>> nano-core CLI >>>" "$profile"; then
-    say "PATH profile already contains nano-core CLI block: $profile"
+  if grep -Fq "# >>> FFT_nano CLI >>>" "$profile"; then
+    say "PATH profile already contains FFT_nano CLI block: $profile"
     return
   fi
 
@@ -416,7 +397,7 @@ install_cli_launcher() {
 
   {
     printf '\n'
-    printf '# >>> nano-core CLI >>>\n'
+    printf '# >>> FFT_nano CLI >>>\n'
     printf 'export PATH="%s:$PATH"\n' "$path_entry"
     printf '# <<< FFT_nano CLI <<<\n'
   } >>"$profile"

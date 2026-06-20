@@ -1,9 +1,11 @@
 import { randomUUID } from 'crypto';
-import { existsSync, unlinkSync } from 'fs';
-import { Socket, createServer } from 'net';
+import { existsSync, lstatSync, mkdirSync, unlinkSync } from 'fs';
+import { Socket } from 'net';
+import { dirname } from 'path';
 import { WebSocket, WebSocketServer } from 'ws';
 
 import { logger } from '../logger.js';
+import { getPlatformAdapter } from '../platform/index.js';
 import type { UpdateCommandStartResult } from '../update-command.js';
 
 import type {
@@ -24,6 +26,7 @@ import {
 type ThinkLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 type ReasoningLevel = 'off' | 'on' | 'stream';
 type VerboseMode = 'off' | 'new' | 'all' | 'verbose';
+type TelegramDeliveryMode = 'stream' | 'append' | 'off' | 'draft';
 
 export interface SessionPrefs {
   provider?: string;
@@ -31,6 +34,7 @@ export interface SessionPrefs {
   thinkLevel?: ThinkLevel;
   reasoningLevel?: ReasoningLevel;
   verboseMode?: VerboseMode;
+  telegramDeliveryMode?: TelegramDeliveryMode;
   noContinueNext?: boolean;
 }
 
@@ -85,6 +89,11 @@ export interface TuiGatewayAdapters {
     action: 'status' | 'restart' | 'doctor';
   }) => Promise<{ ok: boolean; text: string }> | { ok: boolean; text: string };
   hostUpdate: () => UpdateCommandStartResult;
+  executeOperatorCommand?: (params: {
+    chatJid: string;
+    command: string;
+    args: string;
+  }) => Promise<{ ok: boolean; text: string }>;
 }
 
 const DEFAULT_PORT = Number(process.env.FFT_NANO_TUI_PORT || 28989);
@@ -134,6 +143,23 @@ function normalizeVerboseMode(raw: unknown): VerboseMode | undefined {
   return undefined;
 }
 
+function normalizeTelegramDeliveryMode(
+  raw: unknown,
+): TelegramDeliveryMode | undefined {
+  const key = String(raw || '')
+    .trim()
+    .toLowerCase();
+  if (
+    key === 'stream' ||
+    key === 'append' ||
+    key === 'off' ||
+    key === 'draft'
+  ) {
+    return key;
+  }
+  return undefined;
+}
+
 function getSessionKey(params: Record<string, unknown> | undefined): string {
   const raw = typeof params?.sessionKey === 'string' ? params.sessionKey : '';
   const trimmed = raw.trim();
@@ -155,17 +181,46 @@ function asBoolean(input: unknown, fallback = false): boolean {
   return fallback;
 }
 
+/**
+ * A union of the two transport client shapes the gateway talks to:
+ *  - `WebSocket` for the main ws:// transport
+ *  - `LocalClient` for the raw net.Socket / NDJSON transport
+ *
+ * Both expose a `send` (and optional `readyState` for the WebSocket
+ * path) so the rest of the gateway can write the same JSON frame to
+ * either transport.
+ */
+type GatewayClientConnection =
+  | WebSocket
+  | {
+      send: (data: string) => void;
+      close?: () => void;
+      readyState?: number;
+      on: (event: string, listener: (...args: unknown[]) => void) => void;
+      off?: (event: string, listener: (...args: unknown[]) => void) => void;
+    };
+
 function sendFrame(
-  ws: WebSocket,
+  target: GatewayClientConnection,
   frame: GatewayResponseFrame | GatewayEventFrame,
 ): void {
-  if (ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify(frame));
+  const payload = JSON.stringify(frame) + '\n';
+  if ('readyState' in target && typeof target.readyState === 'number') {
+    // WebSocket transport: honor OPEN state
+    if (target.readyState !== WebSocket.OPEN) return;
+    target.send(payload.replace(/\n$/, ''));
+    return;
+  }
+  // LocalClient transport: send is a net.Socket writer
+  target.send(payload);
 }
 
-function broadcast(clients: Set<WebSocket>, frame: GatewayEventFrame): void {
-  for (const ws of clients) {
-    sendFrame(ws, frame);
+function broadcast(
+  recipients: Set<GatewayClientConnection>,
+  frame: GatewayEventFrame,
+): void {
+  for (const client of recipients) {
+    sendFrame(client, frame);
   }
 }
 
@@ -220,14 +275,34 @@ export async function isUnixSocketAcceptingConnections(
 }
 
 export async function removeStaleUnixSocket(socketPath: string): Promise<void> {
-  if (!(await isUnixSocketAcceptingConnections(socketPath))) {
-    try {
-      unlinkSync(socketPath);
-      logger.warn({ socketPath }, 'Removed stale TUI local socket');
-    } catch (err) {
-      const code = (err as NodeJS.ErrnoException).code;
-      if (code !== 'ENOENT') throw err;
-    }
+  // Only attempt to unlink the path if it currently looks like a Unix
+  // socket. We use lstatSync to inspect the entry without dereferencing
+  // symlinks, and skip anything that is a directory or regular file —
+  // unlinking those would be destructive (EISDIR/ENOTDIR) and the
+  // caller should fail with the underlying EADDRINUSE/EINVAL error
+  // surfaced by `listen`.
+  let stat: import('fs').Stats | null = null;
+  try {
+    stat = lstatSync(socketPath);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') return;
+    throw err;
+  }
+  if (!stat.isSocket()) {
+    // Not a socket — let `listen` fail loudly with the real bind error.
+    return;
+  }
+  if (await isUnixSocketAcceptingConnections(socketPath)) {
+    // Socket exists and is in use; do not remove it.
+    return;
+  }
+  try {
+    unlinkSync(socketPath);
+    logger.warn({ socketPath }, 'Removed stale TUI local socket');
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT') throw err;
   }
 }
 
@@ -244,8 +319,8 @@ export async function startTuiGatewayServer(
   const authToken = (resolvedOptions.authToken || '').trim();
   const authRequired = authToken.length > 0;
 
-  const clients = new Set<WebSocket>();
-  const authenticatedClients = new Set<WebSocket>();
+  const clients = new Set<GatewayClientConnection>();
+  const authenticatedClients = new Set<GatewayClientConnection>();
   const wss = new WebSocketServer({
     port,
     host,
@@ -255,7 +330,7 @@ export async function startTuiGatewayServer(
 
   // Helper to handle incoming message frames
   function handleMessage(
-    ws: WebSocket,
+    ws: GatewayClientConnection,
     frame: GatewayRequestFrame,
     isLocal = false,
   ): void {
@@ -288,7 +363,11 @@ export async function startTuiGatewayServer(
             );
             setTimeout(() => {
               try {
-                ws.close(4401, 'Unauthorized');
+                if (typeof ws.close === 'function') {
+                  ws.close(4401, 'Unauthorized');
+                } else if ('terminate' in ws) {
+                  (ws as WebSocket).terminate();
+                }
               } catch {
                 // ignore close errors
               }
@@ -302,7 +381,7 @@ export async function startTuiGatewayServer(
           ws,
           response(frame.id, {
             ok: true,
-            protocol: 'fft_nano.tui.v2',
+            protocol: 'nano-core.tui.v2',
             serverTime: new Date().toISOString(),
             defaultSessionKey: 'main',
             authRequired,
@@ -379,6 +458,9 @@ export async function startTuiGatewayServer(
         const thinkLevel = normalizeThinkLevel(params.thinkLevel);
         const reasoningLevel = normalizeReasoningLevel(params.reasoningLevel);
         const verboseMode = normalizeVerboseMode(params.verboseMode);
+        const telegramDeliveryMode = normalizeTelegramDeliveryMode(
+          params.telegramDeliveryMode,
+        );
 
         const patch: SessionPrefs = {};
         if (provider || params.provider === '')
@@ -387,6 +469,9 @@ export async function startTuiGatewayServer(
         if (thinkLevel) patch.thinkLevel = thinkLevel;
         if (reasoningLevel) patch.reasoningLevel = reasoningLevel;
         if (verboseMode) patch.verboseMode = verboseMode;
+        if (telegramDeliveryMode) {
+          patch.telegramDeliveryMode = telegramDeliveryMode;
+        }
 
         const next = adapters.patchSessionPrefs(chatJid, patch);
         sendFrame(
@@ -538,57 +623,155 @@ export async function startTuiGatewayServer(
         break;
       }
 
+      case 'operator.command': {
+        if (!chatJid) {
+          sendFrame(ws, failure(frame.id, `Unknown session: ${sessionKey}`));
+          break;
+        }
+        const command = asText(params.command).trim().toLowerCase();
+        const args = asText(params.args).trim();
+        if (!command) {
+          sendFrame(ws, failure(frame.id, 'Missing operator command.'));
+          break;
+        }
+        if (!adapters.executeOperatorCommand) {
+          sendFrame(ws, failure(frame.id, 'Operator controls unavailable.'));
+          break;
+        }
+        void adapters
+          .executeOperatorCommand({ chatJid, command, args })
+          .then((result) => sendFrame(ws, response(frame.id, result)))
+          .catch((err) => {
+            sendFrame(
+              ws,
+              failure(
+                frame.id,
+                err instanceof Error ? err.message : String(err),
+              ),
+            );
+          });
+        break;
+      }
+
       default:
         sendFrame(ws, failure(frame.id, `Unknown method: ${frame.method}`));
     }
   }
 
-  // Local mode: Unix socket server for direct TUI connections
-  let localServer: ReturnType<typeof createServer> | undefined;
+  // Local mode: raw newline-delimited JSON over a net server.
+  // The same `connect` / `chat.history` / event frame shape used on
+  // the WebSocket transport applies here, but the wire format is one
+  // JSON object per line so a plain `net.Socket` (no HTTP upgrade,
+  // no WebSocket framing) is enough. This matches the TUI client's
+  // LocalTuiConnection and is required for `FFT_NANO_TUI_LOCAL=1`.
+  const platformAdapter = getPlatformAdapter();
+  let localServer:
+    | ReturnType<typeof platformAdapter.createLocalSocket>
+    | undefined;
+  let localEndpoint: string | undefined;
   if (socketPath) {
-    await removeStaleUnixSocket(socketPath);
+    try {
+      localEndpoint = socketPath;
+      if (process.platform !== 'win32') {
+        mkdirSync(dirname(localEndpoint), { recursive: true, mode: 0o700 });
+      }
+      await removeStaleUnixSocket(localEndpoint);
 
-    localServer = createServer();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const localWss = new WebSocketServer({ server: localServer as any });
+      localServer = platformAdapter.createLocalSocket();
 
-    localWss.on('connection', (ws) => {
-      clients.add(ws);
-      authenticatedClients.add(ws); // Local connections are inherently authenticated
+      // Each net.Socket acts like a tiny per-connection state machine.
+      // We model the socket as a "client" object that the rest of the
+      // gateway can talk to via sendFrame / on close.
+      type LocalClient = {
+        socket: import('net').Socket;
+        send: (line: string) => void;
+        close: () => void;
+      };
+      const localClients = new Set<LocalClient>();
 
-      ws.on('close', () => {
-        clients.delete(ws);
-        authenticatedClients.delete(ws);
+      localServer.on('connection', (socket) => {
+        const client: LocalClient = {
+          socket,
+          send: (line: string) => {
+            if (socket.writable) socket.write(line);
+          },
+          close: () => {
+            try {
+              socket.end();
+            } catch {
+              // ignore
+            }
+          },
+        };
+        localClients.add(client);
+        // Local connections are inherently authenticated. Track them in
+        // the global clients set so broadcast() reaches them.
+        clients.add(client as unknown as WebSocket);
+        authenticatedClients.add(client as unknown as WebSocket);
+
+        let buffer = '';
+        socket.on('data', (chunk: Buffer) => {
+          buffer += chunk.toString('utf8');
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const parsed = JSON.parse(line) as unknown;
+              if (!isGatewayRequestFrame(parsed)) continue;
+              handleMessage(client as unknown as WebSocket, parsed, true);
+            } catch {
+              // ignore malformed frames
+            }
+          }
+        });
+
+        socket.on('close', () => {
+          localClients.delete(client);
+          clients.delete(client as unknown as WebSocket);
+          authenticatedClients.delete(client as unknown as WebSocket);
+        });
+        socket.on('error', () => {
+          try {
+            socket.destroy();
+          } catch {
+            // ignore
+          }
+        });
       });
 
-      ws.on('message', (payload) => {
-        const frame = parseMessage(payload);
-        if (!frame) {
-          sendFrame(
-            ws,
-            failure(
-              'unknown',
-              'Invalid request frame. Expected JSON with id/method.',
-            ),
+      // Wait for local server to be ready before returning
+      await new Promise<void>((resolve, reject) => {
+        const onError = (err: Error) => {
+          logger.error(
+            { err, socketPath: localEndpoint },
+            'TUI local socket server error',
           );
-          return;
-        }
-        handleMessage(ws, frame, true);
+          // Wrap the raw bind error so callers (and the startTuiGatewayService
+          // health surface) get a stable, recognisable message even when the
+          // underlying node error is "listen EADDRINUSE …".
+          const wrapped = new Error(
+            `TUI local socket server failed to listen on ${localEndpoint}: ${err.message}`,
+          );
+          (wrapped as Error & { cause?: unknown }).cause = err;
+          reject(wrapped);
+        };
+        localServer!.once('error', onError);
+        localServer!.listen(localEndpoint!, () => {
+          localServer!.off('error', onError);
+          logger.info(
+            { socketPath: localEndpoint },
+            'TUI local socket server listening',
+          );
+          resolve();
+        });
       });
-    });
-
-    // Wait for local server to be ready before returning
-    await new Promise<void>((resolve, reject) => {
-      localServer!.on('listening', () => {
-        logger.info({ socketPath }, 'TUI local socket server listening');
-        resolve();
+    } catch (err) {
+      await new Promise<void>((resolve) => {
+        wss.close(() => resolve());
       });
-      localServer!.on('error', (err) => {
-        logger.error({ err, socketPath }, 'TUI local socket server error');
-        reject(err);
-      });
-      localServer!.listen(socketPath);
-    });
+      throw err;
+    }
   }
 
   const unsubscribe = eventHub.subscribe((event) => {
@@ -628,9 +811,13 @@ export async function startTuiGatewayServer(
 
   async function close(): Promise<void> {
     unsubscribe();
-    for (const ws of clients) {
+    for (const target of clients) {
       try {
-        ws.close();
+        if (typeof target.close === 'function') {
+          (target as { close: () => void }).close();
+        } else if ('terminate' in target) {
+          (target as WebSocket).terminate();
+        }
       } catch {
         // ignore
       }

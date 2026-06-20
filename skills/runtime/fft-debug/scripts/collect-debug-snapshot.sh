@@ -13,7 +13,7 @@ git status --short || true
 echo
 
 echo "## lock"
-ls -la data/fft_nano.lock 2>/dev/null || echo "no lock file"
+ls -la data/nano-core.lock 2>/dev/null || echo "no lock file"
 echo
 
 echo "## registered groups"
@@ -25,8 +25,8 @@ cat data/router_state.json 2>/dev/null || echo "missing data/router_state.json"
 echo
 
 echo "## host logs (tail)"
-tail -n 100 logs/fft_nano.log 2>/dev/null || echo "missing logs/fft_nano.log"
-tail -n 100 logs/fft_nano.error.log 2>/dev/null || echo "missing logs/fft_nano.error.log"
+tail -n 100 logs/nano-core.log 2>/dev/null || echo "missing logs/nano-core.log"
+tail -n 100 logs/nano-core.error.log 2>/dev/null || echo "missing logs/nano-core.error.log"
 echo
 
 echo "## group logs"

@@ -4,6 +4,7 @@ import fs from 'fs';
 import { DESTRUCTIVE_COMMAND_NAMES } from './bash-guard.js';
 import {
   DEFAULT_CANONICAL_FILE_NAMES,
+  isBootstrapScaffoldContent,
   isCanonicalScaffoldContent,
 } from './memory-paths.js';
 import {
@@ -28,7 +29,7 @@ export type ThinkLevel =
   | 'high'
   | 'xhigh';
 export type ReasoningLevel = 'off' | 'on' | 'stream';
-export type PromptMode = 'full' | 'minimal';
+export type PromptMode = 'full' | 'minimal' | 'maintenance';
 
 export interface SkillCatalogEntry {
   name: string;
@@ -56,6 +57,8 @@ export interface SystemPromptInput {
   requestId?: string;
   extraSystemPrompt?: string;
   skillCatalog?: SkillCatalogEntry[];
+  // LISO.5: Prompt mode for this run
+  promptMode?: 'interactive' | 'maintenance';
 }
 
 export interface WorkspacePaths {
@@ -83,6 +86,50 @@ export interface PromptLayer {
   chars: number;
 }
 
+/**
+ * The stable layer is the byte-identical prefix the provider caches for the
+ * life of a session: identity, safety, IPC, delegation, and stable SOUL
+ * identity/policy context. Session bootstrap material like NANO, MEMORY,
+ * skills, canonical files, and daily memory belongs in the session_bootstrap
+ * layer. Per-turn volatile metadata belongs in the ephemeral suffix.
+ */
+export interface StablePromptLayer {
+  id: 'stable';
+  title: string;
+  content: string;
+  chars: number;
+  mtimeMap: Record<string, number | null>;
+  hash: string;
+  key: string;
+}
+
+/**
+ * The session bootstrap layer carries behavior-rich but mostly session-scoped
+ * context. It is sent when starting/rebasing a pi session, then omitted from
+ * continued turns so those turns stay lean while the model keeps the context
+ * in session history.
+ */
+export interface SessionBootstrapPromptLayer {
+  id: 'session_bootstrap';
+  title: string;
+  content: string;
+  chars: number;
+  included: boolean;
+}
+
+/**
+ * The ephemeral layer is the per-turn volatile suffix the provider cannot
+ * cache: the `Inbound Context` JSON metadata (timestamps, requestId, etc.),
+ * the host context overlay, runtime hints, reasoning visibility, and the
+ * inbound message wrapper.
+ */
+export interface EphemeralPromptLayer {
+  id: 'ephemeral';
+  title: string;
+  content: string;
+  chars: number;
+}
+
 export interface SystemPromptReport {
   mode: PromptMode;
   totalChars: number;
@@ -93,7 +140,16 @@ export interface SystemPromptReport {
     injectedTotalChars: number;
     remainingChars: number;
   };
-  layers: PromptLayer[];
+  layers: (
+    | StablePromptLayer
+    | SessionBootstrapPromptLayer
+    | EphemeralPromptLayer
+  )[];
+  /**
+   * Stable-layer cache key. Includes only stable contributing file mtimes
+   * so SOUL changes force a rebuild without letting high-churn operational
+   * context invalidate the provider-cacheable prefix.
+   */
   baseCacheKey: string;
   basePromptHash: string;
   cacheHit: boolean;
@@ -104,10 +160,11 @@ export interface SystemPromptReport {
   };
 }
 
-interface CachedBaseLayer {
+interface CachedStableLayer {
   key: string;
   hash: string;
   content: string;
+  mtimeMap: Record<string, number | null>;
 }
 
 interface BuildSystemPromptOptions {
@@ -118,19 +175,26 @@ interface BuildSystemPromptOptions {
   fileMaxChars?: number;
   totalMaxChars?: number;
   skillCatalogMaxChars?: number;
-  cachedBaseLayer?: CachedBaseLayer | null;
+  cachedStableLayer?: CachedStableLayer | null;
 }
 
 const DEFAULT_FILE_MAX_CHARS = 24_000;
 const DEFAULT_TOTAL_MAX_CHARS = 96_000;
 const DEFAULT_MEMORY_CONTEXT_MAX_CHARS = 20_000;
 const DEFAULT_SKILL_CATALOG_MAX_CHARS = 20_000;
+const STABLE_PROMPT_RENDERER_VERSION = 2;
 
-const MAIN_ALWAYS_INJECTED_FILES = [
+const MAIN_CONTEXT_FILES = [
   'NANO.md',
   'SOUL.md',
   'TODOS.md',
   'MEMORY.md',
+] as const;
+
+const MAIN_SESSION_BOOTSTRAP_FILES = [
+  'USER.md',
+  'IDENTITY.md',
+  'TOOLS.md',
 ] as const;
 
 function buildDailyMemoryFileNames(now: Date, timezone: string): string[] {
@@ -241,6 +305,26 @@ function classifyPromptInjection(content: string): string[] {
   return Array.from(findings);
 }
 
+function redactPromptInjectionLines(content: string): {
+  redacted: string;
+  blockedPatterns: string[];
+} {
+  const blockedPatterns = new Set<string>();
+  const lines = content.split('\n');
+  const redacted = lines
+    .map((line) => {
+      for (const entry of PROMPT_INJECTION_PATTERNS) {
+        if (entry.pattern.test(line)) {
+          blockedPatterns.add(entry.label);
+          return `[REDACTED: ${entry.label}]`;
+        }
+      }
+      return line;
+    })
+    .join('\n');
+  return { redacted, blockedPatterns: Array.from(blockedPatterns) };
+}
+
 function buildBlockedContent(label: string, patterns: string[]): string {
   return `[BLOCKED: ${label} contained potential prompt injection (${patterns.join(', ')}). Content not loaded.]`;
 }
@@ -253,6 +337,7 @@ function addContextEntry(params: {
   fileMaxChars: number;
   remainingTotalChars: number;
   includeMissing?: boolean;
+  lineLevelRedaction?: boolean;
 }): number {
   const content = params.readFileIfExists(params.path);
   if (content === null) {
@@ -277,9 +362,15 @@ function addContextEntry(params: {
   const normalized = trimAndNormalize(content);
   const blockedPatterns = classifyPromptInjection(normalized);
   const blocked = blockedPatterns.length > 0;
-  const effectiveContent = blocked
-    ? buildBlockedContent(params.label, blockedPatterns)
-    : normalized;
+  let effectiveContent = normalized;
+  let entryBlockedPatterns = blockedPatterns;
+  if (blocked && params.lineLevelRedaction) {
+    const redaction = redactPromptInjectionLines(normalized);
+    effectiveContent = redaction.redacted;
+    entryBlockedPatterns = redaction.blockedPatterns;
+  } else if (blocked) {
+    effectiveContent = buildBlockedContent(params.label, blockedPatterns);
+  }
   const fitted = fitContentToBudget(
     effectiveContent,
     params.label,
@@ -296,10 +387,29 @@ function addContextEntry(params: {
     truncated: fitted.truncated || injected.length < effectiveContent.length,
     missing: false,
     blocked,
-    blockedPatterns,
+    blockedPatterns: entryBlockedPatterns,
     content: injected,
   });
   return Math.max(0, params.remainingTotalChars - injected.length);
+}
+
+function addOptionalNonEmptyContextEntry(params: {
+  entries: ContextEntry[];
+  readFileIfExists: (filePath: string) => string | null;
+  label: string;
+  path: string;
+  fileMaxChars: number;
+  remainingTotalChars: number;
+  lineLevelRedaction?: boolean;
+}): number {
+  const content = params.readFileIfExists(params.path);
+  if (!content || !trimAndNormalize(content)) {
+    return params.remainingTotalChars;
+  }
+  return addContextEntry({
+    ...params,
+    includeMissing: false,
+  });
 }
 
 function buildMainContextEntries(params: {
@@ -317,7 +427,7 @@ function buildMainContextEntries(params: {
   const entries: ContextEntry[] = [];
   let remaining = params.totalMaxChars;
 
-  for (const name of MAIN_ALWAYS_INJECTED_FILES) {
+  for (const name of MAIN_CONTEXT_FILES) {
     remaining = addContextEntry({
       entries,
       readFileIfExists: params.readFileIfExists,
@@ -325,6 +435,36 @@ function buildMainContextEntries(params: {
       path: `${params.groupDir}/${name}`,
       fileMaxChars: params.fileMaxChars,
       remainingTotalChars: remaining,
+      lineLevelRedaction: true,
+    });
+  }
+
+  for (const name of MAIN_SESSION_BOOTSTRAP_FILES) {
+    if (remaining <= 0) break;
+    const path = `${params.groupDir}/${name}`;
+    const content = params.readFileIfExists(path);
+    if (!content || isBootstrapScaffoldContent(name, content)) continue;
+    remaining = addContextEntry({
+      entries,
+      readFileIfExists: params.readFileIfExists,
+      label: name,
+      path,
+      fileMaxChars: params.fileMaxChars,
+      remainingTotalChars: remaining,
+      includeMissing: false,
+      lineLevelRedaction: true,
+    });
+  }
+
+  if (remaining > 0) {
+    remaining = addOptionalNonEmptyContextEntry({
+      entries,
+      readFileIfExists: params.readFileIfExists,
+      label: 'BOOTSTRAP.md',
+      path: `${params.groupDir}/BOOTSTRAP.md`,
+      fileMaxChars: params.fileMaxChars,
+      remainingTotalChars: remaining,
+      lineLevelRedaction: true,
     });
   }
 
@@ -341,6 +481,7 @@ function buildMainContextEntries(params: {
       fileMaxChars: params.fileMaxChars,
       remainingTotalChars: remaining,
       includeMissing: false,
+      lineLevelRedaction: true,
     });
   }
 
@@ -357,6 +498,7 @@ function buildMainContextEntries(params: {
       fileMaxChars: params.fileMaxChars,
       remainingTotalChars: remaining,
       includeMissing: false,
+      lineLevelRedaction: true,
     });
   }
 
@@ -369,6 +511,7 @@ function buildMainContextEntries(params: {
       fileMaxChars: params.fileMaxChars,
       remainingTotalChars: remaining,
       includeMissing: false,
+      lineLevelRedaction: true,
     });
   }
 
@@ -396,6 +539,7 @@ function buildNonMainContextEntries(params: {
     path: `${params.globalDir}/NANO.md`,
     fileMaxChars: params.fileMaxChars,
     remainingTotalChars: remaining,
+    lineLevelRedaction: true,
   });
   if (remaining > 0) {
     remaining = addContextEntry({
@@ -406,6 +550,7 @@ function buildNonMainContextEntries(params: {
       fileMaxChars: params.fileMaxChars,
       remainingTotalChars: remaining,
       includeMissing: false,
+      lineLevelRedaction: true,
     });
   }
 
@@ -416,6 +561,7 @@ function buildNonMainContextEntries(params: {
     path: `${params.globalDir}/SOUL.md`,
     fileMaxChars: params.fileMaxChars,
     remainingTotalChars: remaining,
+    lineLevelRedaction: true,
   });
   if (remaining > 0) {
     remaining = addContextEntry({
@@ -425,6 +571,7 @@ function buildNonMainContextEntries(params: {
       path: `${params.groupDir}/SOUL.md`,
       fileMaxChars: params.fileMaxChars,
       remainingTotalChars: remaining,
+      lineLevelRedaction: true,
     });
   }
 
@@ -437,6 +584,7 @@ function buildNonMainContextEntries(params: {
       fileMaxChars: params.fileMaxChars,
       remainingTotalChars: remaining,
       includeMissing: false,
+      lineLevelRedaction: true,
     });
   }
 
@@ -449,6 +597,7 @@ function buildNonMainContextEntries(params: {
       fileMaxChars: params.fileMaxChars,
       remainingTotalChars: remaining,
       includeMissing: false,
+      lineLevelRedaction: true,
     });
   }
 
@@ -461,6 +610,7 @@ function buildNonMainContextEntries(params: {
       fileMaxChars: params.fileMaxChars,
       remainingTotalChars: remaining,
       includeMissing: false,
+      lineLevelRedaction: true,
     });
   }
 
@@ -481,6 +631,7 @@ function buildNonMainContextEntries(params: {
       fileMaxChars: params.fileMaxChars,
       remainingTotalChars: remaining,
       includeMissing: false,
+      lineLevelRedaction: true,
     });
   }
 
@@ -501,6 +652,7 @@ function buildNonMainContextEntries(params: {
       fileMaxChars: params.fileMaxChars,
       remainingTotalChars: remaining,
       includeMissing: false,
+      lineLevelRedaction: true,
     });
   }
 
@@ -527,32 +679,87 @@ function renderSkillCatalog(
   if (entries.length === 0) {
     return { text: '', injectedChars: 0, count: 0, truncated: false };
   }
-  const lines = [
+
+  const header = [
     '## Skills Catalog',
     'These are compact skill summaries only. Read full SKILL.md bodies on demand when needed.',
     '',
   ];
+
+  // Tier 1: never-truncated name index
+  const indexLine = `Available skills: ${entries.map((e) => e.name).join(', ')}`;
+
+  // Tier 2: per-entry summaries until budget
+  const summaryLines: string[] = [];
   for (const entry of entries) {
     const toolText =
       entry.allowedTools.length > 0
         ? ` Allowed tools: ${entry.allowedTools.join(', ')}.`
         : '';
-    lines.push(
-      `- ${entry.name} [${entry.source}]: ${entry.description}.${toolText} When to use: ${entry.whenToUse}`,
+    // Merge description + whenToUse when they are redundant
+    const when = entry.whenToUse.trim();
+    const desc = entry.description.trim();
+    const combined =
+      when && !desc.toLowerCase().includes(when.toLowerCase())
+        ? `${desc} When to use: ${when}`
+        : desc;
+    summaryLines.push(
+      `- ${entry.name} [${entry.source}]: ${combined}.${toolText}`,
     );
   }
-  const raw = lines.join('\n').trim();
-  const fitted = fitContentToBudget(raw, 'skills catalog', maxChars, maxChars);
-  const text = fitted?.injected || '';
+
+  const headerText = header.join('\n');
+  const indexBudget = indexLine.length + 1; // +1 for newline
+  const summaryBudget = maxChars - headerText.length - indexBudget;
+
+  let summariesText = '';
+  let truncated = false;
+  let omittedCount = 0;
+
+  if (summaryBudget > 0) {
+    const rawSummaries = summaryLines.join('\n');
+    const fitted = fitContentToBudget(
+      rawSummaries,
+      'skills catalog',
+      summaryBudget,
+      summaryBudget,
+    );
+    if (fitted) {
+      summariesText = fitted.injected;
+      truncated = fitted.truncated;
+      if (fitted.truncated) {
+        // Count how many summary lines were fully omitted
+        const injectedLineCount = summariesText
+          .split('\n')
+          .filter((l) => l.startsWith('- ')).length;
+        omittedCount = entries.length - injectedLineCount;
+      }
+    }
+  } else {
+    omittedCount = entries.length;
+    truncated = true;
+  }
+
+  const parts: string[] = [headerText, indexLine];
+  if (summariesText) {
+    parts.push(summariesText);
+  }
+  if (omittedCount > 0) {
+    parts.push(
+      `[${omittedCount} more skill${omittedCount === 1 ? '' : 's'} listed above have no summary — use skill_view for details.]`,
+    );
+  }
+
+  const text = parts.join('\n').trim();
   return {
     text,
     injectedChars: text.length,
     count: entries.length,
-    truncated: fitted?.truncated || false,
+    truncated: truncated || omittedCount > 0,
   };
 }
 
-function buildBaseCacheKey(params: {
+function buildStableCacheKey(params: {
   assistantName: string;
   promptMode: PromptMode;
   isMain: boolean;
@@ -560,10 +767,13 @@ function buildBaseCacheKey(params: {
   canDelegateToCoder: boolean;
   autoDelegationEnabled: boolean;
   isEvaluatorRun: boolean;
-  contextEntries: ContextEntry[];
-  skillCatalogText: string;
+  mtimeMap: Record<string, number | null>;
 }): string {
+  const sortedEntries = Object.keys(params.mtimeMap)
+    .sort()
+    .map((k) => [k, params.mtimeMap[k]]);
   const payload = {
+    rendererVersion: STABLE_PROMPT_RENDERER_VERSION,
     assistantName: params.assistantName,
     promptMode: params.promptMode,
     isMain: params.isMain,
@@ -571,32 +781,57 @@ function buildBaseCacheKey(params: {
     canDelegateToCoder: params.canDelegateToCoder,
     autoDelegationEnabled: params.autoDelegationEnabled,
     isEvaluatorRun: params.isEvaluatorRun,
-    skillCatalogHash: hashString(params.skillCatalogText),
-    contextEntries: params.contextEntries.map((entry) => ({
-      path: entry.path,
-      missing: entry.missing,
-      blocked: entry.blocked,
-      blockedPatterns: entry.blockedPatterns,
-      rawChars: entry.rawChars,
-      contentHash: hashString(entry.content),
-    })),
+    mtimeMap: Object.fromEntries(sortedEntries),
   };
   return hashString(JSON.stringify(payload));
+}
+
+function mtimeMapDeepEqual(
+  a: Record<string, number | null>,
+  b: Record<string, number | null>,
+): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  if (aKeys.length !== bKeys.length) return false;
+  for (const k of aKeys) {
+    if (!Object.prototype.hasOwnProperty.call(b, k)) return false;
+    if (a[k] !== b[k]) return false;
+  }
+  return true;
+}
+
+/**
+ * Stat every path and return a map of path → mtimeMs (or `null` when the
+ * file is missing). The caller is expected to pass the same set of paths
+ * that contribute to the stable prompt layer.
+ */
+function collectMtimeMap(
+  paths: Iterable<string>,
+): Record<string, number | null> {
+  const out: Record<string, number | null> = {};
+  for (const p of paths) {
+    try {
+      const stat = fs.statSync(p);
+      out[p] = stat.mtimeMs;
+    } catch {
+      out[p] = null;
+    }
+  }
+  return out;
 }
 
 function renderBasePrompt(params: {
   assistantName: string;
   paths: WorkspacePaths;
-  contextEntries: ContextEntry[];
-  skillCatalogText: string;
   forcedDelegateMode: 'execute' | 'plan' | null;
   canDelegateToCoder: boolean;
   autoDelegationEnabled: boolean;
   isEvaluatorRun: boolean;
+  isMain: boolean;
 }): string {
   const lines: string[] = [];
   lines.push(
-    `You are ${params.assistantName}, a practical and capable operator running inside nano-core.`,
+    `You are ${params.assistantName}, a practical and capable operator running inside FFT_nano.`,
   );
   lines.push('Default stance: act, verify, and report concrete outcomes.');
   lines.push('');
@@ -642,6 +877,36 @@ function renderBasePrompt(params: {
   lines.push('- Keep SOUL.md stable; do not use it as compaction log storage.');
   lines.push('');
 
+  lines.push('## Context Map');
+  lines.push('Injected EVERY turn (trust these over conversation history):');
+  lines.push(
+    '- SOUL.md (identity/values), TODOS.md (active mission state), retrieved memory snippets.',
+  );
+  lines.push(
+    'Injected ONCE at session start (already in your history — do NOT re-read unless you suspect they changed on disk):',
+  );
+  lines.push(
+    '- NANO.md (operating contract), MEMORY.md (durable facts), skill catalog, USER.md, daily memory files.',
+  );
+  lines.push('On disk only — fetch on demand:');
+  lines.push(
+    "- memory/YYYY-MM-DD.md → daily journal (append-only; create today's if missing)",
+  );
+  lines.push('- knowledge/raw/ → capture staging for the nightly librarian');
+  lines.push('- canonical/*.md → durable structured memory');
+  lines.push(
+    '- skills via skill_list / skill_view (catalog above shows summaries only)',
+  );
+  lines.push(
+    "Recall rule: before claiming you don't know or remember something, use memory_search.",
+  );
+  if (!params.isMain) {
+    lines.push(
+      'Non-main runs: group/global MEMORY.md is injected at session start only. Use memory_search for broader recall.',
+    );
+  }
+  lines.push('');
+
   if (params.canDelegateToCoder) {
     lines.push('## Coding Delegation');
     lines.push(
@@ -675,11 +940,6 @@ function renderBasePrompt(params: {
     lines.push('');
   }
 
-  if (params.skillCatalogText) {
-    lines.push(params.skillCatalogText);
-    lines.push('');
-  }
-
   if (!params.isEvaluatorRun) {
     lines.push('## Messaging IPC');
     lines.push(
@@ -702,9 +962,6 @@ function renderBasePrompt(params: {
     lines.push('- Main-only: {"type":"refresh_groups"}');
     lines.push(
       `- Main-only: {"type":"register_group","jid":"...","name":"...","folder":"...","trigger":"@${params.assistantName}"}`,
-    );
-    lines.push(
-      `Read task snapshot from ${params.paths.ipcDir}/current_tasks.json when needed.`,
     );
     lines.push('');
     lines.push('## Memory Action IPC');
@@ -735,7 +992,7 @@ function renderBasePrompt(params: {
       '- Skills should stay organized without operator effort. Use skill_list/skill_view to inspect available procedural knowledge before repeating a workflow.',
     );
     lines.push(
-      '- Create or patch a skill only when a reusable workflow, pitfall, or common operation pattern should be remembered procedurally.',
+      '- Create or patch a skill only when a reusable workflow, pitfall, or farm operation pattern should be remembered procedurally.',
     );
     lines.push(
       '- Mutations are host-gated to agent-created runtime skills; repo and personal source skills may be read and reported but not destructively curated.',
@@ -766,7 +1023,7 @@ function renderBasePrompt(params: {
     );
     lines.push('```json');
     lines.push('{');
-    lines.push('  "type":"file_delivery",');
+    lines.push('  "type":"farm_action",');
     lines.push('  "action":"deliver_file",');
     lines.push('  "requestId":"<unique-id>",');
     lines.push('  "params":{');
@@ -810,22 +1067,10 @@ function renderBasePrompt(params: {
   lines.push(
     'Avoid markdown headings in final chat replies unless explicitly requested.',
   );
+  lines.push(
+    'For tabular or comparison data, use GitHub-style markdown tables (| col | col | with a |---|---| separator row); the chat renders them as native tables.',
+  );
   lines.push('');
-
-  if (params.contextEntries.length > 0) {
-    lines.push('## Workspace Files (injected)');
-    lines.push(
-      'These files are loaded for this run (subject to prompt budget limits).',
-    );
-    lines.push('');
-    lines.push('# Project Context');
-    lines.push('');
-    for (const entry of params.contextEntries) {
-      lines.push(`## ${entry.path}`);
-      lines.push(entry.content);
-      lines.push('');
-    }
-  }
 
   lines.push('## Heartbeats');
   lines.push(
@@ -834,7 +1079,7 @@ function renderBasePrompt(params: {
   return lines.join('\n').trim();
 }
 
-function renderOverlayPrompt(params: {
+function renderEphemeralPrompt(params: {
   input: SystemPromptInput;
   assistantName: string;
   promptMode: PromptMode;
@@ -933,11 +1178,121 @@ function renderOverlayPrompt(params: {
   return lines.join('\n').trim();
 }
 
+function isStableContextEntry(entry: ContextEntry): boolean {
+  return entry.path.endsWith('/SOUL.md');
+}
+
+function isPerTurnContextEntry(entry: ContextEntry): boolean {
+  return (
+    entry.path.endsWith('/TODOS.md') || entry.path.endsWith('/HEARTBEAT.md')
+  );
+}
+
+function pickMtimeMap(
+  source: Record<string, number | null>,
+  paths: Iterable<string>,
+): Record<string, number | null> {
+  const out: Record<string, number | null> = {};
+  for (const p of paths) {
+    out[p] = Object.prototype.hasOwnProperty.call(source, p) ? source[p] : null;
+  }
+  return out;
+}
+
+function renderContextOverlay(params: {
+  contextEntries: ContextEntry[];
+  fileMaxChars: number;
+}): string {
+  const lines: string[] = [];
+
+  if (params.contextEntries.length > 0) {
+    lines.push('## Workspace Files (injected)');
+    lines.push(
+      'These files are loaded for this run (subject to prompt budget limits).',
+    );
+    lines.push('');
+    lines.push('# Project Context');
+    lines.push('');
+    for (const entry of params.contextEntries) {
+      const fitted = fitContentToBudget(
+        entry.content,
+        entry.label || entry.path,
+        params.fileMaxChars,
+        params.fileMaxChars,
+      );
+      const injected = fitted?.injected || '';
+      lines.push(`## ${entry.path}`);
+      lines.push(injected);
+      lines.push('');
+    }
+  }
+
+  return lines.join('\n').trim();
+}
+
+function renderEphemeralOverlay(params: {
+  contextEntries: ContextEntry[];
+  fileMaxChars: number;
+}): string {
+  const lines: string[] = [];
+
+  const contextOverlay = renderContextOverlay({
+    contextEntries: params.contextEntries,
+    fileMaxChars: params.fileMaxChars,
+  });
+  if (contextOverlay) lines.push(contextOverlay);
+
+  return lines.join('\n').trim();
+}
+
+function renderSessionBootstrapOverlay(params: {
+  contextEntries: ContextEntry[];
+  skillCatalogText: string;
+  fileMaxChars: number;
+}): string {
+  const lines: string[] = [];
+
+  if (params.contextEntries.length === 0 && !params.skillCatalogText) {
+    return '';
+  }
+
+  lines.push('## Session Bootstrap Context');
+  lines.push(
+    'Loaded when a pi session starts or is rebased. Continued turns rely on session history and do not resend this layer.',
+  );
+  lines.push('');
+
+  if (params.skillCatalogText) {
+    lines.push(params.skillCatalogText);
+    lines.push('');
+  }
+
+  const contextOverlay = renderContextOverlay({
+    contextEntries: params.contextEntries,
+    fileMaxChars: params.fileMaxChars,
+  });
+  if (contextOverlay) lines.push(contextOverlay);
+
+  return lines.join('\n').trim();
+}
+
 export function buildSystemPrompt(
   input: SystemPromptInput,
   paths: WorkspacePaths,
   options: BuildSystemPromptOptions = {},
-): { text: string; report: SystemPromptReport } {
+): {
+  stableText: string;
+  sessionBootstrapText: string;
+  ephemeralText: string;
+  /**
+   * Convenience concatenation of the layers that are sent for this build,
+   * joined with double newlines (matching how pi's `--append-system-prompt`
+   * joins multiple values). Session bootstrap is included only when
+   * `input.noContinue` starts/rebases the session.
+   */
+  text: string;
+  report: SystemPromptReport;
+} {
   const readFileIfExists = options.readFileIfExists ?? defaultReadFileIfExists;
   const fileMaxChars =
     options.fileMaxChars ??
@@ -957,10 +1312,21 @@ export function buildSystemPrompt(
       process.env.FFT_NANO_SKILL_CATALOG_MAX_CHARS,
       DEFAULT_SKILL_CATALOG_MAX_CHARS,
     );
-  const promptMode: PromptMode = input.isScheduledTask ? 'minimal' : 'full';
+  // LISO.5: Maintenance mode is set directly; otherwise derive from scheduled task flag
+  const promptMode: PromptMode =
+    input.promptMode === 'maintenance'
+      ? 'maintenance'
+      : input.isScheduledTask
+        ? 'minimal'
+        : 'full';
   const assistantName =
-    (input.assistantName || 'nano-core').trim() || 'nano-core';
-  const providedMemoryContext = trimAndNormalize(input.memoryContext || '');
+    (input.assistantName || 'FarmFriend').trim() || 'FarmFriend';
+  // LISO.5: maintenance runs use minimal bounded context — never retrieved memory,
+  // even if a caller populated memoryContext.
+  const providedMemoryContext =
+    promptMode === 'maintenance'
+      ? ''
+      : trimAndNormalize(input.memoryContext || '');
   const now = options.now?.() ?? new Date();
   const rawTimezone =
     options.timezone ||
@@ -985,31 +1351,113 @@ export function buildSystemPrompt(
     !input.isScheduledTask &&
     options.delegationExtensionAvailable === true;
 
-  const contextState = input.isMain
-    ? buildMainContextEntries({
-        readFileIfExists,
-        includeHeartbeat: includeHeartbeatContext,
-        fileMaxChars,
-        totalMaxChars,
-        groupDir: paths.groupDir,
-        now,
-        timezone,
-      })
-    : buildNonMainContextEntries({
-        readFileIfExists,
-        includeHeartbeat: includeHeartbeatContext,
-        fileMaxChars,
-        totalMaxChars,
-        groupDir: paths.groupDir,
-        globalDir: paths.globalDir,
-      });
+  // Collect mtimes for every stable-source path so a later cache key/hash can
+  // detect any contributing file change without re-hashing file content.
+  const mtimeTracker: Record<string, number | null> = {};
+  const trackingReadFileIfExists = (filePath: string): string | null => {
+    const value = readFileIfExists(filePath);
+    if (!Object.prototype.hasOwnProperty.call(mtimeTracker, filePath)) {
+      try {
+        mtimeTracker[filePath] = fs.statSync(filePath).mtimeMs;
+      } catch {
+        mtimeTracker[filePath] = null;
+      }
+    }
+    return value;
+  };
+
+  // LISO.5: Maintenance mode skips normal context building to exclude
+  // SOUL.md, NANO.md, USER.md, MEMORY.md, daily memory, retrieved memory,
+  // recent conversation, and broad skill catalogs.
+  const contextState =
+    promptMode === 'maintenance'
+      ? { entries: [], remainingTotalChars: 0 }
+      : input.isMain
+        ? buildMainContextEntries({
+            readFileIfExists: trackingReadFileIfExists,
+            includeHeartbeat: includeHeartbeatContext,
+            fileMaxChars,
+            totalMaxChars,
+            groupDir: paths.groupDir,
+            now,
+            timezone,
+          })
+        : buildNonMainContextEntries({
+            readFileIfExists: trackingReadFileIfExists,
+            includeHeartbeat: includeHeartbeatContext,
+            fileMaxChars,
+            totalMaxChars,
+            groupDir: paths.groupDir,
+            globalDir: paths.globalDir,
+          });
 
   const skillCatalog =
-    !input.isScheduledTask && !isHeartbeatRun
+    !input.isScheduledTask && !isHeartbeatRun && promptMode !== 'maintenance'
       ? renderSkillCatalog(input.skillCatalog || [], skillCatalogMaxChars)
       : { text: '', injectedChars: 0, count: 0, truncated: false };
 
-  const baseCacheKey = buildBaseCacheKey({
+  // Also stat any stable-source files that exist on disk but were not
+  // read because of a budget or include-missing gate — their mtime still
+  // belongs in the cache key.
+  const stableSourcePaths: string[] = [];
+  if (input.isMain) {
+    stableSourcePaths.push(
+      ...MAIN_CONTEXT_FILES.map((n) => `${paths.groupDir}/${n}`),
+    );
+    stableSourcePaths.push(
+      ...MAIN_SESSION_BOOTSTRAP_FILES.map((n) => `${paths.groupDir}/${n}`),
+    );
+    stableSourcePaths.push(`${paths.groupDir}/BOOTSTRAP.md`);
+    stableSourcePaths.push(
+      ...DEFAULT_CANONICAL_FILE_NAMES.map(
+        (n) => `${paths.groupDir}/canonical/${n}`,
+      ),
+    );
+    for (const rel of buildDailyMemoryFileNames(now, timezone)) {
+      stableSourcePaths.push(`${paths.groupDir}/${rel}`);
+    }
+    if (includeHeartbeatContext)
+      stableSourcePaths.push(`${paths.groupDir}/HEARTBEAT.md`);
+  } else {
+    stableSourcePaths.push(
+      `${paths.globalDir}/NANO.md`,
+      `${paths.groupDir}/NANO.md`,
+      `${paths.globalDir}/SOUL.md`,
+      `${paths.groupDir}/SOUL.md`,
+      `${paths.globalDir}/TODOS.md`,
+      `${paths.groupDir}/TODOS.md`,
+      `${paths.globalDir}/MEMORY.md`,
+      `${paths.globalDir}/memory.md`,
+      `${paths.groupDir}/MEMORY.md`,
+      `${paths.groupDir}/memory.md`,
+    );
+    if (includeHeartbeatContext)
+      stableSourcePaths.push(`${paths.groupDir}/HEARTBEAT.md`);
+  }
+  for (const p of stableSourcePaths) {
+    if (!Object.prototype.hasOwnProperty.call(mtimeTracker, p)) {
+      try {
+        mtimeTracker[p] = fs.statSync(p).mtimeMs;
+      } catch {
+        mtimeTracker[p] = null;
+      }
+    }
+  }
+
+  const stableContextEntries =
+    contextState.entries.filter(isStableContextEntry);
+  const sessionBootstrapContextEntries = contextState.entries.filter(
+    (entry) => !isStableContextEntry(entry) && !isPerTurnContextEntry(entry),
+  );
+  const ephemeralContextEntries = contextState.entries.filter(
+    isPerTurnContextEntry,
+  );
+  const stableMtimeMap = pickMtimeMap(
+    mtimeTracker,
+    stableContextEntries.map((entry) => entry.path),
+  );
+
+  const stableCacheKey = buildStableCacheKey({
     assistantName,
     promptMode,
     isMain: input.isMain,
@@ -1017,27 +1465,41 @@ export function buildSystemPrompt(
     canDelegateToCoder,
     autoDelegationEnabled,
     isEvaluatorRun: input.isEvaluatorRun === true,
-    contextEntries: contextState.entries,
-    skillCatalogText: skillCatalog.text,
+    mtimeMap: stableMtimeMap,
   });
 
+  const cached = options.cachedStableLayer;
   const cacheHit =
-    options.cachedBaseLayer?.key === baseCacheKey &&
-    typeof options.cachedBaseLayer.content === 'string' &&
-    options.cachedBaseLayer.content.length > 0;
-  const baseContent = cacheHit
-    ? options.cachedBaseLayer!.content
-    : renderBasePrompt({
-        assistantName,
-        paths,
-        contextEntries: contextState.entries,
-        skillCatalogText: skillCatalog.text,
-        forcedDelegateMode,
-        canDelegateToCoder,
-        autoDelegationEnabled,
-        isEvaluatorRun: input.isEvaluatorRun === true,
-      });
-  const overlayContent = renderOverlayPrompt({
+    !!cached &&
+    cached.key === stableCacheKey &&
+    mtimeMapDeepEqual(cached.mtimeMap, stableMtimeMap) &&
+    typeof cached.content === 'string' &&
+    cached.content.length > 0;
+
+  let stableText: string;
+  if (cacheHit) {
+    stableText = cached!.content;
+  } else {
+    const baseText = renderBasePrompt({
+      assistantName,
+      paths,
+      forcedDelegateMode,
+      canDelegateToCoder,
+      autoDelegationEnabled,
+      isEvaluatorRun: input.isEvaluatorRun === true,
+      isMain: input.isMain,
+    });
+    const stableOverlay = renderContextOverlay({
+      contextEntries: stableContextEntries,
+      fileMaxChars,
+    });
+    stableText = [baseText, stableOverlay]
+      .filter((s) => s && s.length > 0)
+      .join('\n\n')
+      .trim();
+  }
+
+  const ephemeralBaseText = renderEphemeralPrompt({
     input,
     assistantName,
     promptMode,
@@ -1046,21 +1508,46 @@ export function buildSystemPrompt(
     now,
     timezone,
   });
-  const text = [baseContent, overlayContent]
-    .filter(Boolean)
+  const sessionBootstrapText = renderSessionBootstrapOverlay({
+    contextEntries: sessionBootstrapContextEntries,
+    skillCatalogText: skillCatalog.text,
+    fileMaxChars,
+  });
+  const ephemeralOverlay = renderEphemeralOverlay({
+    contextEntries: ephemeralContextEntries,
+    fileMaxChars,
+  });
+  const ephemeralText = [ephemeralBaseText, ephemeralOverlay]
+    .filter((s) => s && s.length > 0)
     .join('\n\n')
     .trim();
+
   const injectedTotalChars = contextState.entries.reduce(
     (sum, entry) => sum + entry.injectedChars,
     0,
   );
-  const basePromptHash = hashString(baseContent);
+  const basePromptHash = hashString(stableText);
+  const includeSessionBootstrap = input.noContinue === true;
+  const totalChars =
+    stableText.length +
+    (includeSessionBootstrap ? sessionBootstrapText.length : 0) +
+    ephemeralText.length;
 
   return {
-    text,
+    stableText,
+    sessionBootstrapText,
+    ephemeralText,
+    text: [
+      stableText,
+      includeSessionBootstrap ? sessionBootstrapText : '',
+      ephemeralText,
+    ]
+      .filter((s) => s && s.length > 0)
+      .join('\n\n')
+      .trim(),
     report: {
       mode: promptMode,
-      totalChars: text.length,
+      totalChars,
       contextEntries: contextState.entries,
       contextBudget: {
         fileMaxChars,
@@ -1070,19 +1557,29 @@ export function buildSystemPrompt(
       },
       layers: [
         {
-          id: 'base',
-          title: 'Base Prompt',
-          content: baseContent,
-          chars: baseContent.length,
+          id: 'stable',
+          title: 'Stable Prompt (cacheable prefix)',
+          content: stableText,
+          chars: stableText.length,
+          mtimeMap: stableMtimeMap,
+          hash: basePromptHash,
+          key: stableCacheKey,
         },
         {
-          id: 'overlays',
-          title: 'Runtime Overlays',
-          content: overlayContent,
-          chars: overlayContent.length,
+          id: 'session_bootstrap',
+          title: 'Session Bootstrap Context (fresh sessions only)',
+          content: sessionBootstrapText,
+          chars: sessionBootstrapText.length,
+          included: includeSessionBootstrap,
+        },
+        {
+          id: 'ephemeral',
+          title: 'Ephemeral Overlay (per-turn suffix)',
+          content: ephemeralText,
+          chars: ephemeralText.length,
         },
       ],
-      baseCacheKey,
+      baseCacheKey: stableCacheKey,
       basePromptHash,
       cacheHit,
       skillsCatalog: {

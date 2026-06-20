@@ -68,9 +68,13 @@ export function normalizeFileDeliveryRequest(
   }
 
   const request = raw as Record<string, any>;
-  if (request.type !== 'file_delivery') {
+  const isCanonical =
+    request.type === 'farm_action' && request.action === 'deliver_file';
+  const isLegacy =
+    request.type === 'deliver_file' && request.action === 'deliver_file';
+  if (!isCanonical && !isLegacy) {
     throw new Error(
-      "File delivery request must have type 'file_delivery'",
+      'File delivery request must be farm_action deliver_file or legacy deliver_file',
     );
   }
   if (typeof request.requestId !== 'string' || !request.requestId.trim()) {
@@ -81,7 +85,7 @@ export function normalizeFileDeliveryRequest(
   }
 
   return {
-    type: 'file_delivery',
+    type: 'farm_action',
     action: 'deliver_file',
     requestId: request.requestId,
     params: {

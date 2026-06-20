@@ -4,6 +4,12 @@ import { sanitizeUserFacingVerdictLeak } from '../runtime/boundary-ipc.js';
 import type { TelegramMessagePreviewState } from '../telegram-streaming.js';
 import type { NewMessage } from '../types.js';
 import type { CodingWorkerResult } from '../coding-orchestrator.js';
+import { mintRunAuthority, deriveEffectiveToolSet } from '../run-authority.js';
+import { runSampledChatEvaluation } from '../evaluator.js';
+import {
+  cancelActiveMaintenance,
+  cancelPendingGraceTimer,
+} from '../skill-service.js';
 
 export interface FinalizeCompletedRunParams {
   chatJid: string;
@@ -112,12 +118,15 @@ type CodingRunResult = {
 
 export type InboundOrigin = 'user' | 'assistant' | 'tui' | 'system';
 
+export type SenderRole = 'operator' | 'member' | 'unknown';
+
 interface ClassifiedInboundMessage {
   group: any;
   content: string;
   origin: InboundOrigin;
   isMainGroup: boolean;
   queuePrefs: Record<string, any>;
+  senderRole: SenderRole;
 }
 
 interface DispatchRequest {
@@ -135,6 +144,7 @@ interface DispatchRequest {
   runPreferences: Record<string, any>;
   timestampToPersist?: string;
   workspaceRoot?: string;
+  senderRole: SenderRole;
 }
 
 export type RunRoute = 'agent' | 'coding_worker';
@@ -635,6 +645,48 @@ function resolveInboundOrigin(
   return 'user';
 }
 
+/**
+ * Resolves the sender role for a message.
+ *
+ * Logic (per WS3.1 spec):
+ * - The main-chat owner is always 'operator' (the main chat JID itself)
+ * - A JID in PARITY_CONFIG.skills.selfImprove.operators is 'operator'
+ * - A JID in a registered group but not in the allowlist is 'member'
+ * - A JID with no registered group is 'unknown'
+ */
+export function resolveSenderRole(
+  msg: NewMessage,
+  registeredGroups: Record<string, any>,
+  mainGroupFolder: string,
+): SenderRole {
+  const { sender } = msg;
+
+  // Empty sender defaults to unknown
+  if (!sender) return 'unknown';
+
+  // Check if sender is in the operators allowlist
+  const operators = PARITY_CONFIG.skills.selfImprove.operators || [];
+  if (operators.includes(sender)) return 'operator';
+
+  // Find the main chat JID (the chat with folder === mainGroupFolder)
+  const mainChatJid = Object.entries(registeredGroups).find(
+    ([, group]) => group.folder === mainGroupFolder,
+  )?.[0];
+
+  // The main chat owner (the main chat JID itself) is always operator
+  if (mainChatJid && sender === mainChatJid) return 'operator';
+
+  // Check if sender is in any registered group
+  const senderChatJid = msg.chat_jid;
+  if (registeredGroups[senderChatJid]) {
+    // Sender is in a registered group but not in allowlist and not the main chat owner
+    return 'member';
+  }
+
+  // No registered group found
+  return 'unknown';
+}
+
 function classifyInboundMessage(
   msg: NewMessage,
   deps: MessageDispatcherDeps,
@@ -652,6 +704,11 @@ function classifyInboundMessage(
     origin: resolveInboundOrigin(msg, deps.constants.assistantName),
     isMainGroup: group.folder === deps.constants.mainGroupFolder,
     queuePrefs,
+    senderRole: resolveSenderRole(
+      msg,
+      deps.state.registeredGroups,
+      deps.constants.mainGroupFolder,
+    ),
   };
 }
 
@@ -708,11 +765,7 @@ function shouldAutoRouteLongRun(params: {
   ) {
     return false;
   }
-  // /coder and /coding requests must reach selectRunRoute() (coding_worker
-  // path). Returning true here would divert them into the durable long-run
-  // service, which calls the normal agent path with codingHint:'none' and
-  // skips plan/execute routing plus execute-mode worktree isolation.
-  if (params.shouldUseCodingWorker) return false;
+  if (params.shouldUseCodingWorker) return true;
   if (params.deps.isSubstantialCodingTask?.(params.latestUserText) === true) {
     return true;
   }
@@ -1181,6 +1234,7 @@ export function createMessageDispatcher(deps: MessageDispatcherDeps): {
     deliverToChat?: boolean;
     onSettled?: () => void;
     workspaceRoot?: string;
+    senderRole: SenderRole;
   }): Promise<void> {
     let result: string | null = null;
     let streamed = false;
@@ -1271,7 +1325,7 @@ export function createMessageDispatcher(deps: MessageDispatcherDeps): {
                 params.codingHint,
                 params.requestId,
                 params.runPreferences,
-                {},
+                { senderRole: params.senderRole },
                 abortController.signal,
               );
 
@@ -1378,6 +1432,44 @@ export function createMessageDispatcher(deps: MessageDispatcherDeps): {
             );
           });
       };
+
+      // WS4.4: Fire-and-forget chat sampling after run completes
+      // Only for agent route (not coding_worker which has its own evaluation)
+      if (params.route === 'agent' && result !== null) {
+        const chatAuthority = mintRunAuthority({
+          requestId: params.requestId,
+          groupFolder: params.group.folder,
+          isMain: false, // Chat runs are not interactive-main for authority purposes
+          isSubagent: false,
+          isScheduledTask: false,
+          isHeartbeat: false,
+          isEvaluatorRun: false,
+          effectiveToolSet: deriveEffectiveToolSet({
+            toolMode: 'default',
+            codingHint: 'none',
+          }),
+          senderRole: params.senderRole,
+          startedDuringPause: false,
+        });
+
+        void (async () => {
+          try {
+            await runSampledChatEvaluation({
+              authority: chatAuthority,
+              originalTask: params.latestUserText,
+              agentOutput: result ?? '',
+              group: params.group,
+              chatJid: params.chatJid,
+              abortSignal: abortController.signal,
+            });
+          } catch (err) {
+            deps.logger?.warn?.(
+              { err, chatJid: params.chatJid, requestId: params.requestId },
+              'Chat sampling failed',
+            );
+          }
+        })();
+      }
 
       if (ok) {
         await finalizeRun({
@@ -1737,6 +1829,7 @@ export function createMessageDispatcher(deps: MessageDispatcherDeps): {
       runPreferences,
       timestampToPersist: msg.timestamp,
       workspaceRoot,
+      senderRole: classified.senderRole,
     };
   }
 
@@ -1748,6 +1841,28 @@ export function createMessageDispatcher(deps: MessageDispatcherDeps): {
     if (classified.origin === 'user') {
       // Mark host activity so the idle curator only runs during true quiet.
       deps.state.lastInboundAt = Date.now();
+
+      // LISO.2: Cancel any active maintenance and pending grace timers for this group.
+      // This runs at the earliest common inbound dispatch point before starting
+      // the interactive turn.
+      const group = deps.state.registeredGroups[msg.chat_jid];
+      if (group) {
+        // Cancel pending grace timer first
+        cancelPendingGraceTimer(group.folder);
+
+        // Cancel active maintenance run and wait for graceful exit (max 2s)
+        const cancelPromise = cancelActiveMaintenance(
+          group.folder,
+          'user-inbound',
+        );
+        // Wait up to 2 seconds for graceful exit
+        const timeoutPromise = new Promise<void>((resolve) =>
+          setTimeout(resolve, 2000),
+        );
+        await Promise.race([cancelPromise, timeoutPromise]);
+        // If cancelPromise hasn't resolved, force-terminate is handled by the
+        // AbortController in runQuietSkillAgent
+      }
     }
     if (classified.origin === 'user' && deps.activeChatRuns.has(msg.chat_jid)) {
       enqueueInboundMessage(msg);
@@ -1777,13 +1892,6 @@ export function createMessageDispatcher(deps: MessageDispatcherDeps): {
         sourceRequestId: request.requestId,
         source: 'auto-route',
       });
-      // Advance the per-chat agent timestamp so the auto-routed trigger
-      // message is consumed from the chat backlog. Otherwise future prompt
-      // assembly (which uses getMessagesSince(lastAgentTimestamp)) will keep
-      // re-reading this message into later turns until an unrelated normal
-      // run happens to advance the timestamp.
-      deps.state.lastAgentTimestamp ||= {};
-      deps.state.lastAgentTimestamp[msg.chat_jid] = msg.timestamp;
       return 'started';
     }
 
@@ -1805,6 +1913,7 @@ export function createMessageDispatcher(deps: MessageDispatcherDeps): {
         drainQueuedWork(msg.chat_jid);
       },
       workspaceRoot: request.workspaceRoot,
+      senderRole: request.senderRole,
     });
     return 'started';
   }
@@ -1916,6 +2025,7 @@ export function createMessageDispatcher(deps: MessageDispatcherDeps): {
         onSettled: () => {
           drainQueuedWork(chatJid);
         },
+        senderRole: 'unknown', // TUI sessions don't have a senderRole context
       });
     })();
     return { runId, status: 'started' };

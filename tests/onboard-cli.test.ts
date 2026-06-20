@@ -46,7 +46,7 @@ test('runOnboarding writes SOUL/TODOS and preserves BOOTSTRAP for first-run ritu
   assert.equal(fs.existsSync(path.join(workspace, 'BOOTSTRAP.md')), true);
 
   const state = JSON.parse(
-    fs.readFileSync(path.join(workspace, '.fft_nano', 'workspace-state.json'), 'utf-8'),
+    fs.readFileSync(path.join(workspace, '.nano-core', 'workspace-state.json'), 'utf-8'),
   ) as { onboardingCompletedAt?: string; bootstrapSeededAt?: string };
   assert.equal(state.onboardingCompletedAt, undefined);
   assert.ok(state.bootstrapSeededAt);
@@ -61,7 +61,7 @@ test('runOnboarding with --force is deterministic for same inputs', async () => 
   });
 
   const firstState = fs.readFileSync(
-    path.join(workspace, '.fft_nano', 'workspace-state.json'),
+    path.join(workspace, '.nano-core', 'workspace-state.json'),
     'utf-8',
   );
   await runOnboarding({
@@ -71,7 +71,7 @@ test('runOnboarding with --force is deterministic for same inputs', async () => 
     force: true,
   });
   const secondState = fs.readFileSync(
-    path.join(workspace, '.fft_nano', 'workspace-state.json'),
+    path.join(workspace, '.nano-core', 'workspace-state.json'),
     'utf-8',
   );
 
@@ -251,10 +251,10 @@ test('runOnboarding defaults local runtime from existing env runtime', async () 
   const envBody = fs.readFileSync(envPath, 'utf-8');
   assert.equal(result.runtime, 'host');
   assert.match(envBody, /^CONTAINER_RUNTIME=host$/m);
-  assert.match(envBody, /^FFT_NANO_ALLOW_HOST_RUNTIME=1$/m);
+  assert.doesNotMatch(envBody, /^FFT_NANO_ALLOW_HOST_RUNTIME=1$/m);
 });
 
-test('runOnboarding host runtime writes host opt-in env flags', async () => {
+test('runOnboarding host runtime writes host runtime without opt-in flags', async () => {
   const workspace = makeTmpWorkspace();
   const envPath = path.join(workspace, '.env');
   const result = await runOnboarding({
@@ -267,7 +267,7 @@ test('runOnboarding host runtime writes host opt-in env flags', async () => {
   const envBody = fs.readFileSync(envPath, 'utf-8');
   assert.equal(result.runtime, 'host');
   assert.match(envBody, /^CONTAINER_RUNTIME=host$/m);
-  assert.match(envBody, /^FFT_NANO_ALLOW_HOST_RUNTIME=1$/m);
+  assert.doesNotMatch(envBody, /^FFT_NANO_ALLOW_HOST_RUNTIME=/m);
 });
 
 test('runOnboarding docker runtime clears lingering host opt-in env flag', async () => {

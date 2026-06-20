@@ -175,6 +175,8 @@
     "src/system-prompt.ts",
     "src/telegram-commands.ts",
     "src/wiring.ts",
+    "src/edge/bridge.ts",
+    "src/edge/collector.ts",
     "package.json",
     ".env.example",
     ".gitignore",

@@ -12,7 +12,7 @@ Usage:
 Defaults:
   workspace: $FFT_NANO_MAIN_WORKSPACE_DIR or ~/nano
   out-dir:   ./backups
-  name:      fft_nano
+  name:      nano-core
 
 Creates a .tar.gz backup that preserves:
   - .env (if present)
@@ -24,7 +24,7 @@ USAGE
 
 WORKSPACE_DIR="${FFT_NANO_MAIN_WORKSPACE_DIR:-$HOME/nano}"
 OUT_DIR="$ROOT_DIR/backups"
-NAME_PREFIX="fft_nano"
+NAME_PREFIX="nano-core"
 DRY_RUN=0
 
 while [[ $# -gt 0 ]]; do

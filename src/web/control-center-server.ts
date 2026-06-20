@@ -5,7 +5,10 @@ import path from 'path';
 import type { WebAccessMode } from '../config.js';
 import { logger } from '../logger.js';
 import { sanitizeUserFacingVerdictLeak } from '../runtime/boundary-ipc.js';
-import type { UpdateCommandStartResult } from '../update-command.js';
+import type {
+  UpdateCommandStartResult,
+  UpdateNotificationRecord,
+} from '../update-command.js';
 
 interface RuntimeStatusPayload {
   runtime: string;
@@ -131,6 +134,7 @@ export interface WebControlCenterAdapters {
     payload: OnboardingConfigPayload,
   ) => Promise<{ ok: boolean; requiresRestart: boolean; adminSecret?: string }>;
   hostUpdate?: () => UpdateCommandStartResult;
+  getUpdateReport?: (reportId: string) => UpdateNotificationRecord | null;
   getProviderSetup?: () => ProviderSetupLink[];
   getRuntimeSettings?: () => RuntimeSettingsSnapshot;
   applyRuntimeSettings?: (
@@ -559,15 +563,10 @@ export async function startWebControlCenterServer(
   options: WebControlCenterServerOptions,
 ): Promise<WebControlCenterServer> {
   const authToken = options.authToken.trim();
-  const isLoopbackHost =
-    options.host === '127.0.0.1' ||
-    options.host === '::1' ||
-    options.host === 'localhost';
-  const authRequired =
-    options.accessMode !== 'localhost' || !isLoopbackHost;
+  const authRequired = options.accessMode !== 'localhost';
   if (authRequired && !authToken) {
     throw new Error(
-      'FFT_NANO_WEB_ACCESS_MODE is lan/remote or FFT_NANO_WEB_HOST is non-loopback, but FFT_NANO_WEB_AUTH_TOKEN is empty.',
+      'FFT_NANO_WEB_ACCESS_MODE is lan/remote but FFT_NANO_WEB_AUTH_TOKEN is empty.',
     );
   }
 
@@ -988,7 +987,7 @@ export async function startWebControlCenterServer(
         const target = (url.searchParams.get('target') || 'host').toLowerCase();
         const lines = parseLineCount(url.searchParams.get('lines'));
         const fileName =
-          target === 'error' ? 'fft_nano.error.log' : 'fft_nano.log';
+          target === 'error' ? 'nano-core.error.log' : 'nano-core.log';
         const filePath = path.join(logsDir, fileName);
         const text = redactUserFacingLogText(tailFile(filePath, lines));
         sendJson(res, 200, {
@@ -1235,6 +1234,66 @@ export async function startWebControlCenterServer(
             ...(typeof result.reportId === 'string'
               ? { reportId: result.reportId }
               : {}),
+          });
+        } catch (err) {
+          sendJson(res, 500, {
+            ok: false,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        return;
+      }
+
+      if (requestPath === '/api/update/status') {
+        if (method !== 'GET') {
+          sendJson(res, 405, { ok: false, error: 'Method not allowed' });
+          return;
+        }
+        if (!adapters.getUpdateReport) {
+          sendJson(res, 501, {
+            ok: false,
+            error: 'Update status not available',
+          });
+          return;
+        }
+        const reportId = (url.searchParams.get('reportId') || '').trim();
+        if (!reportId) {
+          sendJson(res, 400, {
+            ok: false,
+            error: 'reportId query parameter is required',
+          });
+          return;
+        }
+        try {
+          const record = adapters.getUpdateReport(reportId);
+          if (!record) {
+            sendJson(res, 404, { ok: false, error: 'Report not found' });
+            return;
+          }
+          // Calculate elapsed time
+          const startedAt = new Date(record.startedAt);
+          const now = record.completedAt
+            ? new Date(record.completedAt)
+            : new Date();
+          const elapsedMs = now.getTime() - startedAt.getTime();
+
+          // Find current phase from progress
+          let currentPhase: string = record.status;
+          if (record.progress && record.progress.length > 0) {
+            const lastIndex =
+              record.lastProgressIndex ?? record.progress.length - 1;
+            const lastEvent = record.progress[Math.max(0, lastIndex)];
+            if (lastEvent) {
+              currentPhase = lastEvent.phase;
+            }
+          }
+
+          sendJson(res, 200, {
+            ok: record.ok ?? false,
+            status: record.status,
+            currentPhase,
+            elapsedMs,
+            previewMessageId: record.previewMessageId ?? null,
           });
         } catch (err) {
           sendJson(res, 500, {

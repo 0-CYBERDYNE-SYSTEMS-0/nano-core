@@ -6,12 +6,15 @@ import {
   IPC_POLL_INTERVAL,
   MAIN_GROUP_FOLDER,
   MAIN_WORKSPACE_DIR,
+  PARITY_CONFIG,
 } from './config.js';
 import { logger } from './logger.js';
+import { enqueueHeldDelivery, markHeldDeliveryNotified } from './db.js';
 import {
   state,
   telegramPreviewRegistry,
   hostEventBus,
+  runAuthorityRegistry,
   type TelegramDeliveryMode,
 } from './app-state.js';
 import {
@@ -21,6 +24,7 @@ import {
   updateTelegramDraftPreview,
   updateTelegramPreview,
 } from './telegram-streaming.js';
+import { getActiveStreamConsumer } from './streaming/active-consumers.js';
 import { deriveTelegramDraftId, type AvailableGroup } from './pi-runner.js';
 import type { RegisteredGroup } from './types.js';
 import { isTelegramJid } from './telegram.js';
@@ -38,17 +42,24 @@ import {
   processFileDeliveryRequest,
 } from './file-delivery.js';
 import { attachActionRequestAudit } from './action-result-audit.js';
+import { executeFarmAction } from './farm-action-gateway.js';
 import { executeMemoryAction } from './memory-action-gateway.js';
 import { executeSkillAction } from './skill-lifecycle.js';
 import { writeJsonFileAtomic } from './atomic-write.js';
+import { FEATURE_FARM } from './config.js';
 import type { StatusTelemetry } from './status-report.js';
-import type { MemoryActionRequest, SkillActionRequest } from './types.js';
+import type {
+  FarmActionRequest,
+  MemoryActionRequest,
+  SkillActionRequest,
+} from './types.js';
 import type { CronV2Schedule } from './cron/types.js';
 import {
   resolveCronExecutionPlan,
   resolveCronPolicy,
 } from './cron/adapters.js';
 import { resolveGroupFolderPath } from './group-folder.js';
+import { recordTaskAuditEvent } from './task-audit.js';
 
 export interface HostCoordinationDeps {
   sendTelegramAgentReply: (chatJid: string, text: string) => Promise<boolean>;
@@ -308,17 +319,27 @@ export async function processHostEvent(
         return;
       }
       const result =
-        event.request.type === 'skill_action'
-          ? await executeSkillAction(event.request, {
-              sourceGroup: event.sourceGroup,
-              isMain: event.isMain,
-              registeredGroups: state.registeredGroups,
-            })
-          : await executeMemoryAction(event.request, {
-              sourceGroup: event.sourceGroup,
-              isMain: event.isMain,
-              registeredGroups: state.registeredGroups,
-            });
+        event.request.type === 'farm_action'
+          ? FEATURE_FARM
+            ? await executeFarmAction(event.request, event.isMain)
+            : {
+                requestId: event.request.requestId,
+                status: 'error' as const,
+                error:
+                  'farm_action is disabled in core profile (set FFT_PROFILE=farm or FEATURE_FARM=1)',
+                executedAt: new Date().toISOString(),
+              }
+          : event.request.type === 'skill_action'
+            ? await executeSkillAction(event.request, {
+                sourceGroup: event.sourceGroup,
+                isMain: event.isMain,
+                registeredGroups: state.registeredGroups,
+              })
+            : await executeMemoryAction(event.request, {
+                sourceGroup: event.sourceGroup,
+                isMain: event.isMain,
+                registeredGroups: state.registeredGroups,
+              });
       fs.writeFileSync(
         event.resultPath,
         JSON.stringify(
@@ -365,6 +386,19 @@ export async function processHostEvent(
       if (!isTelegramJid(event.chatJid)) return;
       if (!state.telegramBot) return;
       if (!state.registeredGroups[event.chatJid]) return;
+
+      const activeConsumer = getActiveStreamConsumer(
+        event.chatJid,
+        event.runId,
+      );
+      if (activeConsumer) {
+        activeConsumer.handleExternalProgress(
+          event.phase,
+          event.text,
+          event.detail,
+        );
+        return;
+      }
 
       const deliveryMode = getTelegramDeliveryMode(event.chatJid);
       if (deliveryMode === 'off') return;
@@ -562,12 +596,90 @@ export function startIpcWatcher(deps: HostCoordinationDeps): void {
       const isMain = sourceGroup === MAIN_GROUP_FOLDER;
       const messagesDir = path.join(ipcBaseDir, sourceGroup, 'messages');
 
+      // Process held markers in messages/ before processing message files.
+      // A .held marker means the permission gate returned 'held' for that
+      // outbound action — the host must call enqueueHeldDelivery instead of
+      // delivering the message. VAL-XARE-001 / VAL-XARE-006.
+      const heldMessageIds = new Set<string>();
+      try {
+        if (fs.existsSync(messagesDir)) {
+          const markerFiles = fs
+            .readdirSync(messagesDir)
+            .filter((f) => f.endsWith('.held'));
+          for (const mf of markerFiles) {
+            const markerPath = path.join(messagesDir, mf);
+            try {
+              const content = fs.readFileSync(markerPath, 'utf-8');
+              const marker = JSON.parse(content) as {
+                requestId: string;
+                action: string;
+                ts: string;
+              };
+              const { requestId, action, ts } = marker;
+              if (requestId && action === 'send_message') {
+                // Read the corresponding message file to get destination + body
+                const msgFile = path.join(messagesDir, `${requestId}.json`);
+                let destination = '';
+                let body = '';
+                if (fs.existsSync(msgFile)) {
+                  try {
+                    const msgData = JSON.parse(
+                      fs.readFileSync(msgFile, 'utf-8'),
+                    ) as { chatJid?: string; text?: string };
+                    destination = msgData.chatJid ?? '';
+                    body = msgData.text ?? '';
+                  } catch {
+                    /* ignore parse errors */
+                  }
+                }
+                const dedupeKey = `held:${sourceGroup}:${requestId}`;
+                enqueueHeldDelivery({ dedupeKey, destination, body });
+                markHeldDeliveryNotified(dedupeKey);
+                heldMessageIds.add(requestId);
+                logger.info(
+                  { sourceGroup, requestId, action, ts },
+                  'Held marker detected: enqueued held delivery',
+                );
+              }
+              fs.unlinkSync(markerPath);
+            } catch (err) {
+              logger.warn(
+                { err, markerPath: markerPath },
+                'Failed to process held marker',
+              );
+              try {
+                fs.unlinkSync(markerPath);
+              } catch {
+                /* ignore */
+              }
+            }
+          }
+        }
+      } catch (err) {
+        logger.error(
+          { err, sourceGroup },
+          'Error processing held markers in messages',
+        );
+      }
+
       try {
         if (fs.existsSync(messagesDir)) {
           const messageFiles = fs
             .readdirSync(messagesDir)
             .filter((f) => f.endsWith('.json'));
           for (const file of messageFiles) {
+            // Skip messages that were already handled via a .held marker
+            const requestId = file.replace(/\.json$/, '');
+            if (heldMessageIds.has(requestId)) {
+              // Message was held — suppress delivery, already enqueued
+              try {
+                fs.unlinkSync(path.join(messagesDir, file));
+              } catch {
+                /* ignore */
+              }
+              continue;
+            }
+
             const filePath = path.join(messagesDir, file);
             try {
               const data = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
@@ -617,14 +729,64 @@ export function startIpcWatcher(deps: HostCoordinationDeps): void {
       try {
         const actionsDir = path.join(ipcBaseDir, sourceGroup, 'actions');
         if (fs.existsSync(actionsDir)) {
+          // Process held markers in actions/ before processing action files.
+          // This covers deliver_file and send_webhook held decisions.
+          // VAL-XARE-001 / VAL-XARE-006.
+          const markerFiles = fs
+            .readdirSync(actionsDir)
+            .filter((f) => f.endsWith('.held'));
+          for (const mf of markerFiles) {
+            const markerPath = path.join(actionsDir, mf);
+            try {
+              const content = fs.readFileSync(markerPath, 'utf-8');
+              const marker = JSON.parse(content) as {
+                requestId: string;
+                action: string;
+                destination: string;
+                body: string;
+                ts: string;
+              };
+              const { requestId, action, destination, body, ts } = marker;
+              if (
+                requestId &&
+                (action === 'deliver_file' || action === 'send_webhook')
+              ) {
+                const dedupeKey = `held:${sourceGroup}:${requestId}`;
+                enqueueHeldDelivery({ dedupeKey, destination, body });
+                markHeldDeliveryNotified(dedupeKey);
+                logger.info(
+                  { sourceGroup, requestId, action, ts },
+                  'Held marker detected in actions: enqueued held delivery',
+                );
+              }
+              fs.unlinkSync(markerPath);
+            } catch (err) {
+              logger.warn(
+                { err, markerPath },
+                'Failed to process held marker in actions',
+              );
+              try {
+                fs.unlinkSync(markerPath);
+              } catch {
+                /* ignore */
+              }
+            }
+          }
+
           const actionFiles = fs
             .readdirSync(actionsDir)
             .filter((f) => f.endsWith('.json'));
 
           for (const file of actionFiles) {
+            // Check if this action was already handled via a .held marker
+            const requestId = file.replace(/\.json$/, '');
+            // The held marker for this action would have been processed above
+            // and removed. If it still exists, it means it's not a held action.
+
             const filePath = path.join(actionsDir, file);
             try {
               const request = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as
+                | FarmActionRequest
                 | MemoryActionRequest
                 | SkillActionRequest;
 
@@ -636,6 +798,7 @@ export function startIpcWatcher(deps: HostCoordinationDeps): void {
               fs.mkdirSync(resultDir, { recursive: true });
 
               if (
+                request.type === 'farm_action' ||
                 request.type === 'memory_action' ||
                 request.type === 'skill_action'
               ) {
@@ -670,7 +833,7 @@ export function startIpcWatcher(deps: HostCoordinationDeps): void {
             } catch (err) {
               logger.error(
                 { file, sourceGroup, err },
-                'Error processing IPC action',
+                'Error processing IPC farm action',
               );
               const errorDir = path.join(ipcBaseDir, 'errors');
               fs.mkdirSync(errorDir, { recursive: true });
@@ -700,6 +863,57 @@ export function startIpcWatcher(deps: HostCoordinationDeps): void {
             .filter((f) => f.endsWith('.json'));
           for (const file of deliveryFiles) {
             const filePath = path.join(deliverFilesDir, file);
+            const requestIdFromFile = file.replace(/\.json$/, '');
+
+            // Check for a .held marker for this deliver_file.
+            // The marker is written to deliver_files/ (same dir) by the extension
+            // so we can detect it before processing the file.
+            const markerPath = path.join(
+              deliverFilesDir,
+              `${requestIdFromFile}.held`,
+            );
+            if (fs.existsSync(markerPath)) {
+              try {
+                const content = fs.readFileSync(markerPath, 'utf-8');
+                const marker = JSON.parse(content) as {
+                  requestId: string;
+                  action: string;
+                  destination: string;
+                  body: string;
+                  ts: string;
+                };
+                const { destination, body, ts } = marker;
+                const dedupeKey = `held:${sourceGroup}:${marker.requestId}`;
+                enqueueHeldDelivery({ dedupeKey, destination, body });
+                markHeldDeliveryNotified(dedupeKey);
+                logger.info(
+                  {
+                    sourceGroup,
+                    requestId: marker.requestId,
+                    action: marker.action,
+                    ts,
+                  },
+                  'Held marker detected for deliver_file: enqueued held delivery',
+                );
+              } catch (err) {
+                logger.warn(
+                  { err, markerPath },
+                  'Failed to process held marker for deliver_file',
+                );
+              }
+              try {
+                fs.unlinkSync(markerPath);
+              } catch {
+                /* ignore */
+              }
+              try {
+                fs.unlinkSync(filePath);
+              } catch {
+                /* ignore */
+              }
+              continue; // Skip processing — delivery is held
+            }
+
             let trackedRequestId: string | null = null;
             let trackedChatJid: string | null = null;
             let parsedRequestId: string | null = null;
@@ -945,6 +1159,27 @@ export async function processTaskIpc(
           data.context_mode === 'group' || data.context_mode === 'isolated'
             ? data.context_mode
             : 'isolated';
+
+        // WS2.2: Derive created_by and status from the run authority's origin.
+        // Agent-created tasks (origin headless/subagent) → pending_approval, created_by='agent'.
+        // Operator-created tasks (origin interactive-main) → active, created_by='operator'.
+        // Conservative default: if no authority found, treat as agent-created.
+        const runAuthority = runAuthorityRegistry.get(sourceGroup);
+        const isAgentOrigin =
+          !runAuthority ||
+          runAuthority.origin === 'headless' ||
+          runAuthority.origin === 'subagent';
+        // WS6.3: When learning is paused, autoApprove is ignored and agent tasks
+        // always go to pending_approval (VAL-WS6-019, VAL-XARE-014).
+        const effectiveAutoApprove = state.learningPaused
+          ? false
+          : PARITY_CONFIG.cron.agentTasks.autoApprove;
+        const taskStatus =
+          isAgentOrigin && !effectiveAutoApprove
+            ? 'pending_approval'
+            : 'active';
+        const createdBy = isAgentOrigin ? 'agent' : 'operator';
+
         createTask({
           id: taskId,
           group_folder: targetGroup,
@@ -965,7 +1200,8 @@ export async function processTaskIpc(
           delete_after_run: policy.deleteAfterRun ? 1 : 0,
           consecutive_errors: 0,
           next_run: executionPlan.nextRun,
-          status: 'active',
+          status: taskStatus,
+          created_by: createdBy,
           created_at: new Date().toISOString(),
         });
         logger.info(
@@ -980,6 +1216,22 @@ export async function processTaskIpc(
           },
           'Task created via IPC',
         );
+
+        // WS2.4: Write audit line for task creation
+        recordTaskAuditEvent(targetGroup, {
+          taskId,
+          kind: 'create',
+          authorityId: runAuthority?.authorityId,
+          priorStatus: undefined,
+          newStatus: taskStatus,
+          promptPreview: data.prompt?.slice(0, 200) || undefined,
+          scheduleType: executionPlan.scheduleType,
+          scheduleValue: executionPlan.scheduleValue,
+          deliveryTo: policy.delivery.to || null,
+          deliveryMode: policy.delivery.mode || null,
+          deleteAfterRun: policy.deleteAfterRun,
+          createdBy: createdBy as 'operator' | 'agent',
+        });
       }
       break;
 
@@ -1023,6 +1275,13 @@ export async function processTaskIpc(
       if (data.taskId) {
         const task = getTask(data.taskId);
         if (task && (isMain || task.group_folder === sourceGroup)) {
+          // WS2.4: Write audit line before deleting
+          recordTaskAuditEvent(task.group_folder, {
+            taskId: data.taskId,
+            kind: 'cancel',
+            priorStatus: task.status || null,
+            newStatus: null,
+          });
           deleteTask(data.taskId);
           logger.info(
             { taskId: data.taskId, sourceGroup },

@@ -37,9 +37,9 @@ OPENROUTER_API_KEY="${OPENROUTER_API_KEY:-}"
 # Optional configuration
 OPERATOR_NAME="${OPERATOR_NAME:-Admin}"
 ASSISTANT_NAME="${ASSISTANT_NAME:-FFT-Agent}"
-FFT_REPO="${FFT_REPO:-https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano.git}"
+FFT_REPO="${FFT_REPO:-https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git}"
 FFT_BRANCH="${FFT_BRANCH:-main}"
-INSTALL_DIR="${INSTALL_DIR:-/opt/fft_nano}"
+INSTALL_DIR="${INSTALL_DIR:-/opt/nano-core}"
 
 # Feature flags
 SKIP_DOCKER_INSTALL="${SKIP_DOCKER_INSTALL:-0}"
@@ -64,7 +64,7 @@ Optional:
   --assistant-name <name>        Assistant name (default: FFT-Agent)
   --repo <url>                   Git repo URL
   --branch <branch>              Git branch (default: main)
-  --install-dir <path>           Install directory (default: /opt/fft_nano)
+  --install-dir <path>           Install directory (default: /opt/nano-core)
   --skip-docker-install          Skip Docker installation
   --skip-node-install            Skip Node.js installation
   --dry-run                      Show what would be done, don't execute
