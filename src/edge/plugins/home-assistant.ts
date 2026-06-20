@@ -8,14 +8,6 @@ import { z } from 'zod';
 
 import { HA_TOKEN, HA_URL, HA_URL_CANDIDATES } from '../../config.js';
 import { logger } from '../../logger.js';
-import type {
-  CanvasCard,
-  CanvasPatchOp,
-  CanvasSpec,
-  DashboardPatchOp,
-  EdgeActionContext,
-} from '../../types.js';
-import type { EdgeBridge } from '../bridge.js';
 
 const haEntitySchema = z.object({
   entity_id: z.string(),

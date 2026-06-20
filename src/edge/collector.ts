@@ -2,17 +2,17 @@ import fs from 'fs';
 import path from 'path';
 
 import {
-  FARM_STATE_DIR,
-  FARM_STATE_FAST_MS,
-  FARM_STATE_MEDIUM_MS,
-  FARM_STATE_SLOW_MS,
-} from './config.js';
+  EDGE_BRIDGE_DIR,
+  EDGE_STATE_FAST_MS,
+  EDGE_STATE_MEDIUM_MS,
+  EDGE_STATE_SLOW_MS,
+} from '../config.js';
 import {
-  HomeAssistantAdapter,
+  HaAdapter,
   type CalendarEvent,
   type HAEntity,
-} from './home-assistant.js';
-import { logger } from './logger.js';
+} from './plugins/home-assistant.js';
+import { logger } from '../logger.js';
 
 type AlertSeverity = 'info' | 'warning' | 'critical';
 
@@ -36,7 +36,7 @@ interface DeviceContext {
     | 'night'
     | 'storm'
     | 'frost'
-    | 'harvest';
+    | 'autumn';
 }
 
 interface CurrentLedger {
@@ -61,11 +61,11 @@ let latestAlerts: DerivedAlert[] = [];
 let lastAlertSnapshot = new Map<string, DerivedAlert>();
 let activeTelemetryDay: string | null = null;
 
-const adapter = new HomeAssistantAdapter();
+const adapter = new HaAdapter();
 
 function ensureDeviceStateDir(): void {
-  fs.mkdirSync(FARM_STATE_DIR, { recursive: true });
-  fs.mkdirSync(path.join(FARM_STATE_DIR, 'screenshots'), { recursive: true });
+  fs.mkdirSync(EDGE_BRIDGE_DIR, { recursive: true });
+  fs.mkdirSync(path.join(EDGE_BRIDGE_DIR, 'screenshots'), { recursive: true });
 }
 
 function atomicWriteJson(filePath: string, payload: unknown): void {
@@ -193,7 +193,7 @@ function deriveAlerts(
           severity: moisture < 12 ? 'critical' : 'warning',
           since,
           entity: entityId,
-          message: `Low soil moisture (${moisture})`,
+          message: `Low moisture level (${moisture})`,
         });
       }
     }
@@ -231,7 +231,7 @@ function deriveContext(
   ) {
     suggestedTheme = 'storm';
   } else if (season === 'fall') {
-    suggestedTheme = 'harvest';
+    suggestedTheme = 'autumn';
   } else if (timeOfDay === 'morning') {
     suggestedTheme = 'dawn';
   } else if (timeOfDay === 'afternoon') {
@@ -286,7 +286,7 @@ function toCurrentLedger(
 
 function ensureTelemetryFileForDate(now: Date): string {
   const day = now.toISOString().slice(0, 10);
-  const activePath = path.join(FARM_STATE_DIR, 'telemetry.ndjson');
+  const activePath = path.join(EDGE_BRIDGE_DIR, 'telemetry.ndjson');
 
   if (
     activeTelemetryDay &&
@@ -294,7 +294,7 @@ function ensureTelemetryFileForDate(now: Date): string {
     fs.existsSync(activePath)
   ) {
     const rotatedPath = path.join(
-      FARM_STATE_DIR,
+      EDGE_BRIDGE_DIR,
       `telemetry-${activeTelemetryDay}.ndjson`,
     );
     if (fs.existsSync(rotatedPath)) {
@@ -405,7 +405,7 @@ async function writeCurrentSnapshot(stale: boolean): Promise<void> {
     stale,
     adapter.getActiveBaseUrl(),
   );
-  atomicWriteJson(path.join(FARM_STATE_DIR, 'current.json'), ledger);
+  atomicWriteJson(path.join(EDGE_BRIDGE_DIR, 'current.json'), ledger);
 }
 
 async function runFastLoop(): Promise<void> {
@@ -422,7 +422,7 @@ async function runFastLoop(): Promise<void> {
   } catch (err) {
     logger.warn(
       { err },
-      'Farm state fast collector failed; writing stale snapshot',
+      'Edge state fast collector failed; writing stale snapshot',
     );
     await writeCurrentSnapshot(true);
     throw err;
@@ -440,7 +440,7 @@ async function runMediumLoop(): Promise<void> {
   }
 
   const snapshot = updateAlertsSnapshot(latestAlerts, nowIso);
-  atomicWriteJson(path.join(FARM_STATE_DIR, 'alerts.json'), {
+  atomicWriteJson(path.join(EDGE_BRIDGE_DIR, 'alerts.json'), {
     timestamp: nowIso,
     active: snapshot.active,
     resolved: snapshot.resolved,
@@ -459,7 +459,7 @@ async function runSlowLoop(): Promise<void> {
     domains[domain] = (domains[domain] || 0) + 1;
   }
 
-  atomicWriteJson(path.join(FARM_STATE_DIR, 'devices.json'), {
+  atomicWriteJson(path.join(EDGE_BRIDGE_DIR, 'devices.json'), {
     timestamp: nowIso,
     entities: states.map((entity) => ({
       entity_id: entity.entity_id,
@@ -542,7 +542,7 @@ async function runSlowLoop(): Promise<void> {
     `${a.date} ${a.start}`.localeCompare(`${b.date} ${b.start}`),
   );
 
-  atomicWriteJson(path.join(FARM_STATE_DIR, 'calendar.json'), {
+  atomicWriteJson(path.join(EDGE_BRIDGE_DIR, 'calendar.json'), {
     timestamp: nowIso,
     today,
     upcoming,
@@ -570,7 +570,7 @@ function scheduleLoop(
       nextDelay = Math.min(60000, 5000 * 2 ** (failureCount - 1));
       logger.warn(
         { err, loopName, failureCount, nextDelay },
-        'Farm state collector loop error',
+        'Edge state collector loop error',
       );
     }
 
@@ -591,7 +591,7 @@ function scheduleLoop(
 
 export function startStateCollector(): void {
   if (running) {
-    logger.debug('Farm state collector already running');
+    logger.debug('Edge state collector already running');
     return;
   }
 
@@ -599,19 +599,19 @@ export function startStateCollector(): void {
   running = true;
 
   stopFns = [
-    scheduleLoop('fast', FARM_STATE_FAST_MS, runFastLoop),
-    scheduleLoop('medium', FARM_STATE_MEDIUM_MS, runMediumLoop),
-    scheduleLoop('slow', FARM_STATE_SLOW_MS, runSlowLoop),
+    scheduleLoop('fast', EDGE_STATE_FAST_MS, runFastLoop),
+    scheduleLoop('medium', EDGE_STATE_MEDIUM_MS, runMediumLoop),
+    scheduleLoop('slow', EDGE_STATE_SLOW_MS, runSlowLoop),
   ];
 
   logger.info(
     {
-      fastMs: FARM_STATE_FAST_MS,
-      mediumMs: FARM_STATE_MEDIUM_MS,
-      slowMs: FARM_STATE_SLOW_MS,
-      dir: FARM_STATE_DIR,
+      fastMs: EDGE_STATE_FAST_MS,
+      mediumMs: EDGE_STATE_MEDIUM_MS,
+      slowMs: EDGE_STATE_SLOW_MS,
+      dir: EDGE_BRIDGE_DIR,
     },
-    'Farm state collector started',
+    'Edge state collector started',
   );
 }
 
@@ -624,5 +624,5 @@ export function stopStateCollector(): void {
   }
   stopFns = [];
 
-  logger.info('Farm state collector stopped');
+  logger.info('Edge state collector stopped');
 }

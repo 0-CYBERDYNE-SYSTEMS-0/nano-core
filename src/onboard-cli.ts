@@ -472,6 +472,11 @@ function shouldRewriteSoulFile(existingBody: string, force: boolean): boolean {
   if (/You are .+: an agricultural assistant\./i.test(existingBody)) {
     return true;
   }
+  // Generic legacy SOUL/body detection: any old prompt that talks about
+  // "agriculture" should be rewritten under the neutral profile.
+  if (/agricultural assistant/i.test(existingBody)) {
+    return true;
+  }
   return false;
 }
 

@@ -6,10 +6,10 @@ import { PARITY_CONFIG, PARITY_CONFIG_PATH } from './parity-config.js';
 
 // ── Profile detection ─────────────────────────────────────────────────────────
 
-export type FFTProfile = 'core' | 'farm';
+export type FFTProfile = 'core';
 
 export interface ProfileDetection {
-  source: 'env' | 'auto_preserve' | 'default';
+  source: 'default';
   reason: string;
 }
 
@@ -22,97 +22,15 @@ function parseBool(value: string | undefined): boolean | null {
   return null;
 }
 
-function normalizeProfile(value: string | undefined): FFTProfile | null {
-  if (typeof value !== 'string') return null;
-  const normalized = value.trim().toLowerCase();
-  if (normalized === 'core' || normalized === 'farm') return normalized;
-  return null;
-}
-
-function hasFarmEnvSignals(env: NodeJS.ProcessEnv): string[] {
-  const reasons: string[] = [];
-  const farmEnabled = parseBool(env.FARM_STATE_ENABLED);
-  const featureFarm = parseBool(env.FEATURE_FARM);
-
-  if (farmEnabled === true) reasons.push('FARM_STATE_ENABLED=true');
-  if (featureFarm === true) reasons.push('FEATURE_FARM=true');
-  if ((env.FARM_PROFILE_PATH || '').trim())
-    reasons.push('FARM_PROFILE_PATH set');
-  if ((env.FFT_DASHBOARD_REPO_PATH || '').trim())
-    reasons.push('FFT_DASHBOARD_REPO_PATH set');
-  if ((env.HA_TOKEN || '').trim()) reasons.push('HA_TOKEN set');
-
-  return reasons;
-}
-
-function hasFarmArtifacts(projectRoot: string): string[] {
-  const reasons: string[] = [];
-  const checks = [
-    {
-      path: path.join(projectRoot, 'data', 'farm-profile.json'),
-      reason: 'data/farm-profile.json exists',
-    },
-    {
-      path: path.join(projectRoot, 'data', 'farm-state', 'current.json'),
-      reason: 'data/farm-state/current.json exists',
-    },
-    {
-      path: path.join(projectRoot, 'data', 'farm-state', 'telemetry.ndjson'),
-      reason: 'data/farm-state/telemetry.ndjson exists',
-    },
-  ];
-  for (const check of checks) {
-    if (fs.existsSync(check.path)) reasons.push(check.reason);
-  }
-  return reasons;
-}
-
-function resolveProfile(): {
-  profile: FFTProfile;
-  detection: ProfileDetection;
-} {
-  const explicit = normalizeProfile(process.env.FFT_PROFILE);
-  if (explicit) {
-    return {
-      profile: explicit,
-      detection: { source: 'env', reason: `FFT_PROFILE=${explicit}` },
-    };
-  }
-
-  const projectRoot = process.cwd();
-  const reasons = [
-    ...hasFarmEnvSignals(process.env),
-    ...hasFarmArtifacts(projectRoot),
-  ];
-
-  if (reasons.length > 0) {
-    return {
-      profile: 'farm',
-      detection: { source: 'auto_preserve', reason: reasons.join('; ') },
-    };
-  }
-
-  return {
-    profile: 'core',
-    detection: {
-      source: 'default',
-      reason: 'no farm env or artifacts detected',
-    },
-  };
-}
-
-const _profileResolution = resolveProfile();
-const _featureFarmOverride = parseBool(process.env.FEATURE_FARM);
-
-export const FFT_PROFILE: FFTProfile = _profileResolution.profile;
-export const PROFILE_DETECTION: ProfileDetection = _profileResolution.detection;
-export const FEATURE_FARM: boolean =
-  _featureFarmOverride ?? FFT_PROFILE === 'farm';
+export const FFT_PROFILE: FFTProfile = 'core';
+export const PROFILE_DETECTION: ProfileDetection = {
+  source: 'default',
+  reason: 'nano-core is single-profile (core only)',
+};
 
 // ── Core config ───────────────────────────────────────────────────────────────
 
-const DEFAULT_ASSISTANT_NAME =
-  FFT_PROFILE === 'farm' ? 'FarmFriend' : 'fft_nano';
+const DEFAULT_ASSISTANT_NAME = 'nano-core';
 
 export const ASSISTANT_NAME =
   process.env.ASSISTANT_NAME || DEFAULT_ASSISTANT_NAME;
@@ -149,30 +67,25 @@ export const MAIN_WORKSPACE_DIR = path.resolve(
   expandHomePath(process.env.FFT_NANO_MAIN_WORKSPACE_DIR || '~/nano'),
 );
 
-export const FARM_STATE_ENABLED =
-  FEATURE_FARM &&
-  envFlag(process.env.FARM_STATE_ENABLED, FFT_PROFILE === 'farm');
-export const FARM_MODE = (process.env.FARM_MODE || 'demo').trim().toLowerCase();
-export const FARM_STATE_DIR = path.resolve(DATA_DIR, 'farm-state');
-export const FARM_PROFILE_PATH = path.resolve(
-  expandHomePath(
-    process.env.FARM_PROFILE_PATH || path.join(DATA_DIR, 'farm-profile.json'),
-  ),
+export const EDGE_BRIDGE_ENABLED = envFlag(
+  process.env.EDGE_BRIDGE_ENABLED,
+  true,
 );
-export const FARM_STATE_FAST_MS = envInt(
-  process.env.FARM_STATE_FAST_MS,
+export const EDGE_BRIDGE_DIR = path.resolve(DATA_DIR, 'edge-bridge');
+export const EDGE_STATE_FAST_MS = envInt(
+  process.env.EDGE_STATE_FAST_MS,
   15000,
   5000,
   60000,
 );
-export const FARM_STATE_MEDIUM_MS = envInt(
-  process.env.FARM_STATE_MEDIUM_MS,
+export const EDGE_STATE_MEDIUM_MS = envInt(
+  process.env.EDGE_STATE_MEDIUM_MS,
   120000,
   30000,
   600000,
 );
-export const FARM_STATE_SLOW_MS = envInt(
-  process.env.FARM_STATE_SLOW_MS,
+export const EDGE_STATE_SLOW_MS = envInt(
+  process.env.EDGE_STATE_SLOW_MS,
   900000,
   300000,
   3600000,
@@ -183,8 +96,6 @@ export const HA_URL_CANDIDATES = parseHaUrlCandidates(
   process.env.HA_URL_CANDIDATES,
 );
 export const HA_TOKEN = process.env.HA_TOKEN || '';
-export const FFT_DASHBOARD_REPO_PATH =
-  process.env.FFT_DASHBOARD_REPO_PATH || '';
 
 export const CONTAINER_IMAGE =
   process.env.CONTAINER_IMAGE || 'fft-nano-agent:latest';
@@ -386,7 +297,7 @@ const parsedAliases = aliasEnv
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
-const defaultAliases = FFT_PROFILE === 'farm' ? ['F-15'] : [];
+const defaultAliases: string[] = [];
 
 export const ASSISTANT_TRIGGER_ALIASES = Array.from(
   new Set([ASSISTANT_NAME, ...defaultAliases, ...parsedAliases]),

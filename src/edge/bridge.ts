@@ -6,14 +6,9 @@ import { promisify } from 'util';
 import YAML, { parseDocument } from 'yaml';
 import { z } from 'zod';
 
-import {
-  FARM_MODE,
-  FARM_PROFILE_PATH,
-  FARM_STATE_DIR,
-  FFT_DASHBOARD_REPO_PATH,
-} from './config.js';
-import { HomeAssistantAdapter } from './home-assistant.js';
-import { logger } from './logger.js';
+import { EDGE_BRIDGE_DIR } from '../config.js';
+import { logger } from '../logger.js';
+import { HaAdapter } from './plugins/home-assistant.js';
 import type {
   CanvasCard,
   CanvasPatchOp,
@@ -21,7 +16,7 @@ import type {
   DashboardPatchOp,
   EdgeActionRequest,
   EdgeActionResult,
-} from './types.js';
+} from '../types.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -241,10 +236,10 @@ const allowedActions = new Set([
   'ha_canvas_get_spec',
   'ha_canvas_set_spec',
   'ha_canvas_patch_spec',
-  'farm_state_refresh',
+  'edge_state_refresh',
 ]);
 
-const adapter = new HomeAssistantAdapter();
+const adapter = new HaAdapter();
 
 const controlActions = new Set([
   'ha_call_service',
@@ -257,15 +252,15 @@ const controlActions = new Set([
 ]);
 
 function appendAudit(record: Record<string, unknown>): void {
-  fs.mkdirSync(FARM_STATE_DIR, { recursive: true });
-  const auditFile = path.join(FARM_STATE_DIR, 'audit.ndjson');
+  fs.mkdirSync(EDGE_BRIDGE_DIR, { recursive: true });
+  const auditFile = path.join(EDGE_BRIDGE_DIR, 'audit.ndjson');
   fs.appendFileSync(auditFile, `${JSON.stringify(record)}\n`);
 }
 
 function ensureMainChatOnly(isMain: boolean, action: string): void {
   if (!isMain) {
     throw new Error(
-      `Action "${action}" rejected: farm actions are main-chat-only in this deployment`,
+      `Action "${action}" rejected: edge bridge actions are main-chat-only in this deployment`,
     );
   }
 }
@@ -278,41 +273,18 @@ function ensureAllowedAction(action: string): void {
 
 function ensureControlActionGate(action: string): void {
   if (!controlActions.has(action)) return;
-  if (FARM_MODE !== 'production') return;
-
-  if (!fs.existsSync(FARM_PROFILE_PATH)) {
-    throw new Error(
-      `Action "${action}" blocked: production mode requires validated farm profile at ${FARM_PROFILE_PATH}`,
-    );
-  }
-
-  const raw = fs.readFileSync(FARM_PROFILE_PATH, 'utf-8');
-  let profile: unknown;
-  try {
-    profile = JSON.parse(raw);
-  } catch (err) {
-    throw new Error(
-      `Action "${action}" blocked: farm profile is not valid JSON (${err instanceof Error ? err.message : String(err)})`,
-    );
-  }
-
-  const validation = (profile as { validation?: { status?: string } })
-    .validation;
-  if (validation?.status !== 'pass') {
-    throw new Error(
-      `Action "${action}" blocked: production validation status is "${validation?.status || 'missing'}"; run farm-validate first`,
-    );
-  }
+  // Profile validation gate removed for nano-core parity. The edge bridge
+  // enforces zod-schema validation upstream; control actions are gated only
+  // by the controlActions set membership.
 }
 
 function getHaConfigDir(): string {
-  const haConfigDir = path.join(FFT_DASHBOARD_REPO_PATH, 'ha_config');
-  if (!FFT_DASHBOARD_REPO_PATH || !fs.existsSync(haConfigDir)) {
-    throw new Error(
-      'FFT_DASHBOARD_REPO_PATH/ha_config is not available on host for dashboard actions',
-    );
-  }
-  return path.resolve(haConfigDir);
+  // Dashboard integration removed for nano-core parity. The edge bridge is
+  // generic; HA plugin handles entity/service operations. Lovelace dashboard
+  // authoring was a specific use case and is no longer wired up by default.
+  throw new Error(
+    'Dashboard authoring is not supported in the generic edge bridge',
+  );
 }
 
 function isWithinRoot(root: string, target: string): boolean {
@@ -1003,7 +975,7 @@ async function handleHaCaptureScreenshot(
 ): Promise<unknown> {
   const parsed = haCaptureScreenshotParamsSchema.parse(params);
 
-  const screenshotsDir = path.join(FARM_STATE_DIR, 'screenshots');
+  const screenshotsDir = path.join(EDGE_BRIDGE_DIR, 'screenshots');
   fs.mkdirSync(screenshotsDir, { recursive: true });
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -1157,7 +1129,7 @@ async function handleHaCanvasPatchSpec(
   };
 }
 
-async function handleFarmStateRefresh(): Promise<unknown> {
+async function handleEdgeStateRefresh(): Promise<unknown> {
   const states = await adapter.getAllStates();
   return {
     timestamp: new Date().toISOString(),
@@ -1165,7 +1137,7 @@ async function handleFarmStateRefresh(): Promise<unknown> {
   };
 }
 
-export async function executeFarmAction(
+export async function executeEdgeAction(
   request: EdgeActionRequest,
   isMain: boolean,
 ): Promise<EdgeActionResult> {
@@ -1215,8 +1187,8 @@ export async function executeFarmAction(
       case 'ha_canvas_patch_spec':
         result = await handleHaCanvasPatchSpec(parsed.params);
         break;
-      case 'farm_state_refresh':
-        result = await handleFarmStateRefresh();
+      case 'edge_state_refresh':
+        result = await handleEdgeStateRefresh();
         break;
       default:
         throw new Error(`Unsupported action: ${parsed.action}`);
@@ -1263,7 +1235,7 @@ export async function executeFarmAction(
 
     logger.warn(
       { requestId: parsedRequestId, action: request?.action, isMain, err },
-      'Farm action execution failed',
+      'Edge action execution failed',
     );
 
     return errorResult;

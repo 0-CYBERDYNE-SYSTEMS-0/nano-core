@@ -12,7 +12,6 @@ import {
   FFT_NANO_TUI_AUTH_TOKEN,
   FFT_NANO_TUI_HOST,
   FFT_NANO_TUI_PORT,
-  FEATURE_FARM,
   FFT_PROFILE,
   MAIN_GROUP_FOLDER,
   MAIN_WORKSPACE_DIR,
@@ -479,7 +478,7 @@ export function createWebControlCenterAdapters(
     }),
     getProfileStatus: () => ({
       profile: FFT_PROFILE,
-      featureFarm: FEATURE_FARM,
+      edgeBridgeEnabled: true,
       profileDetection: PROFILE_DETECTION,
     }),
     getBuildInfo: () => ({

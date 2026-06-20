@@ -18,7 +18,7 @@ interface RuntimeStatusPayload {
 
 interface ProfileStatusPayload {
   profile: string;
-  featureFarm: boolean;
+  edgeBridgeEnabled: boolean;
   profileDetection: {
     source: string;
     reason: string;

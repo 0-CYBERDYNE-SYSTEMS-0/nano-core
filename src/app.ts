@@ -27,6 +27,7 @@ export interface AppRuntimeDeps {
     heartbeatActiveHours?: unknown;
     dataDir?: string;
     fftProfile?: string;
+    edgeBridgeEnabled?: boolean;
     profileDetection?: unknown;
     whatsappEnabled?: boolean;
     onboardingMode?: boolean;
@@ -69,6 +70,8 @@ export interface AppRuntimeDeps {
   sendMessage?: (chatJid: string, text: string) => Promise<boolean>;
   maybeRegisterWhatsAppMainChat?: () => void;
   syncGroupMetadata?: (force?: boolean) => Promise<void>;
+  startStateCollector?: () => void;
+  stopStateCollector?: () => void;
   startSchedulerLoop?: (params: any) => void;
   startIpcWatcher?: () => void;
   startMessageLoop?: () => Promise<void>;
@@ -101,8 +104,6 @@ export interface AppRuntimeDeps {
   startWebControlCenterService?: () => Promise<void>;
   stopTuiGatewayService?: () => Promise<void>;
   stopWebControlCenterService?: () => Promise<void>;
-  startFarmStateCollector?: () => void;
-  stopFarmStateCollector?: () => void;
   startHeartbeatLoop?: () => void;
   maybeRunBootMdOnce?: () => void;
   getContainerRuntime?: () => string;
@@ -122,7 +123,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
   connectWhatsApp: () => Promise<void>;
   startMessageLoop: () => Promise<void>;
   ensureContainerSystemRunning: () => void;
-  stopFarmServicesForShutdown: (signal: string) => void;
+  stopEdgeServicesForShutdown: (signal: string) => void;
   shutdownAndExit: (signal: string, exitCode: number) => Promise<void>;
   registerShutdownHandlers: () => void;
   main: () => Promise<void>;
@@ -482,16 +483,16 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
     }
   }
 
-  function stopFarmServicesForShutdown(signal: string): void {
+  function stopEdgeServicesForShutdown(signal: string): void {
     if (deps.state.shuttingDown) return;
     deps.state.shuttingDown = true;
     if (groupSyncTimer !== null) {
       clearInterval(groupSyncTimer);
       groupSyncTimer = null;
     }
-    deps.logger.info?.({ signal }, 'Shutting down FFT_nano services');
-    if (deps.constants.featureFarm && deps.constants.farmStateEnabled) {
-      deps.stopFarmStateCollector?.();
+    deps.logger.info?.({ signal }, 'Shutting down nano-core services');
+    if (deps.constants.edgeBridgeEnabled) {
+      deps.stopStateCollector?.();
     }
   }
 
@@ -501,7 +502,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
   ): Promise<void> {
     stopPruneLoop();
     stopCuratorLoop();
-    stopFarmServicesForShutdown(signal);
+    stopEdgeServicesForShutdown(signal);
     await deps.stopWebControlCenterService?.();
     await deps.stopTuiGatewayService?.();
     process.exit(exitCode);
@@ -565,13 +566,13 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
     deps.logger.info?.(
       {
         profile: deps.constants.fftProfile,
-        featureFarm: deps.constants.featureFarm,
+        edgeBridgeEnabled: deps.constants.edgeBridgeEnabled,
         profileDetection: deps.constants.profileDetection,
       },
       'Runtime profile resolved',
     );
-    if (deps.constants.featureFarm && deps.constants.farmStateEnabled) {
-      deps.startFarmStateCollector?.();
+    if (deps.constants.edgeBridgeEnabled) {
+      deps.startStateCollector?.();
     }
     if (deps.constants.onboardingMode) {
       deps.logger.info?.(
@@ -581,20 +582,13 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
       return;
     }
     const telegramEnabled = !!deps.constants.telegramBotToken;
-    const farmOnlyMode =
-      !!deps.constants.featureFarm &&
-      !!deps.constants.farmStateEnabled &&
-      deps.constants.whatsappEnabled === false &&
-      !telegramEnabled;
     const tuiOnlyMode =
-      !farmOnlyMode &&
       deps.constants.whatsappEnabled === false &&
       !telegramEnabled &&
       tuiAvailable;
     if (
       deps.constants.whatsappEnabled === false &&
       !telegramEnabled &&
-      !farmOnlyMode &&
       !tuiOnlyMode
     ) {
       throw new Error(
@@ -623,11 +617,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
         deps.logger.fatal?.({ err }, 'Message loop crashed unexpectedly'),
       );
     }
-    if (farmOnlyMode) {
-      deps.logger.info?.(
-        'Running in farm-state-only mode (no channels enabled)',
-      );
-    } else if (deps.constants.whatsappEnabled) {
+    if (deps.constants.whatsappEnabled) {
       await connectWhatsApp();
       deps.startHeartbeatLoop?.();
     } else {
@@ -665,7 +655,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
     connectWhatsApp,
     startMessageLoop,
     ensureContainerSystemRunning,
-    stopFarmServicesForShutdown,
+    stopEdgeServicesForShutdown,
     shutdownAndExit,
     registerShutdownHandlers,
     main,

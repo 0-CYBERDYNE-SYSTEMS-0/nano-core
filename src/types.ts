@@ -230,30 +230,14 @@ export interface TaskRunLog {
   error: string | null;
 }
 
-export interface FarmActionRequest {
-  type: 'farm_action';
-  action: string;
-  params: Record<string, unknown>;
-  requestId: string;
-}
-
-export interface FarmActionResult {
-  requestId: string;
-  status: 'success' | 'error';
-  result?: unknown;
-  error?: string;
-  executedAt: string;
-}
-
 /**
  * EdgeBridge action envelope: a vertical-agnostic request routed through the
- * EdgeBridge plugin framework. Each domain (e.g. "ha", "matter", "mqtt")
- * registers a handler with a zod schema and a handle() implementation.
+ * edge bridge. Each domain (e.g. "ha", "matter", "mqtt") registers a handler
+ * with a zod schema and a handle() implementation.
  */
 export interface EdgeActionRequest {
   type: 'edge_action';
   action: string;
-  domain: string;
   params: Record<string, unknown>;
   requestId: string;
 }

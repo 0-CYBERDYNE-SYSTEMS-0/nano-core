@@ -42,14 +42,13 @@ import {
   processFileDeliveryRequest,
 } from './file-delivery.js';
 import { attachActionRequestAudit } from './action-result-audit.js';
-import { executeFarmAction } from './farm-action-gateway.js';
+import { executeEdgeAction } from './edge/bridge.js';
 import { executeMemoryAction } from './memory-action-gateway.js';
 import { executeSkillAction } from './skill-lifecycle.js';
 import { writeJsonFileAtomic } from './atomic-write.js';
-import { FEATURE_FARM } from './config.js';
 import type { StatusTelemetry } from './status-report.js';
 import type {
-  FarmActionRequest,
+  EdgeActionRequest,
   MemoryActionRequest,
   SkillActionRequest,
 } from './types.js';
@@ -319,16 +318,8 @@ export async function processHostEvent(
         return;
       }
       const result =
-        event.request.type === 'farm_action'
-          ? FEATURE_FARM
-            ? await executeFarmAction(event.request, event.isMain)
-            : {
-                requestId: event.request.requestId,
-                status: 'error' as const,
-                error:
-                  'farm_action is disabled in core profile (set FFT_PROFILE=farm or FEATURE_FARM=1)',
-                executedAt: new Date().toISOString(),
-              }
+        event.request.type === 'edge_action'
+          ? await executeEdgeAction(event.request, event.isMain)
           : event.request.type === 'skill_action'
             ? await executeSkillAction(event.request, {
                 sourceGroup: event.sourceGroup,
@@ -786,7 +777,7 @@ export function startIpcWatcher(deps: HostCoordinationDeps): void {
             const filePath = path.join(actionsDir, file);
             try {
               const request = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as
-                | FarmActionRequest
+                | EdgeActionRequest
                 | MemoryActionRequest
                 | SkillActionRequest;
 
@@ -798,7 +789,7 @@ export function startIpcWatcher(deps: HostCoordinationDeps): void {
               fs.mkdirSync(resultDir, { recursive: true });
 
               if (
-                request.type === 'farm_action' ||
+                request.type === 'edge_action' ||
                 request.type === 'memory_action' ||
                 request.type === 'skill_action'
               ) {
@@ -833,7 +824,7 @@ export function startIpcWatcher(deps: HostCoordinationDeps): void {
             } catch (err) {
               logger.error(
                 { file, sourceGroup, err },
-                'Error processing IPC farm action',
+                'Error processing IPC edge action',
               );
               const errorDir = path.join(ipcBaseDir, 'errors');
               fs.mkdirSync(errorDir, { recursive: true });

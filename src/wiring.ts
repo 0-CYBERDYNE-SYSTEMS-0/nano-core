@@ -13,8 +13,7 @@ import makeWASocket, {
 import {
   ASSISTANT_NAME,
   DATA_DIR,
-  FEATURE_FARM,
-  FARM_STATE_ENABLED,
+  EDGE_BRIDGE_ENABLED,
   FFT_NANO_CODER_GATE_MODE,
   FFT_NANO_ONBOARDING_MODE,
   FFT_NANO_TUI_AUTH_TOKEN,
@@ -85,7 +84,7 @@ import {
 import { recordTaskAuditEvent, type TaskAuditKind } from './task-audit.js';
 import { startSchedulerLoop } from './task-scheduler.js';
 import {
-  FarmActionRequest,
+  EdgeActionRequest,
   MemoryActionRequest,
   NewMessage,
   RegisteredGroup,
@@ -174,15 +173,15 @@ import {
   type CodingWorkerRequest,
 } from './coding-orchestrator.js';
 import { resolveCoderProjectTarget } from './coder-project-resolver.js';
-import { executeFarmAction } from './farm-action-gateway.js';
+import { executeEdgeAction } from './edge/bridge.js';
+import {
+  startStateCollector,
+  stopStateCollector,
+} from './edge/collector.js';
 import {
   normalizeFileDeliveryRequest,
   processFileDeliveryRequest,
 } from './file-delivery.js';
-import {
-  startFarmStateCollector,
-  stopFarmStateCollector,
-} from './farm-state-collector.js';
 import { executeMemoryAction } from './memory-action-gateway.js';
 import {
   applySkillManagerTransitions,
@@ -1877,8 +1876,7 @@ const appRuntime = createAppRuntime({
     heartbeatActiveHours: HEARTBEAT_ACTIVE_HOURS,
     dataDir: DATA_DIR,
     fftProfile: FFT_PROFILE,
-    featureFarm: FEATURE_FARM,
-    farmStateEnabled: FARM_STATE_ENABLED,
+    edgeBridgeEnabled: EDGE_BRIDGE_ENABLED,
     profileDetection: PROFILE_DETECTION,
     whatsappEnabled: WHATSAPP_ENABLED,
     onboardingMode: FFT_NANO_ONBOARDING_MODE,
@@ -1932,8 +1930,8 @@ const appRuntime = createAppRuntime({
   startWebControlCenterService,
   stopTuiGatewayService,
   stopWebControlCenterService,
-  startFarmStateCollector,
-  stopFarmStateCollector,
+  startStateCollector,
+  stopStateCollector,
   startHeartbeatLoop: () =>
     startHeartbeatLoop({
       findMainChatJid,
@@ -2250,7 +2248,7 @@ function ensureContainerSystemRunning(): void {
 function stopFarmServicesForShutdown(signal: string): void {
   stopUpdateNotificationLoop();
   stopHeartbeatLoop();
-  appRuntime.stopFarmServicesForShutdown(signal);
+  appRuntime.stopEdgeServicesForShutdown(signal);
 }
 
 async function shutdownAndExit(
