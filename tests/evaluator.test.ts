@@ -32,8 +32,8 @@ const group: RegisteredGroup = {
 function ctx(overrides: Partial<EvaluatorContext> = {}): EvaluatorContext {
   return {
     runType: 'chat',
-    originalTask: 'Summarize the crop status.',
-    agentOutput: 'Here is the crop summary.',
+    originalTask: 'Summarize the field status.',
+    agentOutput: 'Here is the field summary.',
     durationMs: 10_000,
     toolsInvoked: 0,
     group,
@@ -480,14 +480,14 @@ describe('buildRefinementPrompt', () => {
   const verdict: EvaluatorVerdict = {
     pass: false,
     score: 4,
-    issues: ['Missing crop yield data', 'No weather context included'],
+    issues: ['Missing field yield data', 'No weather context included'],
     feedback: 'Response skipped critical sections of the task.',
     skipped: false,
   };
 
   it('includes original task text', () => {
-    const prompt = buildRefinementPrompt('Analyze the harvest.', verdict);
-    assert.ok(prompt.includes('Analyze the harvest.'));
+    const prompt = buildRefinementPrompt('Analyze the collection.', verdict);
+    assert.ok(prompt.includes('Analyze the collection.'));
   });
 
   it('includes score', () => {
@@ -497,7 +497,7 @@ describe('buildRefinementPrompt', () => {
 
   it('includes all issues', () => {
     const prompt = buildRefinementPrompt('task', verdict);
-    assert.ok(prompt.includes('Missing crop yield data'));
+    assert.ok(prompt.includes('Missing field yield data'));
     assert.ok(prompt.includes('No weather context included'));
   });
 

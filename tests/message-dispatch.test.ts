@@ -1024,9 +1024,9 @@ test('processMessage injects recent assistant context alongside new inbound mess
       {
         id: 'a-news',
         chat_jid: 'telegram:continuity',
-        sender: 'FarmFriend',
-        sender_name: 'FarmFriend',
-        content: 'FarmFriend: Here are the agtech and AI agent headlines.',
+        sender: 'NanoCore',
+        sender_name: 'NanoCore',
+        content: 'NanoCore: Here are the operations and AI agent headlines.',
         timestamp: '2026-03-29T18:03:48.000Z',
         is_from_me: 1,
       },
@@ -1058,7 +1058,7 @@ test('processMessage injects recent assistant context alongside new inbound mess
   assert.match(capturedPrompt, /\[NEW INBOUND MESSAGES\]/);
   assert.match(
     capturedPrompt,
-    /FarmFriend: Here are the agtech and AI agent headlines\./,
+    /NanoCore: Here are the operations and AI agent headlines\./,
   );
   assert.match(
     capturedPrompt,

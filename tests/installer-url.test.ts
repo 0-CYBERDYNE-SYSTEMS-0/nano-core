@@ -7,7 +7,7 @@ import test from 'node:test';
 const REPO_ROOT = process.cwd();
 const CANONICAL_URL =
   'https://raw.githubusercontent.com/0-CYBERDYNE-SYSTEMS-0/nano-core/main/scripts/install.sh';
-const OLD_URL_PATTERN = 'farm-friend.com/fft-nano/install';
+const OLD_URL_PATTERN = 'legacy-vertical.example/fft-nano/install';
 
 function getTrackedFiles(exts: string[]): string[] {
   const extGlobs = exts.map((e) => `*.${e}`).join(' ');
@@ -21,7 +21,7 @@ function getTrackedFiles(exts: string[]): string[] {
     .map((f) => path.join(REPO_ROOT, f));
 }
 
-test('installer-url: no farm-friend.com URL remains in any tracked file', () => {
+test('installer-url: no legacy vertical URL remains in any tracked file', () => {
   const extensions = ['md', 'html', 'ts', 'js', 'sh', 'yml', 'yaml', 'json'];
   const files = getTrackedFiles(extensions);
 
@@ -85,8 +85,8 @@ test('installer-url: docs/RELEASE.md has no manual upload step', () => {
   const content = readFileSync(release, 'utf8');
   assert.doesNotMatch(
     content,
-    /upload.*farm-friend|upload.*install-test|step \d+.*upload/,
-    'docs/RELEASE.md must not describe a manual upload step to farm-friend.com',
+    /upload.*legacy-vertical|upload.*install-test|step \d+.*upload/,
+    'docs/RELEASE.md must not describe a manual upload step to a legacy vertical domain',
   );
   // Should mention the canonical raw URL
   assert.match(

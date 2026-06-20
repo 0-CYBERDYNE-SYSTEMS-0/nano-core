@@ -908,14 +908,14 @@ test('buildSystemPrompt skips scaffold USER.md, IDENTITY.md, and TOOLS.md (A3)',
   ].join('\n');
 
   const scaffoldIdentity = [
-    '# FarmFriend Terminal - Agent Identity',
+    '# Nano Core Terminal - Agent Identity',
     '',
-    'Name: FarmFriend Terminal',
-    'Role: Local-first assistant for agriculture and operations',
+    'Name: Nano Core Terminal',
+    'Role: Local-first assistant for operations',
   ].join('\n');
 
   const scaffoldTools = [
-    '# FarmFriend Terminal - Tool Policy',
+    '# Nano Core Terminal - Tool Policy',
     '',
     'This file documents tool access policy. It is used as a pre-session tool manifest.',
     '',
