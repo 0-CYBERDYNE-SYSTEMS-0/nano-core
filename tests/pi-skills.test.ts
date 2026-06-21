@@ -16,6 +16,16 @@ function requiredSkillMarkdown(skillName: string, marker: string = ''): string {
   return `---\nname: ${skillName}\ndescription: test\n---\n\n# ${skillName}\n\n## When to use this skill\n\n- Use for test coverage.\n\n## When not to use this skill\n\n- Do not use outside test coverage.\n\n## Guardrails\n\n- Never run destructive git commands unless explicitly requested.\n- Preserve unrelated worktree changes.\n- Main/admin chat only for privileged actions.\n\n${marker}\n`;
 }
 
+// Local fixture for tests that need a self-contained required-skills list
+// without depending on the project's skills/manifest.json.
+const TEST_REQUIRED_PROJECT_PI_SKILLS = Object.freeze([
+  'fft-coder-ops',
+  'fft-debug',
+  'fft-setup',
+  'fft-telegram-ops',
+  'web-search',
+]);
+
 test('project Pi skills validate required frontmatter and guardrails', () => {
   const result = validateProjectPiSkills(process.cwd());
   assert.equal(
@@ -234,7 +244,7 @@ test('syncProjectPiSkillsToGroupPiHome mirrors runtime skills and prunes stale m
     fs.mkdirSync(dstSkillsRoot, { recursive: true });
     fs.mkdirSync(unmanagedSkill, { recursive: true });
 
-    for (const skillName of REQUIRED_PROJECT_PI_SKILLS) {
+    for (const skillName of TEST_REQUIRED_PROJECT_PI_SKILLS) {
       const dir = path.join(srcSkillsRoot, skillName);
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(
@@ -361,6 +371,19 @@ test('invalid external override falls back to valid project required skill', () 
     fs.mkdirSync(projectSkillsRoot, { recursive: true });
     fs.mkdirSync(userSkillsRoot, { recursive: true });
     fs.mkdirSync(dstSkillsRoot, { recursive: true });
+
+    // Write a self-contained project manifest declaring fft-debug as a
+    // required skill so strict (required-policy) validation applies in
+    // the absence of a repo-level skills/manifest.json.
+    fs.writeFileSync(
+      path.join(projectRoot, 'skills', 'manifest.json'),
+      JSON.stringify({
+        version: '0.0.0-test',
+        required: ['fft-debug'],
+        bundled: ['fft-debug'],
+        setupOnly: [],
+      }),
+    );
 
     const projectSkillDir = path.join(projectSkillsRoot, 'fft-debug');
     fs.mkdirSync(projectSkillDir, { recursive: true });
