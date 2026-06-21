@@ -155,8 +155,14 @@ export function resolveTaskNextRun(
         schedule.kind === 'cron' && schedule.expr
           ? schedule.expr
           : task.schedule_value;
+      // Validate the timezone up front. cron-parser's luxon-backed CronDate
+      // throws "unhandled timestamp" if the tz is not a real IANA zone, so we
+      // resolve to a validated host timezone before calling the parser. This
+      // matches the fallback behavior already used by getEffectiveTimezone
+      // (see VAL-TIME-009).
+      const parserTz = getEffectiveTimezone(schedule.tz);
       const interval = CronExpressionParser.parse(expr, {
-        tz: schedule.tz || TIMEZONE,
+        tz: parserTz,
         currentDate: new Date(nowMs),
       });
       const naturalNext = interval.next().toISOString();

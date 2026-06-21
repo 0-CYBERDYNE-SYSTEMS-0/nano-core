@@ -627,9 +627,14 @@ test('runScheduledTaskV2 with invalid schedule_json.tz still completes task succ
     },
   });
 
-  // Task should complete successfully
+  // Task should execute without error despite invalid tz
   const postRun = getTaskById(task.id);
-  assert.equal(postRun?.status, 'completed');
+  // Recurring cron task: status stays 'active' (the parser resolves the
+  // next run with the validated host-timezone fallback). The previous
+  // expected 'completed' was a side effect of cron-parser throwing on
+  // the invalid tz, which made nextRun null. We now validate the tz
+  // up front so the task can be re-scheduled correctly.
+  assert.equal(postRun?.status, 'active');
   assert.equal(sentMessages.length, 1);
   assert.match(sentMessages[0], /\[scheduled:invalid-tz-prompt-task\]/);
 

@@ -13,29 +13,36 @@ let cachedAdapter: PlatformAdapter | null = null;
 export function getPlatformAdapter(): PlatformAdapter {
   if (cachedAdapter) return cachedAdapter;
 
+  cachedAdapter = detectPlatformAdapter();
+  return cachedAdapter;
+}
+
+/**
+ * Clears the cached platform adapter. Tests that temporarily mutate
+ * platform-detection inputs (e.g. PREFIX for Termux detection) should
+ * call this so subsequent calls re-evaluate the live environment.
+ */
+export function resetPlatformAdapterCache(): void {
+  cachedAdapter = null;
+}
+
+function detectPlatformAdapter(): PlatformAdapter {
   switch (process.platform) {
     case 'darwin':
-      cachedAdapter = new DarwinAdapter();
-      break;
+      return new DarwinAdapter();
     case 'linux':
       // Check if running in Termux on Android
       if (isAndroidTermux()) {
-        cachedAdapter = new AndroidAdapter();
-      } else {
-        cachedAdapter = new LinuxAdapter();
+        return new AndroidAdapter();
       }
-      break;
+      return new LinuxAdapter();
     case 'win32':
-      cachedAdapter = new Win32Adapter();
-      break;
+      return new Win32Adapter();
     case 'android':
-      cachedAdapter = new AndroidAdapter();
-      break;
+      return new AndroidAdapter();
     default:
       throw new Error(`Unsupported platform: ${process.platform}`);
   }
-
-  return cachedAdapter;
 }
 
 /**

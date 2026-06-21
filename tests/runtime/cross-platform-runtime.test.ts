@@ -5,7 +5,7 @@ import path from 'path';
 import test from 'node:test';
 
 import { getContainerRuntime } from '../../src/container-runtime.ts';
-import { getPlatformAdapter } from '../../src/platform/index.js';
+import { getPlatformAdapter, resetPlatformAdapterCache } from '../../src/platform/index.js';
 
 function withEnv<T>(
   patch: Record<string, string | undefined>,
@@ -51,6 +51,10 @@ test('getContainerRuntime returns host-only on Android/Termux', () => {
     } else {
       process.env.PREFIX = originalPrefix;
     }
+    // Clear cached platform adapter so the next test re-evaluates
+    // the live environment (caching would otherwise keep the Android
+    // adapter that was created while PREFIX pointed at Termux).
+    resetPlatformAdapterCache();
   }
 });
 
