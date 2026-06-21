@@ -182,9 +182,7 @@ export interface TelegramCommandDeps {
     chatJid: string;
   }) => Promise<string> | string;
   runPiListModels: (searchText: string) => { ok: boolean; text: string };
-  loadPiModels: (
-    forceRefresh?: boolean,
-  ) =>
+  loadPiModels: (forceRefresh?: boolean) =>
     | {
         ok: true;
         entries: Array<{ provider: string; model: string }>;
@@ -1919,7 +1917,10 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
         return true;
       }
       deps.logTelegramCommandAudit(m.chatJid, cmd, true, 'ok');
-      await deps.sendMessage(m.chatJid, 'Refreshing model list from providers...');
+      await deps.sendMessage(
+        m.chatJid,
+        'Refreshing model list from providers...',
+      );
       const refreshed = deps.loadPiModels(true);
       if (!refreshed.ok) {
         const text = `Refresh failed: ${refreshed.text}`;
@@ -1935,7 +1936,10 @@ export function createTelegramCommandHandlers(deps: TelegramCommandDeps): {
       const total = refreshed.entries.length;
       const providerCounts = new Map<string, number>();
       for (const entry of refreshed.entries) {
-        providerCounts.set(entry.provider, (providerCounts.get(entry.provider) || 0) + 1);
+        providerCounts.set(
+          entry.provider,
+          (providerCounts.get(entry.provider) || 0) + 1,
+        );
       }
       const providerSummary = Array.from(providerCounts.entries())
         .sort((a, b) => a[0].localeCompare(b[0]))

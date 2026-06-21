@@ -401,7 +401,11 @@ export function runQuietSkillAgent(params: {
       const proposal = parseMaintenanceProposal(output.result ?? '');
       if (proposal.kind === 'noop') {
         logger.debug(
-          { groupFolder: params.group.folder, requestId: params.requestId, reason: proposal.reason },
+          {
+            groupFolder: params.group.folder,
+            requestId: params.requestId,
+            reason: proposal.reason,
+          },
           'Maintenance run produced noop',
         );
         emitMaintenanceEvent(params.group.folder, {
@@ -413,7 +417,11 @@ export function runQuietSkillAgent(params: {
         });
       } else {
         logger.info(
-          { groupFolder: params.group.folder, requestId: params.requestId, proposalKind: proposal.kind },
+          {
+            groupFolder: params.group.folder,
+            requestId: params.requestId,
+            proposalKind: proposal.kind,
+          },
           'Maintenance run produced proposal',
         );
         emitMaintenanceEvent(params.group.folder, {
@@ -456,7 +464,11 @@ interface NoopProposal {
   reason: string;
 }
 
-function parseMaintenanceProposal(output: string): NoopProposal | { kind: 'memory' | 'skill' | 'report'; [key: string]: unknown } {
+function parseMaintenanceProposal(
+  output: string,
+):
+  | NoopProposal
+  | { kind: 'memory' | 'skill' | 'report'; [key: string]: unknown } {
   // Try to extract JSON from the output
   // The maintenance model should return a JSON object with a "kind" field
   const jsonMatch = output.match(/\{[\s\S]*\}/);
@@ -478,7 +490,11 @@ function parseMaintenanceProposal(output: string): NoopProposal | { kind: 'memor
       return { kind: 'noop', reason: parsed.reason };
     }
 
-    if (parsed.kind === 'memory' || parsed.kind === 'skill' || parsed.kind === 'report') {
+    if (
+      parsed.kind === 'memory' ||
+      parsed.kind === 'skill' ||
+      parsed.kind === 'report'
+    ) {
       // Basic validation - detailed validation happens in host gateway
       return parsed;
     }

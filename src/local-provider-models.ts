@@ -84,7 +84,12 @@ export function discoverOpenAiCompatibleModels(params: {
   try {
     const normalizedUrl = normalizeOpenAiBaseUrl(baseUrl);
     if (!normalizedUrl) {
-      return { ok: false, provider: providerId, models: [], error: 'empty baseUrl' };
+      return {
+        ok: false,
+        provider: providerId,
+        models: [],
+        error: 'empty baseUrl',
+      };
     }
     const result = spawnSync(
       'curl',
@@ -152,7 +157,12 @@ function discoverRemoteProviderModels(params: {
   const baseUrl = env[baseUrlEnv] || defaultBaseUrl || '';
   const apiKey = env[apiKeyEnv] || env.PI_API_KEY || '';
   if (!baseUrl || !apiKey) {
-    return { ok: false, provider: providerId, models: [], error: 'missing baseUrl or apiKey' };
+    return {
+      ok: false,
+      provider: providerId,
+      models: [],
+      error: 'missing baseUrl or apiKey',
+    };
   }
   return discoverOpenAiCompatibleModels({ providerId, baseUrl, apiKey });
 }
@@ -344,10 +354,29 @@ export function ensureLocalProviderModels(
 
     // Discover remote OpenAI-compatible providers
     const remoteProviders = [
-      { providerId: 'openai', baseUrlEnv: 'OPENAI_BASE_URL', apiKeyEnv: 'OPENAI_API_KEY' },
-      { providerId: 'moonshotai', baseUrlEnv: 'MOONSHOT_BASE_URL', apiKeyEnv: 'MOONSHOT_API_KEY', defaultBaseUrl: 'https://api.moonshot.ai/v1' },
-      { providerId: 'minimax', baseUrlEnv: 'MINIMAX_BASE_URL', apiKeyEnv: 'MINIMAX_API_KEY', defaultBaseUrl: 'https://api.minimax.io/v1' },
-      { providerId: 'openrouter', baseUrlEnv: 'OPENROUTER_BASE_URL', apiKeyEnv: 'OPENROUTER_API_KEY', defaultBaseUrl: 'https://openrouter.ai/api/v1' },
+      {
+        providerId: 'openai',
+        baseUrlEnv: 'OPENAI_BASE_URL',
+        apiKeyEnv: 'OPENAI_API_KEY',
+      },
+      {
+        providerId: 'moonshotai',
+        baseUrlEnv: 'MOONSHOT_BASE_URL',
+        apiKeyEnv: 'MOONSHOT_API_KEY',
+        defaultBaseUrl: 'https://api.moonshot.ai/v1',
+      },
+      {
+        providerId: 'minimax',
+        baseUrlEnv: 'MINIMAX_BASE_URL',
+        apiKeyEnv: 'MINIMAX_API_KEY',
+        defaultBaseUrl: 'https://api.minimax.io/v1',
+      },
+      {
+        providerId: 'openrouter',
+        baseUrlEnv: 'OPENROUTER_BASE_URL',
+        apiKeyEnv: 'OPENROUTER_API_KEY',
+        defaultBaseUrl: 'https://openrouter.ai/api/v1',
+      },
     ];
 
     for (const rp of remoteProviders) {

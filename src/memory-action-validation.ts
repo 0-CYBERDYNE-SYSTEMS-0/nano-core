@@ -64,7 +64,9 @@ export function assertDurableMemoryPath(relPath: string): void {
   // in isAllowedMemoryRelativePath and the workspace-escape check in
   // resolveAllowedMemoryFilePath.
   if (/\.ts$/i.test(lower)) {
-    throw new Error(`Path "${relPath}" is a .ts source file and may not be written as memory`);
+    throw new Error(
+      `Path "${relPath}" is a .ts source file and may not be written as memory`,
+    );
   }
 
   const isMemoryRoot = lower === 'memory.md';

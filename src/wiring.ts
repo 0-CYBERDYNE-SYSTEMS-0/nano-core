@@ -174,10 +174,7 @@ import {
 } from './coding-orchestrator.js';
 import { resolveCoderProjectTarget } from './coder-project-resolver.js';
 import { executeEdgeAction } from './edge/bridge.js';
-import {
-  startStateCollector,
-  stopStateCollector,
-} from './edge/collector.js';
+import { startStateCollector, stopStateCollector } from './edge/collector.js';
 import {
   normalizeFileDeliveryRequest,
   processFileDeliveryRequest,

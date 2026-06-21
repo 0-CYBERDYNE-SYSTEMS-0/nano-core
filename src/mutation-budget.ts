@@ -115,9 +115,9 @@ export function recordMutationEvent(params: {
     const cutoff = new Date(
       Date.now() - windowMinutes * 60 * 1000,
     ).toISOString();
-    db.prepare(
-      `DELETE FROM mutation_budget_events WHERE created_at < ?`,
-    ).run(cutoff);
+    db.prepare(`DELETE FROM mutation_budget_events WHERE created_at < ?`).run(
+      cutoff,
+    );
   } catch (err) {
     logger.warn({ err, params }, 'Failed to record mutation event');
   }
@@ -135,9 +135,7 @@ export function getRollingWindowCount(
 
   const config = PARITY_CONFIG.skills.mutationBudget?.rollingWindow;
   const windowMinutes = config?.windowMinutes ?? 60;
-  const cutoff = new Date(
-    Date.now() - windowMinutes * 60 * 1000,
-  ).toISOString();
+  const cutoff = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString();
 
   try {
     const row = db
@@ -150,7 +148,10 @@ export function getRollingWindowCount(
       .get(groupFolder, mutationType, cutoff) as { count: number } | undefined;
     return row?.count ?? 0;
   } catch (err) {
-    logger.warn({ err, groupFolder, mutationType }, 'Failed to query rolling window count');
+    logger.warn(
+      { err, groupFolder, mutationType },
+      'Failed to query rolling window count',
+    );
     return 0;
   }
 }
@@ -185,7 +186,10 @@ export function checkMutationBudget(params: {
     params.mutationType,
   );
 
-  if (params.attribution.authorityId !== 'unknown' && perRunCount >= perRunLimit) {
+  if (
+    params.attribution.authorityId !== 'unknown' &&
+    perRunCount >= perRunLimit
+  ) {
     return {
       allowed: false,
       reason: `per-run ${params.mutationType} mutation budget exceeded (${perRunCount}/${perRunLimit})`,

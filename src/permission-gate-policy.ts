@@ -124,7 +124,8 @@ export function evaluatePermissionGate(params: {
       // not here). Block all reads from maintenance at the gate level.
       return {
         action: 'block',
-        reason: 'Maintenance run cannot read files. All filesystem access is denied.',
+        reason:
+          'Maintenance run cannot read files. All filesystem access is denied.',
       };
     }
     // All mutations, scheduling, outbound, and destroy are blocked for maintenance
@@ -149,10 +150,7 @@ export function evaluatePermissionGate(params: {
       typeof input.path === 'string' &&
       isProtectedPath(input.path)
     ) {
-      if (
-        origin === 'interactive-main' &&
-        runAuthority.operatorGrant
-      ) {
+      if (origin === 'interactive-main' && runAuthority.operatorGrant) {
         return {
           action: 'confirm',
           title: 'Protected Path',

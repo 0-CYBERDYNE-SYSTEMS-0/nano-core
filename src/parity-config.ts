@@ -92,13 +92,13 @@ export interface SkillManagerParityConfig {
 }
 
 export interface MutationBudgetPerRunConfig {
-  skillMutations: number;  // max skill mutations per single run (default: 5)
+  skillMutations: number; // max skill mutations per single run (default: 5)
   memoryMutations: number; // max memory mutations per single run (default: 10)
 }
 
 export interface MutationBudgetRollingWindowConfig {
   windowMinutes: number; // rolling window size (default: 60 minutes)
-  maxMutations: number;   // max mutations per window per group (default: 20)
+  maxMutations: number; // max mutations per window per group (default: 20)
 }
 
 export interface MutationBudgetConfig {

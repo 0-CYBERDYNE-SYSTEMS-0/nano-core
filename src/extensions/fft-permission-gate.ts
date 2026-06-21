@@ -93,13 +93,18 @@ function writeHeldMarker(
 function parseRunAuthority(): RunAuthority | null {
   const raw = process.env.FFT_NANO_RUN_AUTHORITY_JSON;
   if (!raw) {
-    console.error('[fft-permission-gate] FFT_NANO_RUN_AUTHORITY_JSON is not set');
+    console.error(
+      '[fft-permission-gate] FFT_NANO_RUN_AUTHORITY_JSON is not set',
+    );
     return null;
   }
   try {
     return JSON.parse(raw) as RunAuthority;
   } catch (err) {
-    console.error('[fft-permission-gate] Failed to parse FFT_NANO_RUN_AUTHORITY_JSON:', err);
+    console.error(
+      '[fft-permission-gate] Failed to parse FFT_NANO_RUN_AUTHORITY_JSON:',
+      err,
+    );
     return null;
   }
 }
@@ -115,7 +120,10 @@ export default function (pi: ExtensionAPI) {
     if (!runAuthority) {
       // Conservative fallback: block if we cannot verify the authority.
       // This maintains the security invariant — missing authority means no trust.
-      return { block: true, reason: 'RunAuthority not available; refusing tool call' };
+      return {
+        block: true,
+        reason: 'RunAuthority not available; refusing tool call',
+      };
     }
 
     const input =
