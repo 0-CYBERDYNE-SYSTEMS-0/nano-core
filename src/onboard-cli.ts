@@ -463,10 +463,18 @@ function shouldRewriteSoulFile(existingBody: string, force: boolean): boolean {
   if (force) return true;
   if (!existingBody.trim()) return true;
   if (
-    /You are (?:nano-core|OpenClaw|nano-core): concise, practical, and technically rigorous\./i.test(
+    /You are (?:OpenClaw|nano-core|FFT_nano): concise, practical, and technically rigorous\./i.test(
       existingBody,
     )
   ) {
+    return true;
+  }
+  if (/You are .+: an agricultural assistant\./i.test(existingBody)) {
+    return true;
+  }
+  // Generic legacy SOUL/body detection: any old prompt that talks about
+  // "agriculture" should be rewritten under the neutral profile.
+  if (/agricultural assistant/i.test(existingBody)) {
     return true;
   }
   return false;
@@ -784,7 +792,7 @@ async function resolvePromptValues(params: {
 }
 
 function writeWizardMetadata(workspace: string, summary: OnboardSummary): void {
-  const stateDir = path.join(workspace, '.fft_nano');
+  const stateDir = path.join(workspace, '.nano-core');
   fs.mkdirSync(stateDir, { recursive: true });
   const payload = {
     lastRunAt: new Date().toISOString(),
@@ -861,7 +869,7 @@ export async function runOnboarding(
           ? String(wizard.gatewayPort)
           : undefined,
       CONTAINER_RUNTIME: wizard.runtime,
-      FFT_NANO_ALLOW_HOST_RUNTIME: wizard.runtime === 'host' ? '1' : undefined,
+      FFT_NANO_ALLOW_HOST_RUNTIME: undefined,
     };
     ensureAdminSecret(updates, envMap);
 
@@ -910,8 +918,7 @@ export async function runOnboarding(
     };
     if (opts.runtime) {
       updates.CONTAINER_RUNTIME = wizard.runtime;
-      updates.FFT_NANO_ALLOW_HOST_RUNTIME =
-        wizard.runtime === 'host' ? '1' : undefined;
+      updates.FFT_NANO_ALLOW_HOST_RUNTIME = undefined;
     }
     upsertDotEnv(envPath, updates);
   }
@@ -945,7 +952,45 @@ export async function runOnboarding(
     gatewayPort: wizard.gatewayPort,
   };
   writeWizardMetadata(workspace, summary);
+  if (wizard.installDaemon) {
+    await installDaemonIfRequested();
+  }
   return summary;
+}
+
+async function installDaemonIfRequested(): Promise<void> {
+  // Delegate to `scripts/service.sh install` via a child process so
+  // the same on-disk service definition is used across macOS / Linux
+  // / Termux. This is the right place to wire it because the operator
+  // already accepted the risk and the env file is in place.
+  const { spawn } = await import('child_process');
+  const scriptPath = path.join(process.cwd(), 'scripts', 'service.sh');
+  if (!fs.existsSync(scriptPath)) {
+    process.stderr.write(
+      `service.sh not found at ${scriptPath}; skipping daemon install. Run \`fft service install\` later.\n`,
+    );
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    const child = spawn('bash', [scriptPath, 'install'], {
+      env: { ...process.env, FFT_NANO_NONINTERACTIVE: '1' },
+      stdio: 'inherit',
+    });
+    child.once('error', (err) => {
+      process.stderr.write(
+        `daemon install failed: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+      resolve();
+    });
+    child.once('exit', (code) => {
+      if (code !== 0) {
+        process.stderr.write(
+          `daemon install exited with code ${code}; the wizard chose --install-daemon, so you may need to fix the issue and run \`fft service install\` manually.\n`,
+        );
+      }
+      resolve();
+    });
+  });
 }
 
 async function main(): Promise<void> {

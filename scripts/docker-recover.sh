@@ -23,7 +23,7 @@ docker_daemon_healthy() {
   local err_file="$1"
   : >"$err_file"
   if perl -e 'my $t=shift; alarm $t; my $rc=system(@ARGV); exit($rc >> 8);' \
-    4 docker version --format '{{.Server.Version}}' >/tmp/fft_nano_docker_server_version.out 2>"$err_file"; then
+    4 docker version --format '{{.Server.Version}}' >/tmp/nano-core_docker_server_version.out 2>"$err_file"; then
     return 0
   fi
   return 1
@@ -59,15 +59,15 @@ wait_for_daemon() {
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RAW_PATH="$HOME/Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"
-BACKUP_DIR="${FFT_NANO_DOCKER_BACKUP_DIR:-$HOME/fft_nano_docker_backups}"
+BACKUP_DIR="${FFT_NANO_DOCKER_BACKUP_DIR:-$HOME/nano-core_docker_backups}"
 TS="$(date -u +%Y%m%dT%H%M%SZ)"
-ERR_FILE="$(mktemp -t fft_nano_docker_recover.XXXXXX)"
+ERR_FILE="$(mktemp -t nano-core_docker_recover.XXXXXX)"
 
 say "Docker recovery start"
 say "Repo: $ROOT_DIR"
 
 if docker_daemon_healthy "$ERR_FILE"; then
-  say "Docker daemon already healthy (server $(cat /tmp/fft_nano_docker_server_version.out 2>/dev/null || echo unknown))."
+  say "Docker daemon already healthy (server $(cat /tmp/nano-core_docker_server_version.out 2>/dev/null || echo unknown))."
   rm -f "$ERR_FILE"
   exit 0
 fi
@@ -105,7 +105,7 @@ say "Starting Docker Desktop with fresh disk image..."
 open -a Docker
 
 if wait_for_daemon 180 "$ERR_FILE"; then
-  say "Docker daemon healthy (server $(cat /tmp/fft_nano_docker_server_version.out 2>/dev/null || echo unknown))."
+  say "Docker daemon healthy (server $(cat /tmp/nano-core_docker_server_version.out 2>/dev/null || echo unknown))."
   say "Note: Docker images/containers from old VM disk are not active. Backup remains at: $BACKUP_RAW"
   rm -f "$ERR_FILE"
   exit 0

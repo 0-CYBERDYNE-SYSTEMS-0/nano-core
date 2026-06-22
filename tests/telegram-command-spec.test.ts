@@ -66,12 +66,15 @@ test('main chat help includes admin restart alias and non-main help does not', (
   assert.match(nonMainHelp, /\/delivery \[stream\|append\|off\|draft\]/);
   assert.match(
     mainHelp,
-    /\/knowledge \[status\|init\|task\|ingest\|lint\] - knowledge wiki\/librarian controls/,
+    /\/knowledge \[status\|init\|task\|ingest\|lint\|run\|dry-run\|log\|progress\] - knowledge wiki controls/,
   );
   assert.doesNotMatch(nonMainHelp, /\/knowledge \[/);
   assert.match(mainHelp, /\/restart - alias for \/gateway restart/);
-  assert.match(mainHelp, /\/run <task> - start a durable long normal-agent run/);
-  assert.match(mainHelp, /\/run-status <id> - show long run status/);
+  assert.match(
+    mainHelp,
+    /\/run <task> - start a durable long normal-agent run/,
+  );
+  assert.match(mainHelp, /\/run_status <id> - show long run status/);
   assert.match(
     mainHelp,
     /\/setup \[cancel\] - runtime setup wizard for provider\/model\/key/,
@@ -91,4 +94,41 @@ test('/reflect is a registered, normalizable, main-only command', () => {
   const nonMainHelp = formatHelpText(false);
   assert.match(mainHelp, /\/reflect \[dry-run\] \[focus\]/);
   assert.doesNotMatch(nonMainHelp, /\/reflect \[dry-run\]/);
+});
+
+test('VAL-WS6-007: /learning is registered in TELEGRAM_ADMIN_COMMANDS and normalizes correctly', () => {
+  // Check catalog entry
+  const learningEntries = TELEGRAM_ADMIN_COMMANDS.filter(
+    (c) => c.command === 'learning',
+  );
+  assert.equal(
+    learningEntries.length,
+    1,
+    'learning should be in TELEGRAM_ADMIN_COMMANDS',
+  );
+  assert.match(
+    learningEntries[0].description,
+    /learning/i,
+    'learning command description should mention learning',
+  );
+
+  // Check normalization
+  assert.equal(
+    normalizeTelegramCommandToken('/learning'),
+    '/learning',
+    '/learning should normalize to /learning',
+  );
+  assert.equal(
+    normalizeTelegramCommandToken('/learning@TestBot'),
+    '/learning',
+    '/learning@TestBot should normalize to /learning',
+  );
+
+  // Check /help text includes /learning
+  const mainHelp = formatHelpText(true);
+  assert.match(
+    mainHelp,
+    /\/learning/,
+    '/learning should appear in main chat help',
+  );
 });

@@ -49,7 +49,7 @@ done
 if [[ -n "$out" ]]; then
   printf 'stub archive\\n' > "$out"
 else
-  printf 'https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano/releases/tag/vtest\\n'
+  printf 'https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core/releases/tag/vtest\\n'
 fi
 `,
   );
@@ -70,11 +70,19 @@ while [[ "$#" -gt 0 ]]; do
       ;;
   esac
 done
-root="$dest/nano-core-vtest"
+root="$dest/FFT_nano-vtest"
 mkdir -p "$root/scripts"
 cat > "$root/.env.example" <<'ENV'
 PI_API=replace-me
 ENV
+# Create minimal package-lock.json for npm ci
+cat > "$root/package-lock.json" <<'LOCK'
+{
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {}
+}
+LOCK
 cat > "$root/scripts/onboard-all.sh" <<'SCRIPT'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -94,6 +102,15 @@ chmod +x "$root/scripts/onboard-all.sh"
     `#!/usr/bin/env bash
 set -euo pipefail
 printf 'pkg:%s\\n' "$*" >> "${path.join(fixtureRoot, 'pkg.log')}"
+`,
+  );
+
+  // Mock npm to succeed without doing anything (for deps stage)
+  writeExecutable(
+    path.join(binDir, 'npm'),
+    `#!/usr/bin/env bash
+set -euo pipefail
+exit 0
 `,
   );
 
@@ -134,12 +151,12 @@ printf 'pkg:%s\\n' "$*" >> "${path.join(fixtureRoot, 'pkg.log')}"
   );
   assert.doesNotMatch(onboardBody, /docker|--install-daemon(?! --non)/);
   assert.match(onboardBody, /^container:host$/m);
-  assert.match(onboardBody, /^allow_host:1$/m);
+  assert.match(onboardBody, /^allow_host:$/m);
   assert.match(onboardBody, /^auto_link:0$/m);
 
   const envBody = readFileSync(path.join(installDir, '.env'), 'utf8');
   assert.match(envBody, /^CONTAINER_RUNTIME=host$/m);
-  assert.match(envBody, /^FFT_NANO_ALLOW_HOST_RUNTIME=1$/m);
+  assert.doesNotMatch(envBody, /^FFT_NANO_ALLOW_HOST_RUNTIME=/m);
   assert.match(result.stdout, /Android Termux detected/);
   assert.match(result.stdout, /Termux install complete/);
 });

@@ -45,22 +45,79 @@
     "(^|/)tractor[^/]*"
   ],
   "skipForbiddenFiles": true,
+  "fileMappings": [
+    { "from": "src/farm-action-gateway.ts", "to": "src/edge/bridge.ts" },
+    { "from": "src/farm-state-collector.ts", "to": "src/edge/collector.ts" },
+    { "from": "src/home-assistant.ts", "to": "src/edge/plugins/home-assistant.ts" }
+  ],
+  "fileScopedReplacements": [
+    {
+      "file": "src/edge/bridge.ts",
+      "replacements": [
+        { "from": "FarmActionGateway", "to": "EdgeBridge" },
+        { "from": "farmActionGateway", "to": "edgeBridge" },
+        { "from": "FarmActionRequest", "to": "EdgeActionRequest" },
+        { "from": "FarmActionResult", "to": "EdgeActionResult" },
+        { "from": "farm_action", "to": "edge_action" },
+        { "from": "farmConfig", "to": "bridgeConfig" }
+      ]
+    },
+    {
+      "file": "src/edge/collector.ts",
+      "replacements": [
+        { "from": "FarmStateCollector", "to": "StateCollector" },
+        { "from": "FarmContext", "to": "DeviceContext" },
+        { "from": "farmContext", "to": "deviceContext" },
+        { "from": "FarmState", "to": "DeviceState" },
+        { "from": "farmStateDir", "to": "stateDir" },
+        { "from": "farmPollInterval", "to": "pollInterval" },
+        { "from": "farmTelemetryDir", "to": "telemetryDir" }
+      ]
+    },
+    {
+      "file": "src/edge/plugins/home-assistant.ts",
+      "replacements": [
+        { "from": "HomeAssistantAdapter", "to": "HaAdapter" },
+        { "from": "haAdapter", "to": "haAdapter" }
+      ]
+    }
+  ],
   "textReplacements": [
     {
-      "from": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git",
+      "from": "https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano.git",
       "to": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core.git"
     },
     {
-      "from": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core",
+      "from": "https://github.com/0-CYBERDYNE-SYSTEMS-0/FFT_nano",
+      "to": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core"
+    },
+    {
+      "from": "git@github.com:0-CYBERDYNE-SYSTEMS-0/FFT_nano.git",
+      "to": "git@github.com:0-CYBERDYNE-SYSTEMS-0/nano-core.git"
+    },
+    {
+      "from": "0-CYBERDYNE-SYSTEMS-0/FFT_nano",
+      "to": "0-CYBERDYNE-SYSTEMS-0/nano-core"
+    },
+    {
+      "from": "fft_nano",
+      "to": "nano-core"
+    },
+    {
+      "from": "https://farm-friend.com/fft_nano/",
+      "to": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core/"
+    },
+    {
+      "from": "https://farm-friend.com/fft_nano",
       "to": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core"
     },
     {
       "from": "https://farm-friend.com/nano-core/",
-      "to": "https://farm-friend.com/nano-core/"
+      "to": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core/"
     },
     {
       "from": "https://farm-friend.com/nano-core",
-      "to": "https://farm-friend.com/nano-core"
+      "to": "https://github.com/0-CYBERDYNE-SYSTEMS-0/nano-core"
     }
   ],
   "packageJson": {
@@ -106,6 +163,38 @@
     "config/nano-core-sync.json",
     "scripts/sync-nano-core.mjs",
     "tests/nano-core-sync.test.ts",
-    "SYNC_SOURCE.md"
+    "SYNC_SOURCE.md",
+    "src/app.ts",
+    "src/app-config.ts",
+    "src/doctor.ts",
+    "src/evaluator.ts",
+    "src/host-coordination.ts",
+    "src/memory-paths.ts",
+    "src/onboard-cli.ts",
+    "src/skill-service.ts",
+    "src/system-prompt.ts",
+    "src/telegram-commands.ts",
+    "src/wiring.ts",
+    "src/edge/bridge.ts",
+    "src/edge/collector.ts",
+    "package.json",
+    ".env.example",
+    ".gitignore",
+    "tests/boundary-ipc.test.ts",
+    "tests/chat-preferences.test.ts",
+    "tests/cli/fft-cli.test.ts",
+    "tests/db-fts.test.ts",
+    "tests/db-message-fetch.test.ts",
+    "tests/evaluator.test.ts",
+    "tests/installer-url.test.ts",
+    "tests/memory-action-gateway.test.ts",
+    "tests/message-dispatch.test.ts",
+    "tests/pi-runner-stale.test.ts",
+    "tests/skill-lifecycle.test.ts",
+    "tests/system-prompt-architecture.test.ts",
+    "tests/telegram-commands.test.ts",
+    "tests/telegram-learning-digest.test.ts",
+    "tests/telegram.test.ts",
+    "tests/web-control-center-server.test.ts"
   ]
 }

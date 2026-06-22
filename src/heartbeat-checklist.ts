@@ -17,7 +17,7 @@ export interface HeartbeatChecklistInput {
 }
 
 export interface HeartbeatChecklistResult {
-  schema: 'fft_nano.heartbeat_check_result.v1';
+  schema: 'nano-core.heartbeat_check_result.v1';
   requestId: string;
   reason: string;
   createdAt: string;
@@ -68,7 +68,7 @@ export function buildHeartbeatChecklist(
   );
   const skillsDir = path.join(input.workspaceDir, 'skills');
   return {
-    schema: 'fft_nano.heartbeat_check_result.v1',
+    schema: 'nano-core.heartbeat_check_result.v1',
     requestId: input.requestId,
     reason: input.reason,
     createdAt: now.toISOString(),

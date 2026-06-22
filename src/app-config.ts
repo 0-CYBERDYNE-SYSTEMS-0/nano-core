@@ -1,16 +1,32 @@
+import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
 import { PARITY_CONFIG, PARITY_CONFIG_PATH } from './parity-config.js';
-import {
-  FEATURE_FARM,
-  FFT_PROFILE,
-  PROFILE_DETECTION,
-  type FFTProfile,
-} from './profile.js';
 
-export type { FFTProfile };
-export type ProfileDetection = typeof PROFILE_DETECTION;
+// ── Profile detection ─────────────────────────────────────────────────────────
+
+export type FFTProfile = 'core';
+
+export interface ProfileDetection {
+  source: 'default';
+  reason: string;
+}
+
+function parseBool(value: string | undefined): boolean | null {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return null;
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return null;
+}
+
+export const FFT_PROFILE: FFTProfile = 'core';
+export const PROFILE_DETECTION: ProfileDetection = {
+  source: 'default',
+  reason: 'nano-core is single-profile (core only)',
+};
 
 // ── Core config ───────────────────────────────────────────────────────────────
 
@@ -40,7 +56,7 @@ function expandHomePath(input: string): string {
 export const MOUNT_ALLOWLIST_PATH = path.join(
   HOME_DIR,
   '.config',
-  'nano-core',
+  'fft_nano',
   'mount-allowlist.json',
 );
 export const STORE_DIR = path.resolve(PROJECT_ROOT, 'store');
@@ -50,6 +66,36 @@ export const MAIN_GROUP_FOLDER = 'main';
 export const MAIN_WORKSPACE_DIR = path.resolve(
   expandHomePath(process.env.FFT_NANO_MAIN_WORKSPACE_DIR || '~/nano'),
 );
+
+export const EDGE_BRIDGE_ENABLED = envFlag(
+  process.env.EDGE_BRIDGE_ENABLED,
+  true,
+);
+export const EDGE_BRIDGE_DIR = path.resolve(DATA_DIR, 'edge-bridge');
+export const EDGE_STATE_FAST_MS = envInt(
+  process.env.EDGE_STATE_FAST_MS,
+  15000,
+  5000,
+  60000,
+);
+export const EDGE_STATE_MEDIUM_MS = envInt(
+  process.env.EDGE_STATE_MEDIUM_MS,
+  120000,
+  30000,
+  600000,
+);
+export const EDGE_STATE_SLOW_MS = envInt(
+  process.env.EDGE_STATE_SLOW_MS,
+  900000,
+  300000,
+  3600000,
+);
+export const HA_URL = process.env.HA_URL || 'http://localhost:8123';
+export const HA_URL_CANDIDATES = parseHaUrlCandidates(
+  HA_URL,
+  process.env.HA_URL_CANDIDATES,
+);
+export const HA_TOKEN = process.env.HA_TOKEN || '';
 
 export const CONTAINER_IMAGE =
   process.env.CONTAINER_IMAGE || 'fft-nano-agent:latest';
@@ -72,6 +118,14 @@ export const IPC_POLL_INTERVAL = 1000;
 export const TELEGRAM_MEDIA_MAX_MB = Math.max(
   1,
   parseInt(process.env.TELEGRAM_MEDIA_MAX_MB || '20', 10),
+);
+export const FFT_NANO_TELEGRAM_GROUP_EDIT_INTERVAL_MS = parseInt(
+  process.env.FFT_NANO_TELEGRAM_GROUP_EDIT_INTERVAL_MS || '3000',
+  10,
+);
+export const FFT_NANO_TELEGRAM_HEARTBEAT_MS = parseInt(
+  process.env.FFT_NANO_TELEGRAM_HEARTBEAT_MS || '30000',
+  10,
 );
 export type WebAccessMode = 'localhost' | 'lan' | 'remote';
 
@@ -112,6 +166,25 @@ function resolveTuiHost(accessMode: WebAccessMode): string {
   if (explicit) return explicit;
   if (accessMode === 'localhost') return '127.0.0.1';
   return '0.0.0.0';
+}
+
+function normalizeUrlCandidate(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.replace(/\/$/, '');
+}
+
+function parseHaUrlCandidates(primaryUrl: string, rawList?: string): string[] {
+  const fallbacks = ['http://localhost:8123', 'http://192.168.64.1:8123'];
+  const explicit =
+    rawList
+      ?.split(',')
+      .map((entry) => normalizeUrlCandidate(entry))
+      .filter((entry): entry is string => Boolean(entry)) || [];
+  const ordered = [primaryUrl, ...explicit, ...fallbacks]
+    .map((entry) => normalizeUrlCandidate(entry))
+    .filter((entry): entry is string => Boolean(entry));
+  return Array.from(new Set(ordered));
 }
 
 export const MEMORY_RETRIEVAL_GATE_ENABLED = envFlag(
@@ -275,4 +348,3 @@ export const FFT_NANO_PROVIDER_FALLBACK_ENABLED = envFlag(
 );
 
 export { PARITY_CONFIG, PARITY_CONFIG_PATH };
-export { FEATURE_FARM, FFT_PROFILE, PROFILE_DETECTION };

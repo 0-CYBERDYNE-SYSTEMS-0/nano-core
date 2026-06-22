@@ -570,7 +570,7 @@ export function createWatchdog(
         'pi',
         'main',
         '.pi',
-        'fft_nano',
+        'nano-core',
         'prompt-state.json',
       ),
     );

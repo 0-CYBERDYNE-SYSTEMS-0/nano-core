@@ -627,9 +627,14 @@ test('runScheduledTaskV2 with invalid schedule_json.tz still completes task succ
     },
   });
 
-  // Task should complete successfully
+  // Task should execute without error despite invalid tz
   const postRun = getTaskById(task.id);
-  assert.equal(postRun?.status, 'completed');
+  // Recurring cron task: status stays 'active' (the parser resolves the
+  // next run with the validated host-timezone fallback). The previous
+  // expected 'completed' was a side effect of cron-parser throwing on
+  // the invalid tz, which made nextRun null. We now validate the tz
+  // up front so the task can be re-scheduled correctly.
+  assert.equal(postRun?.status, 'active');
   assert.equal(sentMessages.length, 1);
   assert.match(sentMessages[0], /\[scheduled:invalid-tz-prompt-task\]/);
 
@@ -730,4 +735,63 @@ test('runScheduledTaskV2 with invalid process.env.TZ still executes tasks (VAL-C
     if (priorTz === undefined) delete process.env.TZ;
     else process.env.TZ = priorTz;
   }
+});
+
+// ---------------------------------------------------------------------------
+// VAL-WS4-005: Cron v2 path routes through recordVerdictOutcome
+// ---------------------------------------------------------------------------
+
+test('VAL-WS4-005: runScheduledTaskV2 writes evaluator_verdicts row with runType=cron', async () => {
+  const dbPath = makeTempDbPath();
+  initDatabaseAtPath(dbPath);
+
+  const task = makeTask({
+    id: 'cron-verdict-task',
+    schedule_type: 'once',
+    schedule_value: new Date().toISOString(),
+    context_mode: 'isolated',
+    delivery_mode: 'announce',
+    delivery_to: 'telegram:99',
+  });
+  createTask(task);
+
+  const group: RegisteredGroup = {
+    name: 'main',
+    folder: 'main',
+    trigger: '@FarmFriend',
+    added_at: new Date().toISOString(),
+  };
+
+  const latest = getTaskById(task.id);
+  assert.ok(latest);
+
+  await runScheduledTaskV2(latest!, {
+    sendMessage: async () => {},
+    registeredGroups: () => ({ 'telegram:1': group }),
+    runContainerTask: async () => ({
+      status: 'success',
+      result: 'cron task completed',
+    }),
+    runEvaluatorPass: async () => ({
+      pass: true,
+      score: 8,
+      issues: [],
+      feedback: 'Good cron task',
+      skipped: false,
+    }),
+  });
+
+  // Verify the evaluator_verdicts row was written with runType='cron'
+  const { getDb } = await import('../src/db.ts');
+  const db = getDb();
+  const rows = db!
+    .prepare(`SELECT request_id, run_type, pass, score FROM evaluator_verdicts WHERE group_folder = 'main'`)
+    .all() as Array<{ request_id: string; run_type: string; pass: number; score: number }>;
+
+  const cronRow = rows.find((r) => r.run_type === 'cron');
+  assert.ok(cronRow, `Expected a row with run_type='cron', got: ${JSON.stringify(rows)}`);
+  assert.equal(cronRow!.pass, 1);
+  assert.equal(cronRow!.score, 8);
+
+  closeDatabase();
 });

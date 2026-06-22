@@ -2,6 +2,7 @@ import { exec, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { pruneStaleState } from './app-state.js';
+import { getPlatformAdapter } from './platform/index.js';
 
 export interface AppRuntimeDeps {
   state: {
@@ -26,6 +27,7 @@ export interface AppRuntimeDeps {
     heartbeatActiveHours?: unknown;
     dataDir?: string;
     fftProfile?: string;
+    edgeBridgeEnabled?: boolean;
     profileDetection?: unknown;
     whatsappEnabled?: boolean;
     onboardingMode?: boolean;
@@ -68,6 +70,8 @@ export interface AppRuntimeDeps {
   sendMessage?: (chatJid: string, text: string) => Promise<boolean>;
   maybeRegisterWhatsAppMainChat?: () => void;
   syncGroupMetadata?: (force?: boolean) => Promise<void>;
+  startStateCollector?: () => void;
+  stopStateCollector?: () => void;
   startSchedulerLoop?: (params: any) => void;
   startIpcWatcher?: () => void;
   startMessageLoop?: () => Promise<void>;
@@ -96,7 +100,7 @@ export interface AppRuntimeDeps {
   migrateLegacyClaudeMemoryFiles?: () => void;
   migrateCompactionSummariesFromSoul?: () => void;
   maybePromoteConfiguredTelegramMain?: () => void;
-  startTuiGatewayService?: () => Promise<void>;
+  startTuiGatewayService?: () => Promise<boolean>;
   startWebControlCenterService?: () => Promise<void>;
   stopTuiGatewayService?: () => Promise<void>;
   stopWebControlCenterService?: () => Promise<void>;
@@ -119,7 +123,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
   connectWhatsApp: () => Promise<void>;
   startMessageLoop: () => Promise<void>;
   ensureContainerSystemRunning: () => void;
-  stopDomainServicesForShutdown: (signal: string) => void;
+  stopEdgeServicesForShutdown: (signal: string) => void;
   shutdownAndExit: (signal: string, exitCode: number) => Promise<void>;
   registerShutdownHandlers: () => void;
   main: () => Promise<void>;
@@ -261,11 +265,9 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
       if (qr) {
         const msg = 'WhatsApp authentication required. Run: npm run auth';
         deps.logger.error?.(msg);
-        if (process.platform === 'darwin') {
-          exec(
-            `osascript -e 'display notification "${msg}" with title "nano-core" sound name "Basso"'`,
-          );
-        }
+        // Use platform adapter for cross-platform notifications
+        const platformAdapter = getPlatformAdapter();
+        platformAdapter.showNotification('FFT_nano', msg);
         setTimeout(() => process.exit(1), 1000);
       }
 
@@ -377,7 +379,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
     }
     deps.state.messageLoopRunning = true;
     deps.logger.info?.(
-      `nano-core running (trigger: @${deps.constants.assistantName})`,
+      `FFT_nano running (trigger: @${deps.constants.assistantName})`,
     );
     while (true) {
       try {
@@ -424,18 +426,8 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
   function ensureContainerSystemRunning(): void {
     const runtime = deps.getContainerRuntime?.() || 'docker';
     if (runtime === 'host') {
-      if (
-        (process.env.NODE_ENV || '').toLowerCase() === 'production' &&
-        !['1', 'true', 'yes', 'on'].includes(
-          (process.env.FFT_NANO_ALLOW_HOST_RUNTIME_IN_PROD || '').toLowerCase(),
-        )
-      ) {
-        throw new Error(
-          'Host runtime is blocked in production unless FFT_NANO_ALLOW_HOST_RUNTIME_IN_PROD=1',
-        );
-      }
       deps.logger.warn?.(
-        'Running in host runtime mode (no container isolation). This should only be used for trusted local workflows.',
+        'Running in host runtime mode because Docker is not selected/available. This runs Pi without container isolation.',
       );
       return;
     }
@@ -463,7 +455,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
         '║  2. Start the Docker daemon                                    ║',
       );
       console.error(
-        '║  3. Restart nano-core                                         ║',
+        '║  3. Restart FFT_nano                                          ║',
       );
       console.error(
         '╚════════════════════════════════════════════════════════════════╝\n',
@@ -491,7 +483,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
     }
   }
 
-  function stopDomainServicesForShutdown(signal: string): void {
+  function stopEdgeServicesForShutdown(signal: string): void {
     if (deps.state.shuttingDown) return;
     deps.state.shuttingDown = true;
     if (groupSyncTimer !== null) {
@@ -499,6 +491,9 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
       groupSyncTimer = null;
     }
     deps.logger.info?.({ signal }, 'Shutting down nano-core services');
+    if (deps.constants.edgeBridgeEnabled) {
+      deps.stopStateCollector?.();
+    }
   }
 
   async function shutdownAndExit(
@@ -507,7 +502,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
   ): Promise<void> {
     stopPruneLoop();
     stopCuratorLoop();
-    stopDomainServicesForShutdown(signal);
+    stopEdgeServicesForShutdown(signal);
     await deps.stopWebControlCenterService?.();
     await deps.stopTuiGatewayService?.();
     process.exit(exitCode);
@@ -566,15 +561,19 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
     deps.migrateLegacyClaudeMemoryFiles?.();
     deps.migrateCompactionSummariesFromSoul?.();
     deps.maybePromoteConfiguredTelegramMain?.();
-    await deps.startTuiGatewayService?.();
+    const tuiAvailable = (await deps.startTuiGatewayService?.()) === true;
     await deps.startWebControlCenterService?.();
     deps.logger.info?.(
       {
         profile: deps.constants.fftProfile,
+        edgeBridgeEnabled: deps.constants.edgeBridgeEnabled,
         profileDetection: deps.constants.profileDetection,
       },
       'Runtime profile resolved',
     );
+    if (deps.constants.edgeBridgeEnabled) {
+      deps.startStateCollector?.();
+    }
     if (deps.constants.onboardingMode) {
       deps.logger.info?.(
         'Running in onboarding-only mode (web/TUI enabled, channels deferred)',
@@ -583,13 +582,25 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
       return;
     }
     const telegramEnabled = !!deps.constants.telegramBotToken;
+    const tuiOnlyMode =
+      deps.constants.whatsappEnabled === false &&
+      !telegramEnabled &&
+      tuiAvailable;
     if (
       deps.constants.whatsappEnabled === false &&
-      !telegramEnabled
+      !telegramEnabled &&
+      !tuiOnlyMode
     ) {
       throw new Error(
-        'No channels enabled. Set WHATSAPP_ENABLED=1 and/or TELEGRAM_BOT_TOKEN.',
+        'No channels enabled and TUI gateway is unavailable. Set WHATSAPP_ENABLED=1, TELEGRAM_BOT_TOKEN, or enable a working TUI gateway.',
       );
+    }
+    if (tuiOnlyMode) {
+      deps.logger.info?.(
+        'Running in TUI-only mode (messaging channels and delivery loops disabled)',
+      );
+      deps.maybeRunBootMdOnce?.();
+      return;
     }
     if (telegramEnabled) {
       await startTelegram();
@@ -644,7 +655,7 @@ export function createAppRuntime(deps: AppRuntimeDeps): {
     connectWhatsApp,
     startMessageLoop,
     ensureContainerSystemRunning,
-    stopDomainServicesForShutdown,
+    stopEdgeServicesForShutdown,
     shutdownAndExit,
     registerShutdownHandlers,
     main,

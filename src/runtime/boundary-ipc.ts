@@ -1,4 +1,5 @@
 import type {
+  EdgeActionRequest,
   MemoryActionRequest,
   RegisteredGroup,
   SkillActionRequest,
@@ -16,8 +17,10 @@ export interface BoundaryEnvelope<TPayload = unknown> {
 
 export interface BoundaryActionEnvelope<
   TPayload extends
+    | EdgeActionRequest
     | MemoryActionRequest
     | SkillActionRequest =
+    | EdgeActionRequest
     | MemoryActionRequest
     | SkillActionRequest,
 > extends BoundaryEnvelope<TPayload> {
@@ -58,7 +61,7 @@ export function wrapLegacyMessageEnvelope(
 }
 
 export function wrapLegacyActionEnvelope(
-  payload: MemoryActionRequest | SkillActionRequest,
+  payload: EdgeActionRequest | MemoryActionRequest | SkillActionRequest,
   sourceGroup: string,
   resultPath: string,
   createdAt = new Date().toISOString(),

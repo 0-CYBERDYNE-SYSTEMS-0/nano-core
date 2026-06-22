@@ -12,6 +12,7 @@ import {
 import { logger } from './logger.js';
 import {
   isTelegramJid,
+  isTelegramRichMessageWithinLimit,
   splitTelegramText,
   parseTelegramChatId,
 } from './telegram.js';
@@ -49,14 +50,19 @@ import type { VerboseMode } from './verbose-mode.js';
 import {
   getAllTasks,
   getDueTasks,
+  getPendingTasks,
   getTaskById,
   getTaskRunLogs,
+  getEvaluatorStats,
+  getRecentLearningInjections,
   listActiveAgentRuns,
 } from './db.js';
+import { resolveGroupFolderPath } from './group-folder.js';
 import { APP_VERSION, SERVICE_STARTED_AT } from './app-state.js';
 import { GIT_INFO } from './state-persistence.js';
 import { getContainerRuntime } from './container-runtime.js';
 import { formatStatusReport } from './status-report.js';
+import { readMutationAuditEventsLast7Days } from './mutation-audit.js';
 import {
   readKnowledgeWikiStatus,
   formatKnowledgeWikiStatusText,
@@ -85,6 +91,10 @@ const TELEGRAM_MEDIA_MAX_BYTES = TELEGRAM_MEDIA_MAX_MB * 1024 * 1024;
 // --- sendMessage ---
 
 export async function sendMessage(jid: string, text: string): Promise<boolean> {
+  if (jid.startsWith('tui:')) {
+    logger.warn({ jid }, 'External delivery requested for local TUI session');
+    return false;
+  }
   if (isTelegramJid(jid)) {
     if (!state.telegramBot) {
       logger.error(
@@ -366,10 +376,12 @@ export async function finalizeTelegramPreviewMessage(
   const ids = messageIds && messageIds.length ? messageIds : [messageId];
 
   const extracted = extractTelegramAttachmentHintsFromReply(text);
+  // Attachments must still be delivered as fresh messages. Bot API 10.1 lets
+  // the first persistent preview bubble become the final rich message in place.
+  const richEligible =
+    text.length > 0 && isTelegramRichMessageWithinLimit(text);
   if (extracted.hints.length > 0) {
     const sent = await sendTelegramAgentReply(chatJid, text);
-    // The reply carries attachments and is delivered as fresh messages, so the
-    // transient preview bubbles must be removed to avoid orphaned leading text.
     await deleteTelegramPreviewMessage(chatJid, ids[0], ids);
     logger.info(
       {
@@ -382,6 +394,38 @@ export async function finalizeTelegramPreviewMessage(
       'Telegram streaming preview finalized',
     );
     return sent;
+  }
+
+  if (richEligible) {
+    try {
+      await state.telegramBot.editStreamMessage(chatJid, ids[0], text, {
+        rich: true,
+      });
+      for (const staleId of ids.slice(1)) {
+        await deleteTelegramPreviewMessage(chatJid, staleId);
+      }
+      logger.info(
+        {
+          chatJid,
+          messageId,
+          previewCount: ids.length,
+          finalizeMode: 'edit-rich',
+          textLength: text.length,
+        },
+        'Telegram streaming preview finalized',
+      );
+      return true;
+    } catch (err) {
+      logger.warn(
+        { chatJid, messageId, err },
+        'Failed to finalize Telegram rich preview in place',
+      );
+      const sent = await sendTelegramAgentReply(chatJid, text);
+      if (sent) {
+        await deleteTelegramPreviewMessage(chatJid, ids[0], ids);
+      }
+      return sent;
+    }
   }
 
   const chunks = splitTelegramText(text);
@@ -881,6 +925,269 @@ export function formatTasksText(mode: 'list' | 'due' = 'list'): string {
   return [prefix, ...lines].join('\n');
 }
 
+// WS2.3: Format pending agent-created tasks for the operator approval surface.
+// Returns an object with the rendered text and inline keyboard rows, one row per
+// pending task with Approve/Reject buttons. Uses the registerToken callback to
+// generate non-guessable callback_data tokens.
+export interface PendingTasksDeps {
+  registerToken: (
+    taskId: string,
+    groupFolder: string,
+    action: 'approve' | 'reject',
+  ) => string;
+}
+
+export function formatPendingTasksText(deps: PendingTasksDeps): {
+  text: string;
+  keyboard: Array<Array<{ text: string; callbackData: string }>>;
+} {
+  const tasks = getPendingTasks();
+  if (tasks.length === 0) {
+    return {
+      text: 'No pending tasks requiring approval.',
+      keyboard: [],
+    };
+  }
+
+  const lines: string[] = ['Pending agent-created tasks:'];
+  const keyboard: Array<Array<{ text: string; callbackData: string }>> = [];
+
+  for (const task of tasks.slice(0, 30)) {
+    const taskText = formatPendingTaskRow(task);
+    lines.push(taskText);
+
+    const approveCallbackData = `task:approve:${deps.registerToken(
+      task.id,
+      task.group_folder,
+      'approve',
+    )}`;
+    const rejectCallbackData = `task:reject:${deps.registerToken(
+      task.id,
+      task.group_folder,
+      'reject',
+    )}`;
+
+    keyboard.push([
+      { text: `✅ Approve`, callbackData: approveCallbackData },
+      { text: `❌ Reject`, callbackData: rejectCallbackData },
+    ]);
+  }
+
+  if (tasks.length > 30) {
+    lines.push(`... ${tasks.length - 30} more pending tasks`);
+  }
+
+  return { text: lines.join('\n'), keyboard };
+}
+
+function formatPendingTaskRow(
+  task: ReturnType<typeof getPendingTasks>[0],
+): string {
+  const promptPreview =
+    task.prompt.length > 60 ? `${task.prompt.slice(0, 60)}…` : task.prompt;
+  const schedule = `${task.schedule_type} ${task.schedule_value}`;
+  const deliveryTo = task.delivery_to || 'n/a';
+  const deliveryMode = task.delivery_mode || 'none';
+  const deleteAfterRun = task.delete_after_run ? 'true' : 'false';
+  const createdAt = task.created_at
+    ? new Date(task.created_at).toLocaleString()
+    : 'n/a';
+
+  return [
+    `  ID: ${task.id}`,
+    `  Prompt: ${promptPreview}`,
+    `  Schedule: ${schedule}`,
+    `  Delivery: ${deliveryMode} → ${deliveryTo}`,
+    `  Delete after run: ${deleteAfterRun}`,
+    `  Created: ${createdAt}`,
+  ].join('\n');
+}
+
+// --- Learning digest ---
+// WS6.2: /learning digest command - single operator surface summarizing learning
+// activity, pause state, recent skips, and pending approvals.
+
+/**
+ * Read self-improve events from the JSONL file for the given group.
+ * Returns parsed lines from the last 7 days.
+ */
+function readSelfImproveEventsLast7Days(
+  groupFolder: string,
+): Array<Record<string, unknown>> {
+  try {
+    const logPath = path.join(
+      resolveGroupFolderPath(groupFolder),
+      'logs',
+      'self-improve-events.jsonl',
+    );
+    if (!fs.existsSync(logPath)) return [];
+    const content = fs.readFileSync(logPath, 'utf-8');
+    const lines = content.split('\n').filter((l) => l.trim());
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const cutoff = sevenDaysAgo.toISOString();
+    const events: Array<Record<string, unknown>> = [];
+    for (const line of lines) {
+      try {
+        const parsed = JSON.parse(line) as Record<string, unknown>;
+        const ts = parsed['ts'] as string | undefined;
+        if (ts && ts >= cutoff) {
+          events.push(parsed);
+        }
+      } catch {
+        // Skip malformed lines
+      }
+    }
+    return events;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Read task audit events from the JSONL file for the given group.
+ * Returns parsed lines from the last 7 days.
+ */
+function readTaskAuditEventsLast7Days(
+  groupFolder: string,
+): Array<Record<string, unknown>> {
+  try {
+    const logPath = path.join(
+      resolveGroupFolderPath(groupFolder),
+      'logs',
+      'task-audit.jsonl',
+    );
+    if (!fs.existsSync(logPath)) return [];
+    const content = fs.readFileSync(logPath, 'utf-8');
+    const lines = content.split('\n').filter((l) => l.trim());
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const cutoff = sevenDaysAgo.toISOString();
+    const events: Array<Record<string, unknown>> = [];
+    for (const line of lines) {
+      try {
+        const parsed = JSON.parse(line) as Record<string, unknown>;
+        const ts = parsed['ts'] as string | undefined;
+        if (ts && ts >= cutoff) {
+          events.push(parsed);
+        }
+      } catch {
+        // Skip malformed lines
+      }
+    }
+    return events;
+  } catch {
+    return [];
+  }
+}
+
+export function formatLearningDigest(): string {
+  const lines: string[] = ['## Learning Status'];
+  const groupFolder = MAIN_GROUP_FOLDER;
+
+  // Section 1: Skills created/patched/archived in the last 7 days (VAL-WS6-009)
+  // Read from mutation-audit.jsonl for actual skill mutations
+  const mutationEvents = readMutationAuditEventsLast7Days(groupFolder);
+  const skillMutations = mutationEvents.filter(
+    (e) => e.kind === 'mutation' && e.mutationType === 'skill' && e.success,
+  );
+  if (skillMutations.length === 0) {
+    lines.push(
+      'Skills (last 7 days): No skills created or modified in the last 7 days.',
+    );
+  } else {
+    lines.push(
+      `Skills (last 7 days): ${skillMutations.length} skill mutation(s).`,
+    );
+    for (const evt of skillMutations.slice(0, 3)) {
+      const detail = evt.targetName
+        ? `${evt.action}: ${evt.targetName}`
+        : evt.action;
+      lines.push(`  - ${detail}`);
+    }
+    if (skillMutations.length > 3) {
+      lines.push(`  ... and ${skillMutations.length - 3} more`);
+    }
+  }
+
+  // Optional: mention review triggers as a one-line aside
+  const selfImproveEvents = readSelfImproveEventsLast7Days(groupFolder);
+  const skillReviewEvents = selfImproveEvents.filter(
+    (e) =>
+      e['review_fired'] === true &&
+      (e['review_type'] === 'skill-self-improve' ||
+        e['review_type'] === 'skill-manager'),
+  );
+  if (skillReviewEvents.length > 0) {
+    lines.push(`  (${skillReviewEvents.length} skill review(s) triggered)`);
+  }
+
+  // Section 2: Memory writes from learning_injections (VAL-WS6-009)
+  const injections = getRecentLearningInjections(groupFolder, 20);
+  const memoryInjections = injections.filter((i) => i.kind === 'memory');
+  if (memoryInjections.length === 0) {
+    lines.push('Memory writes: No memory writes in the last 20 injections.');
+  } else {
+    lines.push(
+      `Memory writes: ${memoryInjections.length} memory write(s) in last 20 injections.`,
+    );
+    for (const inj of memoryInjections.slice(0, 5)) {
+      const itemPreview =
+        inj.item.length > 50 ? inj.item.slice(0, 50) + '…' : inj.item;
+      lines.push(`  - ${inj.kind}: ${itemPreview}`);
+    }
+    if (memoryInjections.length > 5) {
+      lines.push(`  ... and ${memoryInjections.length - 5} more`);
+    }
+  }
+
+  // Section 3: Pass-rate trend (this week vs prior) (VAL-WS6-009)
+  // Read evaluator verdicts to compute week-over-week trend
+  // Note: getEvaluatorStats already provides recentSkips; we add week comparison here
+  const stats = getEvaluatorStats(groupFolder, 20);
+  if (stats.total === 0) {
+    lines.push('Pass-rate trend: No runs evaluated yet.');
+  } else {
+    // Show overall stats
+    const passPct = Math.round(stats.passRate * 100);
+    lines.push(
+      `Pass-rate (last ${stats.total} runs): ${stats.passes}/${stats.total} passed (${passPct}%)`,
+    );
+  }
+
+  // Section 4: Recent skips (VAL-WS6-011)
+  lines.push(`Recent skips: ${stats.recentSkips} / ${stats.total}`);
+  if (stats.recentIssues.length > 0) {
+    lines.push('Recurring issues:');
+    for (const issue of stats.recentIssues.slice(0, 5)) {
+      lines.push(`  - ${issue}`);
+    }
+  }
+
+  // Section 5: Pending agent-task approvals (VAL-WS6-012)
+  const pendingTasks = getPendingTasks();
+  if (pendingTasks.length === 0) {
+    lines.push('Pending agent-task approvals: None.');
+  } else {
+    lines.push(`Pending agent-task approvals: ${pendingTasks.length} pending.`);
+    for (const task of pendingTasks.slice(0, 5)) {
+      const promptPreview =
+        task.prompt.length > 50 ? task.prompt.slice(0, 50) + '…' : task.prompt;
+      lines.push(`  - ${task.id}: ${promptPreview}`);
+    }
+    if (pendingTasks.length > 5) {
+      lines.push(`  ... and ${pendingTasks.length - 5} more`);
+    }
+  }
+
+  // Section 6: Pause status (VAL-INV-I6-002)
+  lines.push(
+    `Pause status: ${state.learningPaused ? 'Learning is paused' : 'Learning is active'}`,
+  );
+
+  return lines.join('\n');
+}
+
 // --- Gateway service command ---
 
 export function runGatewayServiceCommand(
@@ -991,8 +1298,38 @@ export function runGatewayServiceCommand(
 
   return {
     ok: true,
-    text: bounded || `Gateway service command completed: ${action}`,
+    text:
+      action === 'status'
+        ? appendTuiGatewayHealth(
+            bounded || `Gateway service command completed: ${action}`,
+          )
+        : bounded || `Gateway service command completed: ${action}`,
   };
+}
+
+function appendTuiGatewayHealth(prefix: string): string {
+  if (state.tuiGatewayServer) {
+    const endpoint = state.tuiGatewayLocalEndpoint;
+    return (
+      prefix +
+      '\n\nTUI gateway: healthy' +
+      (endpoint ? `\n- local_endpoint: ${endpoint}` : '')
+    );
+  }
+  const localEndpoint = state.tuiGatewayLocalEndpoint;
+  const lines: string[] = [prefix, '', 'TUI gateway: degraded (not listening)'];
+  lines.push(
+    localEndpoint
+      ? `- local_endpoint: ${localEndpoint}`
+      : '- local_endpoint: <not resolved>',
+  );
+  if (state.tuiGatewayLastError) {
+    lines.push(`- last_error: ${state.tuiGatewayLastError}`);
+  }
+  lines.push(
+    '- hint: run ./scripts/service.sh status and inspect service logs; if running on Android/Termux, ensure termux-services is installed and the daemon was installed with --install-daemon.',
+  );
+  return lines.join('\n');
 }
 
 // --- Knowledge runtime snapshot + command ---

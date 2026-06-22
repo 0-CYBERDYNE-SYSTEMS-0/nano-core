@@ -1,5 +1,6 @@
 export const TELEGRAM_COMMON_COMMANDS = [
   { command: 'help', description: 'Show command help' },
+  { command: 'settings', description: 'Open chat runtime controls' },
   { command: 'status', description: 'Show runtime status' },
   { command: 'title', description: 'Show/set session title' },
   { command: 'id', description: 'Show this chat id' },
@@ -49,14 +50,18 @@ export const TELEGRAM_ADMIN_COMMANDS = [
     command: 'reflect',
     description: 'Reflect on recent work; save only durable learning',
   },
+  {
+    command: 'learning',
+    description: 'Learning digest and pause/resume controls',
+  },
   { command: 'tasks', description: 'List scheduled tasks' },
   { command: 'knowledge', description: 'Manage knowledge wiki/librarian' },
-  { command: 'task_pause', description: 'Pause a task: /task_pause <id>' },
-  { command: 'task_resume', description: 'Resume a task: /task_resume <id>' },
-  { command: 'task_cancel', description: 'Cancel a task: /task_cancel <id>' },
   { command: 'groups', description: 'List registered groups' },
   { command: 'reload', description: 'Refresh command state and metadata' },
-  { command: 'panel', description: 'Open admin panel buttons' },
+  {
+    command: 'refresh_models',
+    description: 'Refresh model list from provider APIs',
+  },
   {
     command: 'update',
     description: 'Preserve local changes, pull, rebuild, and restart',
@@ -65,6 +70,7 @@ export const TELEGRAM_ADMIN_COMMANDS = [
 
 export type TelegramCommandName =
   | '/help'
+  | '/settings'
   | '/status'
   | '/title'
   | '/id'
@@ -97,6 +103,7 @@ export type TelegramCommandName =
   | '/librarian'
   | '/curator'
   | '/reflect'
+  | '/learning'
   | '/main'
   | '/gateway'
   | '/restart'
@@ -109,6 +116,8 @@ export type TelegramCommandName =
   | '/groups'
   | '/reload'
   | '/panel'
+  | '/refresh-models'
+  | '/refresh_models'
   | '/update'
   | '/coder'
   | '/coding'
@@ -118,6 +127,7 @@ export type TelegramCommandName =
 
 const KNOWN_TELEGRAM_COMMANDS: Set<TelegramCommandName> = new Set([
   '/help',
+  '/settings',
   '/status',
   '/title',
   '/id',
@@ -150,6 +160,7 @@ const KNOWN_TELEGRAM_COMMANDS: Set<TelegramCommandName> = new Set([
   '/librarian',
   '/curator',
   '/reflect',
+  '/learning',
   '/main',
   '/gateway',
   '/restart',
@@ -162,6 +173,8 @@ const KNOWN_TELEGRAM_COMMANDS: Set<TelegramCommandName> = new Set([
   '/groups',
   '/reload',
   '/panel',
+  '/refresh-models',
+  '/refresh_models',
   '/update',
   '/coder',
   '/coding',
@@ -184,6 +197,7 @@ export function normalizeTelegramCommandToken(
 export function formatHelpText(isMainGroup: boolean): string {
   const common = [
     '/help - show this help',
+    '/settings - open runtime controls and admin actions',
     '/status - runtime and queue status',
     '/title [text|reset] - set a per-chat session title',
     '/id - show current Telegram chat id',
@@ -216,29 +230,25 @@ export function formatHelpText(isMainGroup: boolean): string {
     '/gateway status|restart|doctor - host service + diagnostics',
     '/restart - alias for /gateway restart',
     '/setup [cancel] - runtime setup wizard for provider/model/key',
-    '/tasks [list|due|detail|runs] - inspect scheduled tasks',
-    '/knowledge [status|init|task|ingest|lint] - knowledge wiki/librarian controls',
-    '/task_pause <id> - pause task',
-    '/task_resume <id> - resume task',
-    '/task_cancel <id> - cancel task',
+    '/tasks [list|due|detail|runs|pause|resume|cancel] - inspect or manage scheduled tasks',
+    '/knowledge [status|init|task|ingest|lint|run|dry-run|log|progress] - knowledge wiki controls',
     '/groups - list registered groups',
     '/freechat add <chatId> - enable free chat in a non-main Telegram chat',
     '/freechat remove <chatId> - disable free chat in a non-main Telegram chat',
     '/freechat list - list chats with free chat enabled',
     '/reload - refresh command menus and group metadata',
-    '/panel - open admin quick actions',
+    '/refresh_models - refresh model list from provider APIs',
     '/update - preserve local changes, pull latest code, rebuild, and restart service',
     '/coder <task> - explicit delegated coding run',
     '/coding <task> - alias for /coder',
-    '/coder-plan <task> - explicit delegated planning run',
+    '/coder_plan <task> - explicit delegated planning run',
     '/subagents list|stop|spawn - manage delegated subagent runs',
     '/run <task> - start a durable long normal-agent run',
     '/runs - list recent long normal-agent runs',
-    '/run-status <id> - show long run status',
-    '/cancel-run <id> - cancel an active long run',
-    '/skill-manager status|dry-run|run|pause|resume|pin|unpin|archive|restore|backup - manage skill lifecycle',
+    '/run_status <id> - show long run status',
+    '/cancel_run <id> - cancel an active long run',
+    '/skill_manager status|dry-run|run|pause|resume|pin|unpin|archive|restore|backup - manage skill lifecycle',
     '/reflect [dry-run] [focus] - reflect on recent work and save only durable learning (memory/skill); no-ops when nothing is reusable',
-    '/librarian status|lint|capture|run|dry-run|log|progress - manage knowledge wiki',
-    '/curator status|dry-run|run|pause|resume|pin|unpin|archive|restore|backup - [DEPRECATED: use /skill-manager]',
+    '/learning - show learning digest (skills, memory, pass-rate, skips, pending approvals); /learning pause|resume to toggle',
   ].join('\n');
 }

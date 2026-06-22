@@ -12,7 +12,7 @@ import type { FileDeliveryRequest, RegisteredGroup } from '../src/types.js';
 
 function makeRequest(filePath: string): FileDeliveryRequest {
   return {
-    type: 'file_delivery',
+    type: 'farm_action',
     action: 'deliver_file',
     requestId: `deliver-${Date.now().toString(36)}`,
     params: {
@@ -33,7 +33,7 @@ test('processFileDeliveryRequest resolves relative paths inside the source works
     'telegram:1': {
       name: 'main',
       folder: 'main',
-      trigger: '@fft_nano',
+      trigger: '@nano-core',
       added_at: '2026-05-11T00:00:00.000Z',
     },
   };
@@ -102,11 +102,11 @@ test('processFileDeliveryRequest rejects paths outside the source workspace', as
   );
 });
 
-test('normalizeFileDeliveryRequest accepts file_delivery payloads', () => {
+test('normalizeFileDeliveryRequest accepts legacy deliver_file payloads', () => {
   const normalized = normalizeFileDeliveryRequest({
-    type: 'file_delivery',
+    type: 'deliver_file',
     action: 'deliver_file',
-    requestId: 'video-1',
+    requestId: 'legacy-video-1',
     params: {
       filePath: 'out.mp4',
       caption: 'ready',
@@ -115,9 +115,9 @@ test('normalizeFileDeliveryRequest accepts file_delivery payloads', () => {
   });
 
   assert.deepEqual(normalized, {
-    type: 'file_delivery',
+    type: 'farm_action',
     action: 'deliver_file',
-    requestId: 'video-1',
+    requestId: 'legacy-video-1',
     params: {
       filePath: 'out.mp4',
       caption: 'ready',
@@ -136,6 +136,6 @@ test('normalizeFileDeliveryRequest rejects poison payloads', () => {
         requestId: 'bad-1',
         params: {},
       }),
-    /type 'file_delivery'/,
+    /farm_action deliver_file or legacy deliver_file/,
   );
 });

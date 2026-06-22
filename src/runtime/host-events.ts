@@ -41,6 +41,7 @@ export type HostEvent =
       sourceGroup: string;
       isMain: boolean;
       request:
+        | import('../types.js').EdgeActionRequest
         | import('../types.js').MemoryActionRequest
         | import('../types.js').SkillActionRequest;
       resultPath: string;

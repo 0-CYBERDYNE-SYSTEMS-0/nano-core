@@ -6,7 +6,7 @@ export interface AdditionalMount {
 
 /**
  * Mount Allowlist - Security configuration for additional mounts
- * This file should be stored at ~/.config/nano-core/mount-allowlist.json
+ * This file should be stored at ~/.config/fft_nano/mount-allowlist.json
  * and is NOT mounted into any container, making it tamper-proof from agents.
  */
 export interface MountAllowlist {
@@ -31,6 +31,148 @@ export interface ContainerConfig {
   additionalMounts?: AdditionalMount[];
   timeout?: number; // Default baseline: 21600000 (6 hours)
   env?: Record<string, string>;
+}
+
+/**
+ * RunAuthority — host-issued, immutable authority for a single agent run.
+ *
+ * Produced by mintRunAuthority() at spawn time; consumed by the permission gate,
+ * the outbox hold logic, and JSONL audit stampers. The agent subprocess never
+ * sees anything but FFT_NANO_RUN_AUTHORITY_ID (a random ID, not the authorityId).
+ *
+ * Invariants:
+ *   I1: nothing in RunAuthority is writable by the agent subprocess.
+ *   I4: operatorGrant is set exclusively by the host; the agent cannot influence it.
+ */
+export type RunOrigin =
+  | 'interactive-main'
+  | 'subagent'
+  | 'headless'
+  | 'evaluator'
+  | 'maintenance';
+
+// LISO.1: Session persistence mode for Pi runs
+export type SessionPersistence = 'normal' | 'ephemeral';
+
+// LISO.3: Turn-local learning evidence
+export interface LearningTurnInput {
+  turnId: string;
+  groupFolder: string;
+  latestUserText: string;
+  assistantResponse: string;
+  executionSummary: TurnExecutionSummary;
+}
+
+export interface TurnExecutionSummary {
+  toolsRequested: number;
+  toolsAllowed: number;
+  toolsDenied: number;
+  toolsFailed: number;
+  toolsCancelled: number;
+  selectedSkills: string[];
+  completionStatus: 'success' | 'error' | 'cancelled' | 'timeout';
+  hostDetectedCorrection: boolean;
+  explicitMemoryMarkers: boolean;
+  responseTruncated: boolean;
+  deliveryFailed: boolean;
+  permissionDenials: string[];
+}
+
+// LISO.4: Structured learning proposal schema
+export type LearningProposal =
+  | {
+      kind: 'noop';
+      reason: string;
+    }
+  | {
+      kind: 'memory';
+      intent: 'memory_append' | 'memory_promote';
+      target: string;
+      content: string;
+      rationale: string;
+      provenance: LearningProvenance;
+    }
+  | {
+      kind: 'skill';
+      intent: 'skill_create' | 'skill_patch';
+      skillName: string;
+      baseHash?: string;
+      content: string;
+      rationale: string;
+      provenance: LearningProvenance;
+    }
+  | {
+      kind: 'report';
+      issue: string;
+      recommendation: string;
+      provenance: LearningProvenance;
+    };
+
+export interface LearningProvenance {
+  reviewedTurnId: string;
+  source: 'explicit-correction' | 'explicit-memory' | 'tool-failure';
+  evidenceSummary: string;
+}
+
+// LISO.7: Maintenance lifecycle events
+export type MaintenanceEventKind =
+  | 'scheduled'
+  | 'idle_grace_started'
+  | 'idle_grace_cancelled'
+  | 'maintenance_started'
+  | 'maintenance_aborted'
+  | 'maintenance_timeout'
+  | 'proposal_parsed'
+  | 'proposal_rejected'
+  | 'proposal_applied'
+  | 'maintenance_completed_noop';
+
+export interface MaintenanceEventFields {
+  runId: string;
+  groupFolder: string;
+  reviewedTurnId: string;
+  kind: MaintenanceEventKind;
+  sessionPersistence: 'ephemeral';
+  promptMode: 'maintenance';
+  status: string;
+  abortReason?: string;
+  proposalKind?: string;
+  rejectionCode?: string;
+  mutationId?: string;
+  durationMs?: number;
+}
+
+// WS3: sender role for learning input provenance
+export type SenderRole = 'operator' | 'member' | 'unknown';
+
+export interface RunAuthority {
+  authorityId: string; // crypto.randomUUID() — host-issued, unpredictable
+  requestId: string; // existing per-run id; the authority wraps it
+  origin: RunOrigin;
+  groupFolder: string;
+  startedAt: string; // ISO timestamp
+  effectiveToolSet: readonly (
+    | 'read'
+    | 'bash'
+    | 'edit'
+    | 'write'
+    | 'grep'
+    | 'find'
+    | 'ls'
+    | 'agent'
+  )[];
+  // True for interactive-main runs and operator-created cron tasks; false for
+  // agent-created schedule_task outputs and any agent-spawned outbound until
+  // approved.
+  operatorGrant: boolean;
+  // Provenance (WS3)
+  senderRole: SenderRole;
+  // Global pause stamp captured at run start — a mid-run pause applies to the
+  // next loop tick, not to the in-flight run.
+  startedDuringPause: boolean;
+  // /reflect dry-run: host hard-rejects skill and memory mutations for this run.
+  // Read-only actions remain allowed.
+  dryRun: boolean;
 }
 
 export interface RegisteredGroup {
@@ -74,7 +216,8 @@ export interface ScheduledTask {
   next_run: string | null;
   last_run: string | null;
   last_result: string | null;
-  status: 'active' | 'paused' | 'completed';
+  status: 'active' | 'paused' | 'completed' | 'pending_approval';
+  created_by?: 'operator' | 'agent';
   created_at: string;
 }
 
@@ -86,6 +229,137 @@ export interface TaskRunLog {
   result: string | null;
   error: string | null;
 }
+
+/**
+ * EdgeBridge action envelope: a vertical-agnostic request routed through the
+ * edge bridge. Each domain (e.g. "ha", "matter", "mqtt") registers a handler
+ * with a zod schema and a handle() implementation.
+ */
+export interface EdgeActionRequest {
+  type: 'edge_action';
+  action: string;
+  params: Record<string, unknown>;
+  requestId: string;
+}
+
+export interface EdgeActionResult {
+  requestId: string;
+  status: 'success' | 'error';
+  result?: unknown;
+  error?: string;
+  executedAt: string;
+}
+
+export interface EdgeActionContext {
+  sourceGroup: string;
+  isMain: boolean;
+}
+
+export interface CanvasLayout {
+  columns: number;
+  gap: number;
+  rowHeight: number;
+}
+
+export type CanvasCardType =
+  | 'line'
+  | 'bar'
+  | 'radial'
+  | 'comparison'
+  | 'kpi'
+  | 'markdown'
+  | 'iframe';
+
+export interface CanvasCard {
+  id: string;
+  type: CanvasCardType;
+  title?: string;
+  entities?: string[];
+  labels?: string[];
+  span?: number;
+  options?: Record<string, unknown>;
+}
+
+export interface CanvasSpec {
+  version: '1.0';
+  title: string;
+  layout: CanvasLayout;
+  cards: CanvasCard[];
+}
+
+export type DashboardPatchOp =
+  | {
+      op: 'add_view';
+      view: Record<string, unknown>;
+      index?: number;
+    }
+  | {
+      op: 'update_view';
+      viewPath: string;
+      patch: Record<string, unknown>;
+    }
+  | {
+      op: 'remove_view';
+      viewPath: string;
+    }
+  | {
+      op: 'add_card';
+      viewPath: string;
+      card: Record<string, unknown>;
+      sectionIndex?: number;
+      index?: number;
+    }
+  | {
+      op: 'update_card';
+      viewPath: string;
+      cardId: string;
+      patch: Record<string, unknown>;
+    }
+  | {
+      op: 'remove_card';
+      viewPath: string;
+      cardId: string;
+    }
+  | {
+      op: 'move_card';
+      viewPath: string;
+      cardId: string;
+      toIndex: number;
+      toSectionIndex?: number;
+    }
+  | {
+      op: 'set_theme';
+      theme: string;
+    };
+
+export type CanvasPatchOp =
+  | {
+      op: 'add_card';
+      card: CanvasCard;
+      index?: number;
+    }
+  | {
+      op: 'update_card';
+      cardId: string;
+      patch: Partial<CanvasCard>;
+    }
+  | {
+      op: 'remove_card';
+      cardId: string;
+    }
+  | {
+      op: 'move_card';
+      cardId: string;
+      toIndex: number;
+    }
+  | {
+      op: 'set_layout';
+      layout: Partial<CanvasLayout>;
+    }
+  | {
+      op: 'set_title';
+      title: string;
+    };
 
 export interface MemoryActionRequest {
   type: 'memory_action';
@@ -187,7 +461,7 @@ export interface MemoryActionResult {
 export type FileDeliveryKind = 'photo' | 'document' | 'video' | 'audio';
 
 export interface FileDeliveryRequest {
-  type: 'file_delivery';
+  type: 'farm_action';
   action: 'deliver_file';
   requestId: string;
   params: {
@@ -220,4 +494,5 @@ export type RunType =
   | 'scheduled'
   | 'cron'
   | 'heartbeat'
-  | 'subagent';
+  | 'subagent'
+  | 'agent-task';

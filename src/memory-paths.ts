@@ -75,6 +75,41 @@ const DEFAULT_CANONICAL_BODIES: Record<string, string> = {
     '# projects\n\nLong-lived project context and architecture notes.\n',
 };
 
+const DEFAULT_USER_BODY = [
+  '# Nano Core Terminal - User Profile',
+  '',
+  '- Name:',
+  '- Operation:',
+  '- Preferences:',
+  '- Safety notes:',
+].join('\n');
+
+const DEFAULT_IDENTITY_BODY = [
+  '# Nano Core Terminal - Agent Identity',
+  '',
+  'Name: Nano Core Terminal',
+  'Role: Local-first assistant for operations',
+].join('\n');
+
+const DEFAULT_TOOLS_BODY = [
+  '# Nano Core Terminal - Tool Policy',
+  '',
+  'This file documents tool access policy. It is used as a pre-session tool manifest.',
+  '',
+  'Allowed tools (example):',
+  'allowed-tools:',
+  '',
+  'Notes:',
+  '- If no allowed-tools list is present, all tools remain available.',
+  '- ALWAYS_ALLOWED tools (skill_loader, skill_documentation, skill_sequencer, skill_draft, skill_apply) are always permitted.',
+].join('\n');
+
+const DEFAULT_BOOTSTRAP_BODIES: Record<string, string> = {
+  'USER.md': DEFAULT_USER_BODY,
+  'IDENTITY.md': DEFAULT_IDENTITY_BODY,
+  'TOOLS.md': DEFAULT_TOOLS_BODY,
+};
+
 export const DEFAULT_CANONICAL_FILE_NAMES = Object.freeze(
   Object.keys(DEFAULT_CANONICAL_BODIES),
 );
@@ -192,6 +227,15 @@ export function isCanonicalScaffoldContent(
   content: string,
 ): boolean {
   const defaultBody = DEFAULT_CANONICAL_BODIES[fileName];
+  if (!defaultBody) return false;
+  return content.trim() === defaultBody.trim();
+}
+
+export function isBootstrapScaffoldContent(
+  fileName: string,
+  content: string,
+): boolean {
+  const defaultBody = DEFAULT_BOOTSTRAP_BODIES[fileName];
   if (!defaultBody) return false;
   return content.trim() === defaultBody.trim();
 }

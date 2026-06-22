@@ -57,9 +57,14 @@ export interface CronDeterministicStaggerConfig {
   maxMs: number;
 }
 
+export interface CronAgentTasksConfig {
+  autoApprove: boolean;
+}
+
 export interface CronParityConfig {
   isolatedDefaultDelivery: 'none' | 'announce';
   deterministicTopOfHourStagger: CronDeterministicStaggerConfig;
+  agentTasks: CronAgentTasksConfig;
 }
 
 export interface SkillSelfImproveConfig {
@@ -67,6 +72,9 @@ export interface SkillSelfImproveConfig {
   turnInterval: number;
   toolInterval: number;
   minIntervalMinutes: number;
+  operators: string[];
+  // LISO.9: Wait period after interactive response before starting quiet learning
+  idleGracePeriodMs: number;
 }
 
 export interface SkillManagerBackupConfig {
@@ -83,9 +91,26 @@ export interface SkillManagerParityConfig {
   backup: SkillManagerBackupConfig;
 }
 
+export interface MutationBudgetPerRunConfig {
+  skillMutations: number; // max skill mutations per single run (default: 5)
+  memoryMutations: number; // max memory mutations per single run (default: 10)
+}
+
+export interface MutationBudgetRollingWindowConfig {
+  windowMinutes: number; // rolling window size (default: 60 minutes)
+  maxMutations: number; // max mutations per window per group (default: 20)
+}
+
+export interface MutationBudgetConfig {
+  perRun: MutationBudgetPerRunConfig;
+  rollingWindow: MutationBudgetRollingWindowConfig;
+}
+
 export interface SkillsParityConfig {
   selfImprove: SkillSelfImproveConfig;
   curator: SkillManagerParityConfig;
+  historyRetentionDays: number;
+  mutationBudget?: MutationBudgetConfig;
 }
 
 export interface WorkspaceParityConfig {
@@ -113,6 +138,10 @@ export interface PromptParityConfig {
   recentConversationMaxChars: number;
 }
 
+export interface EvaluatorParityConfig {
+  chatSampleRate: number; // 0 = disabled, 0.1 = 10% sampling, 1.0 = 100% sampling
+}
+
 export interface ParityConfig {
   memory: MemoryParityConfig;
   heartbeat: HeartbeatParityConfig;
@@ -121,6 +150,7 @@ export interface ParityConfig {
   workspace: WorkspaceParityConfig;
   doctor: DoctorParityConfig;
   prompt: PromptParityConfig;
+  evaluator: EvaluatorParityConfig;
 }
 
 const DEFAULTS: ParityConfig = {
@@ -153,6 +183,7 @@ const DEFAULTS: ParityConfig = {
   cron: {
     isolatedDefaultDelivery: 'announce',
     deterministicTopOfHourStagger: { enabled: false, maxMs: 5 * 60_000 },
+    agentTasks: { autoApprove: false },
   },
   skills: {
     selfImprove: {
@@ -160,6 +191,8 @@ const DEFAULTS: ParityConfig = {
       turnInterval: 10,
       toolInterval: 10,
       minIntervalMinutes: 15,
+      operators: [],
+      idleGracePeriodMs: 30_000, // LISO.9: 30 second grace period
     },
     curator: {
       enabled: true,
@@ -168,6 +201,17 @@ const DEFAULTS: ParityConfig = {
       staleAfterDays: 30,
       archiveAfterDays: 90,
       backup: { enabled: true, keep: 5 },
+    },
+    historyRetentionDays: 14,
+    mutationBudget: {
+      perRun: {
+        skillMutations: 5,
+        memoryMutations: 10,
+      },
+      rollingWindow: {
+        windowMinutes: 60,
+        maxMutations: 20,
+      },
     },
   },
   workspace: {
@@ -189,6 +233,9 @@ const DEFAULTS: ParityConfig = {
     skillCatalogMaxChars: 20_000,
     recentConversationMaxMessages: 50,
     recentConversationMaxChars: 16_000,
+  },
+  evaluator: {
+    chatSampleRate: 0.1, // default 10% sampling; 0 disables
   },
 };
 
@@ -255,7 +302,7 @@ function resolveDefaultParityConfigPath(): string {
   const userPath = path.join(
     home,
     '.config',
-    'fft_nano',
+    'nano-core',
     'runtime.parity.json',
   );
   const repoPath = path.join(process.cwd(), 'config', 'runtime.parity.json');
@@ -313,10 +360,16 @@ function mergeParityConfig(file: Partial<ParityConfig>): ParityConfig {
         ...f.skills?.curator,
         backup: { ...D.skills.curator.backup, ...f.skills?.curator?.backup },
       },
+      historyRetentionDays:
+        f.skills?.historyRetentionDays ?? D.skills.historyRetentionDays,
     },
     workspace: { ...D.workspace, ...f.workspace },
     doctor: { ...D.doctor, ...f.doctor },
     prompt: { ...D.prompt, ...f.prompt },
+    evaluator: {
+      ...D.evaluator,
+      ...f.evaluator,
+    },
   };
 
   merged.memory.backend = sanitizeBackend(merged.memory.backend, 'lexical');
@@ -378,6 +431,11 @@ function mergeParityConfig(file: Partial<ParityConfig>): ParityConfig {
     5,
     1,
   );
+  merged.skills.historyRetentionDays = clamp(
+    merged.skills.historyRetentionDays,
+    14,
+    1,
+  );
   merged.workspace.bootstrapMaxChars = clamp(
     merged.workspace.bootstrapMaxChars,
     20000,
@@ -410,6 +468,12 @@ function mergeParityConfig(file: Partial<ParityConfig>): ParityConfig {
     merged.prompt.recentConversationMaxChars,
     4_000,
     200,
+  );
+  // chatSampleRate: 0 = disabled, 0.1 = 10% sampling, 1.0 = 100% sampling
+  merged.evaluator.chatSampleRate = clamp(
+    merged.evaluator.chatSampleRate,
+    0.1, // default
+    0,
   );
 
   return merged;
@@ -508,6 +572,10 @@ function applyEnvOverrides(config: ParityConfig): ParityConfig {
     0,
     3_600_000,
   );
+  c.cron.agentTasks.autoApprove = envBool(
+    e.FFT_NANO_CRON_AGENT_TASKS_AUTO_APPROVE,
+    c.cron.agentTasks.autoApprove,
+  );
 
   c.skills.selfImprove.enabled = envBool(
     e.FFT_NANO_SKILL_SELF_IMPROVE_ENABLED,
@@ -531,6 +599,19 @@ function applyEnvOverrides(config: ParityConfig): ParityConfig {
     0,
     100_000,
   );
+  // LISO.9: Idle grace period env var (FFT_NANO_LEARNING_IDLE_GRACE_MS)
+  c.skills.selfImprove.idleGracePeriodMs = envInt(
+    e.FFT_NANO_LEARNING_IDLE_GRACE_MS,
+    c.skills.selfImprove.idleGracePeriodMs,
+    0,
+    300_000,
+  );
+  if (e.FFT_NANO_SKILL_SELF_IMPROVE_OPERATORS?.trim()) {
+    c.skills.selfImprove.operators =
+      e.FFT_NANO_SKILL_SELF_IMPROVE_OPERATORS.split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+  }
   c.skills.curator.enabled = envBool(
     e.FFT_NANO_SKILL_CURATOR_ENABLED,
     c.skills.curator.enabled,
@@ -568,6 +649,42 @@ function applyEnvOverrides(config: ParityConfig): ParityConfig {
     c.skills.curator.backup.keep,
     1,
     1000,
+  );
+  c.skills.historyRetentionDays = envInt(
+    e.FFT_NANO_SKILL_HISTORY_RETENTION_DAYS,
+    c.skills.historyRetentionDays,
+    1,
+    3650,
+  );
+
+  // Mutation budget overrides
+  c.skills.mutationBudget = c.skills.mutationBudget ?? {
+    perRun: { skillMutations: 5, memoryMutations: 10 },
+    rollingWindow: { windowMinutes: 60, maxMutations: 20 },
+  };
+  c.skills.mutationBudget.perRun.skillMutations = envInt(
+    e.FFT_NANO_MUTATION_BUDGET_PER_RUN_SKILL,
+    c.skills.mutationBudget.perRun.skillMutations,
+    1,
+    1000,
+  );
+  c.skills.mutationBudget.perRun.memoryMutations = envInt(
+    e.FFT_NANO_MUTATION_BUDGET_PER_RUN_MEMORY,
+    c.skills.mutationBudget.perRun.memoryMutations,
+    1,
+    1000,
+  );
+  c.skills.mutationBudget.rollingWindow.windowMinutes = envInt(
+    e.FFT_NANO_MUTATION_BUDGET_WINDOW_MINUTES,
+    c.skills.mutationBudget.rollingWindow.windowMinutes,
+    1,
+    100_000,
+  );
+  c.skills.mutationBudget.rollingWindow.maxMutations = envInt(
+    e.FFT_NANO_MUTATION_BUDGET_MAX_MUTATIONS,
+    c.skills.mutationBudget.rollingWindow.maxMutations,
+    1,
+    100_000,
   );
 
   c.workspace.skipBootstrap = envBool(
@@ -646,6 +763,15 @@ function applyEnvOverrides(config: ParityConfig): ParityConfig {
     200,
     200_000,
   );
+
+  // WS4.4: evaluator.chatSampleRate env override
+  // FFT_NANO_EVALUATOR_CHAT_SAMPLE_RATE=0 disables; 0.1 = 10%; 1.0 = 100%
+  const chatSampleRate = parseFloat(
+    e.FFT_NANO_EVALUATOR_CHAT_SAMPLE_RATE || '',
+  );
+  if (isFinite(chatSampleRate)) {
+    c.evaluator.chatSampleRate = Math.max(0, Math.min(1, chatSampleRate));
+  }
 
   return c;
 }

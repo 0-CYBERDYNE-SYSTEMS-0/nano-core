@@ -30,6 +30,7 @@ import {
   activeCoderRuns,
   telegramSettingsPanelActions,
   telegramSetupInputStates,
+  pendingTaskTokens,
   TELEGRAM_SETTINGS_PANEL_PREFIX,
   TELEGRAM_SETTINGS_PANEL_TTL_MS,
   TELEGRAM_SETUP_INPUT_TTL_MS,
@@ -174,7 +175,9 @@ export function persistRuntimeConfigUpdates(
 
 export function loadPiModels(
   forceRefresh = false,
-): { ok: true; entries: PiModelEntry[] } | { ok: false; text: string } {
+):
+  | { ok: true; entries: PiModelEntry[]; warnings?: string[] }
+  | { ok: false; text: string } {
   if (
     !forceRefresh &&
     state.piModelsCache &&
@@ -208,6 +211,14 @@ export function loadPiModels(
     piAgentDir,
     getRuntimeConfigEnv(),
   );
+  const warnings = localSeedResult.ok
+    ? localSeedResult.errors.filter(
+        (error) =>
+          !error.startsWith('ollama:') &&
+          !error.startsWith('lm-studio:') &&
+          !error.endsWith(': missing baseUrl or apiKey'),
+      )
+    : localSeedResult.errors;
   if (!localSeedResult.ok) {
     void localSeedResult;
   }
@@ -264,7 +275,9 @@ export function loadPiModels(
   }
 
   state.piModelsCache = { entries, loadedAt: Date.now() };
-  return { ok: true, entries };
+  return warnings.length > 0
+    ? { ok: true, entries, warnings }
+    : { ok: true, entries };
 }
 
 export function runPiListModels(searchText: string): {
@@ -356,10 +369,6 @@ export function modelExistsInPiModels(
   );
 }
 
-export function providerAllowsCustomModelId(provider: string): boolean {
-  return provider.trim().toLowerCase() === 'opencode-go';
-}
-
 export function parseProviderFromModelLabel(label: string): string | null {
   const slash = label.indexOf('/');
   if (slash <= 0) return null;
@@ -370,7 +379,7 @@ export function parseProviderFromModelLabel(label: string): string | null {
 export function validateProviderModelRef(
   provider: string,
   model: string,
-): { ok: true } | { ok: false; text: string } {
+): { ok: true; warning?: string } | { ok: false; text: string } {
   const normalizedProvider = provider.trim();
   const normalizedModel = model.trim();
   if (!normalizedProvider || !normalizedModel) {
@@ -392,15 +401,12 @@ export function validateProviderModelRef(
       text: `Unknown provider "${normalizedProvider}". Use /models or /model picker.`,
     };
   }
-  if (providerAllowsCustomModelId(normalizedProvider)) {
-    return { ok: true };
-  }
   if (
     !modelExistsInPiModels(loaded.entries, normalizedProvider, normalizedModel)
   ) {
     return {
       ok: false,
-      text: `Model "${normalizedProvider}/${normalizedModel}" is unavailable. Use /models or /model picker.`,
+      text: `Model "${normalizedProvider}/${normalizedModel}" is not available. Run /refresh_models, then select it with /model.`,
     };
   }
   return { ok: true };
@@ -444,8 +450,7 @@ export function sanitizeRunPreferencesModelOverride(
     effectiveProvider,
   );
   const modelKnown = rawModel
-    ? providerAllowsCustomModelId(effectiveProvider) ||
-      modelExistsInPiModels(loaded.entries, effectiveProvider, rawModel)
+    ? modelExistsInPiModels(loaded.entries, effectiveProvider, rawModel)
     : providerKnown;
   if (providerKnown && modelKnown) {
     return { runPreferences: nextPrefs };
@@ -514,6 +519,54 @@ export function getTelegramSettingsPanelAction(
   const panelState = telegramSettingsPanelActions.get(token);
   if (!panelState || panelState.chatJid !== chatJid) return null;
   return panelState.action;
+}
+
+// WS2.3: Pending task approval token management
+const PENDING_TASK_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
+export function prunePendingTaskTokens(): void {
+  const now = Date.now();
+  for (const [token, entry] of pendingTaskTokens.entries()) {
+    if (entry.expiresAt <= now) pendingTaskTokens.delete(token);
+  }
+}
+
+export function registerPendingTaskToken(
+  taskId: string,
+  groupFolder: string,
+  action: 'approve' | 'reject',
+): string {
+  prunePendingTaskTokens();
+  let token = '';
+  do {
+    token = Math.random().toString(36).slice(2, 10);
+  } while (pendingTaskTokens.has(token));
+  pendingTaskTokens.set(token, {
+    taskId,
+    groupFolder,
+    action,
+    expiresAt: Date.now() + PENDING_TASK_TTL_MS,
+  });
+  return token;
+}
+
+export interface PendingTaskTokenEntry {
+  taskId: string;
+  groupFolder: string;
+  action: 'approve' | 'reject';
+}
+
+export function getPendingTaskToken(
+  token: string,
+): PendingTaskTokenEntry | null {
+  prunePendingTaskTokens();
+  const entry = pendingTaskTokens.get(token);
+  if (!entry) return null;
+  return {
+    taskId: entry.taskId,
+    groupFolder: entry.groupFolder,
+    action: entry.action,
+  };
 }
 
 // --- Setup input state ---
@@ -940,77 +993,102 @@ export function buildTelegramSetupApiKeyPanel(chatJid: string): {
 
 export function buildTelegramSettingsHomePanel(
   chatJid: string,
-  deps: { getEffectiveModelLabel: (jid: string) => string },
+  deps: {
+    getEffectiveModelLabel: (jid: string) => string;
+    isMainChat?: (jid: string) => boolean;
+  },
 ): {
   text: string;
   keyboard: TelegramInlineKeyboard;
 } {
+  const keyboard: TelegramInlineKeyboard = [
+    [
+      {
+        text: 'Models',
+        callbackData: registerTelegramSettingsPanelAction(chatJid, {
+          kind: 'show-model-providers',
+        }),
+      },
+      {
+        text: 'Think',
+        callbackData: registerTelegramSettingsPanelAction(chatJid, {
+          kind: 'show-think',
+        }),
+      },
+    ],
+    [
+      {
+        text: 'Queue',
+        callbackData: registerTelegramSettingsPanelAction(chatJid, {
+          kind: 'show-queue',
+        }),
+      },
+      {
+        text: 'Delivery',
+        callbackData: registerTelegramSettingsPanelAction(chatJid, {
+          kind: 'show-delivery',
+        }),
+      },
+    ],
+    [
+      {
+        text: 'Fresh Next Run',
+        callbackData: registerTelegramSettingsPanelAction(chatJid, {
+          kind: 'trigger-new',
+        }),
+        style: 'primary' as const,
+      },
+      {
+        text: 'Reasoning',
+        callbackData: registerTelegramSettingsPanelAction(chatJid, {
+          kind: 'show-reasoning',
+        }),
+      },
+      {
+        text: 'Verbose',
+        callbackData: registerTelegramSettingsPanelAction(chatJid, {
+          kind: 'show-verbose',
+        }),
+      },
+    ],
+  ];
+  if (deps.isMainChat?.(chatJid)) {
+    keyboard.push(
+      [
+        { text: 'Tasks', callbackData: 'panel:tasks' },
+        { text: 'Pending Approvals', callbackData: 'panel:pending-tasks' },
+      ],
+      [
+        { text: 'Groups', callbackData: 'panel:groups' },
+        { text: 'Health', callbackData: 'panel:health' },
+      ],
+      [
+        { text: 'Coder', callbackData: 'panel:coder' },
+        {
+          text: 'Runtime Setup',
+          callbackData: registerTelegramSettingsPanelAction(chatJid, {
+            kind: 'show-setup-home',
+          }),
+        },
+      ],
+    );
+  }
+  keyboard.push([
+    {
+      text: 'Reset Model',
+      callbackData: registerTelegramSettingsPanelAction(chatJid, {
+        kind: 'reset-model',
+        returnTo: 'home',
+      }),
+      style: 'danger' as const,
+    },
+  ]);
   return {
     text: [
       'Runtime controls for this chat:',
       ...formatTelegramSettingsPanelSummary(chatJid, deps),
     ].join('\n'),
-    keyboard: [
-      [
-        {
-          text: 'Models',
-          callbackData: registerTelegramSettingsPanelAction(chatJid, {
-            kind: 'show-model-providers',
-          }),
-        },
-        {
-          text: 'Think',
-          callbackData: registerTelegramSettingsPanelAction(chatJid, {
-            kind: 'show-think',
-          }),
-        },
-      ],
-      [
-        {
-          text: 'Queue',
-          callbackData: registerTelegramSettingsPanelAction(chatJid, {
-            kind: 'show-queue',
-          }),
-        },
-        {
-          text: 'Delivery',
-          callbackData: registerTelegramSettingsPanelAction(chatJid, {
-            kind: 'show-delivery',
-          }),
-        },
-      ],
-      [
-        {
-          text: 'Fresh Next Run',
-          callbackData: registerTelegramSettingsPanelAction(chatJid, {
-            kind: 'trigger-new',
-          }),
-          style: 'primary' as const,
-        },
-        {
-          text: 'Reasoning',
-          callbackData: registerTelegramSettingsPanelAction(chatJid, {
-            kind: 'show-reasoning',
-          }),
-        },
-        {
-          text: 'Verbose',
-          callbackData: registerTelegramSettingsPanelAction(chatJid, {
-            kind: 'show-verbose',
-          }),
-        },
-      ],
-      [
-        {
-          text: 'Reset Model',
-          callbackData: registerTelegramSettingsPanelAction(chatJid, {
-            kind: 'reset-model',
-            returnTo: 'home',
-          }),
-          style: 'danger' as const,
-        },
-      ],
-    ],
+    keyboard,
   };
 }
 
@@ -1519,12 +1597,13 @@ export function buildAdminPanelKeyboard(): TelegramInlineKeyboard {
   return [
     [
       { text: 'Tasks', callbackData: 'panel:tasks' },
-      { text: 'Coder', callbackData: 'panel:coder' },
+      { text: 'Pending Approvals', callbackData: 'panel:pending-tasks' },
     ],
     [
       { text: 'Groups', callbackData: 'panel:groups' },
       { text: 'Health', callbackData: 'panel:health' },
     ],
+    [{ text: 'Coder', callbackData: 'panel:coder' }],
   ];
 }
 
@@ -1535,6 +1614,7 @@ export interface ResolvePanelDeps {
     text: string;
     keyboard: TelegramInlineKeyboard;
   };
+  isMainChat?: (chatJid: string) => boolean;
 }
 
 export function resolveTelegramSettingsPanel(

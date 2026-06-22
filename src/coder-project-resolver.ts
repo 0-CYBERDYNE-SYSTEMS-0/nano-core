@@ -32,7 +32,7 @@ export type ResolveCoderProjectTargetResult =
     };
 
 const FALLBACK_EXCLUDED_DIRS = new Set([
-  '.fft_nano',
+  '.nano-core',
   '.github',
   'backup',
   'config',

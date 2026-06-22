@@ -119,13 +119,13 @@ test('when onboarding is completed and BOOTSTRAP.md removed, reruns do not recre
 
 test('legacy bootstrap state without gate marker is pending but not gate-eligible', () => {
   const workspaceDir = makeTmpWorkspace();
-  fs.mkdirSync(path.join(workspaceDir, '.fft_nano'), { recursive: true });
+  fs.mkdirSync(path.join(workspaceDir, '.nano-core'), { recursive: true });
   fs.writeFileSync(
     path.join(workspaceDir, 'BOOTSTRAP.md'),
     '# BOOTSTRAP\n\nLegacy pending onboarding.\n',
   );
   fs.writeFileSync(
-    path.join(workspaceDir, '.fft_nano', 'workspace-state.json'),
+    path.join(workspaceDir, '.nano-core', 'workspace-state.json'),
     JSON.stringify(
       {
         version: 1,

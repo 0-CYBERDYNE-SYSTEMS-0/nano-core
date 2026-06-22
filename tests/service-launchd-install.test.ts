@@ -16,7 +16,7 @@ test('service install unloads existing launch agent before bootstrap', () => {
   const fakeHome = path.join(workDir, 'home');
   const launchctlLog = path.join(workDir, 'launchctl.log');
   const launchctlState = path.join(workDir, 'launchctl.state');
-  const label = 'com.fft_nano.test';
+  const label = 'com.nano-core.test';
 
   mkdirSync(fakeBinDir, { recursive: true });
   mkdirSync(path.join(fakeHome, 'Library', 'LaunchAgents'), { recursive: true });

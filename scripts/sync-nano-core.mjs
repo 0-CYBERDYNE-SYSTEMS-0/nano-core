@@ -53,6 +53,10 @@ function loadConfig(configPath) {
     textReplacements: config.textReplacements ?? [],
     forbiddenTerms: (config.forbiddenTerms ?? []).map((term) => new RegExp(term, 'i')),
     forbiddenTermExemptions: new Set(config.forbiddenTermExemptions ?? []),
+    fileMappings: new Map((config.fileMappings ?? []).map((mapping) => [mapping.from, mapping.to])),
+    fileScopedReplacements: new Map(
+      (config.fileScopedReplacements ?? []).map((entry) => [entry.file, entry.replacements ?? []]),
+    ),
   };
 }
 
@@ -85,15 +89,17 @@ function shouldCopy(rel, config) {
 function walk(root, options = {}) {
   const out = [];
   const skip = new Set(options.skip ?? []);
+  const resolve = options.resolve ?? ((rel) => rel);
 
   function visit(dir) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const abs = path.join(dir, entry.name);
       const rel = normalizeRel(path.relative(root, abs));
+      const checkRel = resolve(rel);
       if (
         skip.has(entry.name) ||
-        pathMatches(`${rel}${entry.isDirectory() ? '/' : ''}`, options.blocked ?? []) ||
-        (options.blockedPatterns ?? []).some((pattern) => pattern.test(rel))
+        pathMatches(`${checkRel}${entry.isDirectory() ? '/' : ''}`, options.blocked ?? []) ||
+        (options.blockedPatterns ?? []).some((pattern) => pattern.test(checkRel))
       ) {
         continue;
       }
@@ -113,12 +119,11 @@ function mkdirp(filePath) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
-function copyFile(sourceRoot, targetRoot, rel, config) {
-  const source = path.join(sourceRoot, rel);
-  const target = path.join(targetRoot, rel);
+function copyFile(sourceRoot, targetRoot, sourceRel, targetRel, config, dryRun = false) {
+  const source = path.join(sourceRoot, sourceRel);
+  const target = path.join(targetRoot, targetRel);
   assertInside(sourceRoot, source);
   assertInside(targetRoot, target);
-  mkdirp(target);
 
   const content = fs.readFileSync(source);
   if (isProbablyText(content)) {
@@ -126,16 +131,36 @@ function copyFile(sourceRoot, targetRoot, rel, config) {
     for (const replacement of config.textReplacements) {
       text = text.split(replacement.from).join(replacement.to);
     }
-    if (rel === 'package.json') text = transformPackageJson(text, config);
-    const findings = scanText(config, rel, text);
-    if (findings.length > 0 && config.skipForbiddenFiles) {
-      return { copied: false, skipped: findings };
+    if (targetRel === 'package.json') text = transformPackageJson(text, config);
+    const scopedReplacements = config.fileScopedReplacements.get(targetRel) ?? [];
+    if (scopedReplacements.length > 0) {
+      for (const replacement of scopedReplacements) {
+        text = text.split(replacement.from).join(replacement.to);
+      }
     }
-    fs.writeFileSync(target, text, 'utf8');
-  } else {
+    const findings = scanText(config, targetRel, text);
+    if (findings.length > 0 && config.skipForbiddenFiles) {
+      return {
+        copied: false,
+        skipped: findings,
+        scopedReplacementsApplied: scopedReplacements.length,
+      };
+    }
+    if (!dryRun) {
+      mkdirp(target);
+      fs.writeFileSync(target, text, 'utf8');
+    }
+    return {
+      copied: true,
+      skipped: [],
+      scopedReplacementsApplied: scopedReplacements.length,
+    };
+  }
+  if (!dryRun) {
+    mkdirp(target);
     fs.writeFileSync(target, content);
   }
-  return { copied: true, skipped: [] };
+  return { copied: true, skipped: [], scopedReplacementsApplied: 0 };
 }
 
 function isProbablyText(buffer) {
@@ -165,7 +190,7 @@ function transformPackageJson(text, config) {
   return `${JSON.stringify(pkg, null, 2)}\n`;
 }
 
-function writeSyncSource(targetRoot, sourceSha, workflowUrl, skippedFiles = []) {
+function writeSyncSource(targetRoot, sourceSha, workflowUrl, skippedFiles = [], dryRun = false) {
   const body = [
     '# nano-core Sync Source',
     '',
@@ -183,7 +208,9 @@ function writeSyncSource(targetRoot, sourceSha, workflowUrl, skippedFiles = []) 
       : ['None.']),
     '',
   ].join('\n');
+  if (dryRun) return body;
   fs.writeFileSync(path.join(targetRoot, 'SYNC_SOURCE.md'), body, 'utf8');
+  return body;
 }
 
 function gitChangedFiles(root) {
@@ -222,35 +249,49 @@ function sync(args) {
   }
   const configPath = path.resolve(args.config ?? path.join(process.cwd(), DEFAULT_CONFIG));
   const config = loadConfig(configPath);
+  const dryRun = Boolean(args['dry-run']);
 
   const sourceFiles = walk(sourceRoot, {
     skip: ['.git', 'node_modules', 'dist'],
     blocked: config.blockedPaths,
     blockedPatterns: config.blockedPathPatterns,
-  }).filter((rel) => shouldCopy(rel, config));
+    resolve: (rel) => config.fileMappings.get(rel) ?? rel,
+  }).filter((rel) => shouldCopy(config.fileMappings.get(rel) ?? rel, config));
 
   const copiedFiles = [];
   const skippedFiles = [];
-  for (const rel of sourceFiles) {
-    const result = copyFile(sourceRoot, targetRoot, rel, config);
-    if (result.copied) copiedFiles.push(rel);
-    else skippedFiles.push({ rel, findings: result.skipped });
+  let mappingsApplied = 0;
+  let scopedReplacementsApplied = 0;
+  let inProcessFindings = 0;
+  for (const sourceRel of sourceFiles) {
+    const targetRel = config.fileMappings.get(sourceRel) ?? sourceRel;
+    if (targetRel !== sourceRel) mappingsApplied += 1;
+    const result = copyFile(sourceRoot, targetRoot, sourceRel, targetRel, config, dryRun);
+    scopedReplacementsApplied += result.scopedReplacementsApplied;
+    if (result.copied) copiedFiles.push(targetRel);
+    else {
+      skippedFiles.push({ rel: targetRel, findings: result.skipped });
+      inProcessFindings += result.skipped.length;
+    }
   }
-  writeSyncSource(targetRoot, args['source-sha'], args['workflow-url'], skippedFiles);
+  writeSyncSource(targetRoot, args['source-sha'], args['workflow-url'], skippedFiles, dryRun);
 
-  const changedFiles = fs.existsSync(path.join(targetRoot, '.git'))
+  const changedFiles = !dryRun && fs.existsSync(path.join(targetRoot, '.git'))
     ? gitChangedFiles(targetRoot)
     : [...copiedFiles, 'SYNC_SOURCE.md'];
   const findings = scanFiles(targetRoot, config, [...copiedFiles, 'SYNC_SOURCE.md']);
-  if (findings.length > 0) {
-    throw new Error(`Forbidden core-surface terms found:\n${findings.join('\n')}`);
-  }
+  const forbiddenFindings = inProcessFindings + findings.length;
 
   if (args['dry-run']) {
-    process.stdout.write(`Dry run produced ${changedFiles.length} changed file(s).\n`);
-  } else {
     process.stdout.write(
-      `Synced ${copiedFiles.length} file(s); skipped ${skippedFiles.length} contaminated file(s); ${changedFiles.length} changed file(s).\n`,
+      `Dry run: ${copiedFiles.length} copy(s) (${mappingsApplied} rename(s), ${scopedReplacementsApplied} scoped replacement(s)); ${skippedFiles.length} skip(s); ${forbiddenFindings} forbidden finding(s).\n`,
+    );
+  } else {
+    if (findings.length > 0) {
+      throw new Error(`Forbidden core-surface terms found:\n${findings.join('\n')}`);
+    }
+    process.stdout.write(
+      `Synced ${copiedFiles.length} file(s) (${mappingsApplied} rename(s), ${scopedReplacementsApplied} scoped replacement(s)); skipped ${skippedFiles.length} contaminated file(s); ${changedFiles.length} changed file(s).\n`,
     );
   }
 }

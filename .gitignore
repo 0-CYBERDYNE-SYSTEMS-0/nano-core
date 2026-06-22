@@ -5,6 +5,8 @@ web/control-center/node_modules/
 # Build output
 dist/
 dist-web/
+dist-electron/
+release/
 
 # Local data & auth
 store/
@@ -40,7 +42,6 @@ skills/runtime/docs/
 skills/runtime/document-skills/
 skills/runtime/dreamhost-manager/
 skills/runtime/fft-canvas-dynamic-ops/
-
 skills/runtime/gemini/
 skills/runtime/grok/
 skills/runtime/hf-dataset-creator/
@@ -54,7 +55,6 @@ skills/runtime/nano-pdf/
 skills/runtime/nanobanana-image-gen/
 skills/runtime/plantnet-api/
 skills/runtime/ralph-wiggum/
-skills/runtime/rapid-research/
 skills/runtime/responsive-web-design/
 skills/runtime/run-other-cli-agents/
 skills/runtime/satellite-osint/
@@ -83,7 +83,10 @@ agents-sdk-docs
 
 # Dev orchestration (orchestrator/droid infrastructure - local only)
 .factory/
-nano-experience/
+fft-experience/
 
 # Claude Code planning artifacts (local only)
 docs/superpowers/
+
+# Local runtime lock (not for VCS)
+.claude/scheduled_tasks.lock
